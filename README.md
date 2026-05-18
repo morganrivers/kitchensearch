@@ -20,15 +20,16 @@ Emojikitchen has approximately 147,000 images. Many of them are *delightful*.
 
 | Script | What it does |
 |---|---|
-| `emoji-picker.py` | Search and combine emojis using a fast sloppy, or slow accurate method. Also make a tiled story out of any text. |
+| `emoji-picker-tk.py` | Tkinter GUI — keyword, semantic, and CLIP search; emoji combos; story generator |
+| `emoji-split-daemon.py` | Background ML daemon (auto-started, 10 min idle timeout) |
+| `emoji-story.py` | Converts a phrase into a PNG emoji strip |
 | `emoji-wallpaper.py` | Sets a random mashup as a tiled wallpaper each day |
 
 ## Requirements
 
 - Linux with X11 or Wayland
-- **Python 3.8+** with `venv`
+- **Python 3.8+** with `python3-tk`
 - **curl**: used by the installer
-- **rofi**: the picker UI (`sudo apt install rofi` / `sudo pacman -S rofi`)
 - **xclip** (X11) or **wl-clipboard** (Wayland): for copying emojis to clipboard (`sudo apt install xclip` / `sudo apt install wl-clipboard`)
 
 ## Optional

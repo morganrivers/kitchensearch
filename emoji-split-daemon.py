@@ -19,15 +19,14 @@ Protocol: newline-terminated JSON each direction.
 import os
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 
-import ast as _ast
 import json
 import re
+import shutil
 import signal
 import socket
 import sys
 import tempfile
 import threading
-import time
 from pathlib import Path
 
 import numpy as np
@@ -42,31 +41,29 @@ SOCK_PATH    = CACHE_DIR / "split-daemon.sock"
 STATUS_PATH  = CACHE_DIR / "split-daemon-loading.json"
 SEARCH_INDEX = DATA_DIR / "search-index.tsv"
 
-_SEM_HF_REPO  = "qdrant/all-MiniLM-L6-v2-onnx"
-_CLIP_HF_REPO = "Qdrant/clip-ViT-B-32-text"
-_SEM_SIZE_MB  = 88
-_CLIP_SIZE_MB = 245
-
-# base emoji files (built by build-base-emoji-embeddings.py)
+# base emoji files
 BASE_CODES = DATA_DIR / "base-emoji-codes.txt"
 BASE_NAMES = DATA_DIR / "base-emoji-names.txt"
 BASE_SEM   = DATA_DIR / "base-emoji-sem.npy"
 BASE_CLIP  = DATA_DIR / "base-emoji-clip.npy"
 
-# full combo files (shared with combined daemon)
-SEM_EMBEDDINGS       = DATA_DIR / "embeddings.npy"
-SEM_EMBEDDINGS_PCA   = DATA_DIR / "embeddings-pca340.npy"
-SEM_PCA_MATRIX       = DATA_DIR / "embeddings-pca340-matrix.npy"
-SEM_PCA_MEAN         = DATA_DIR / "embeddings-pca340-mean.npy"
-SEM_URLS             = DATA_DIR / "embedding-urls.txt"
-CLIP_EMBEDDINGS      = DATA_DIR / "clip-embeddings.npy"
-CLIP_EMBEDDINGS_PCA  = DATA_DIR / "clip-embeddings-pca256.npy"
-CLIP_PCA_MATRIX      = DATA_DIR / "clip-pca256-matrix.npy"
-CLIP_PCA_MEAN        = DATA_DIR / "clip-pca256-mean.npy"
-CLIP_URLS            = DATA_DIR / "clip-urls.txt"
-CLIP_ALTS            = DATA_DIR / "clip-alts.txt"
+# PCA combo files (only PCA versions are supported)
+SEM_EMBEDDINGS_PCA  = DATA_DIR / "embeddings-pca340.npy"
+SEM_PCA_MATRIX      = DATA_DIR / "embeddings-pca340-matrix.npy"
+SEM_PCA_MEAN        = DATA_DIR / "embeddings-pca340-mean.npy"
+SEM_URLS            = DATA_DIR / "embedding-urls.txt"
+CLIP_EMBEDDINGS_PCA = DATA_DIR / "clip-embeddings-pca256.npy"
+CLIP_PCA_MATRIX     = DATA_DIR / "clip-pca256-matrix.npy"
+CLIP_PCA_MEAN       = DATA_DIR / "clip-pca256-mean.npy"
+CLIP_URLS           = DATA_DIR / "clip-urls.txt"
+CLIP_ALTS           = DATA_DIR / "clip-alts.txt"
 
 IDLE_TIMEOUT = 600
+
+_SEM_HF_REPO  = "qdrant/all-MiniLM-L6-v2-onnx"
+_CLIP_HF_REPO = "Qdrant/clip-ViT-B-32-text"
+_SEM_SIZE_MB  = 88
+_CLIP_SIZE_MB = 245
 
 
 def _fastembed_cache():
@@ -79,22 +76,19 @@ def _model_dir(hf_repo_id):
 
 
 def _model_cached(hf_repo_id):
-    blobs = _model_dir(hf_repo_id) / "blobs"
+    """Returns True if model is fully downloaded. Deletes incomplete downloads."""
+    model_dir = _model_dir(hf_repo_id)
+    blobs = model_dir / "blobs"
     try:
-        return blobs.exists() and any(
-            f for f in blobs.iterdir() if f.stat().st_size > 1_000_000
-        )
+        if not blobs.exists():
+            return False
+        files = list(blobs.iterdir())
+        if any(f.suffix == ".incomplete" for f in files):
+            shutil.rmtree(model_dir, ignore_errors=True)
+            return False
+        return any(f.stat().st_size > 1_000_000 for f in files)
     except OSError:
         return False
-
-
-def _write_status(step, pct):
-    try:
-        tmp = STATUS_PATH.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"step": step, "pct": round(float(pct), 1)}))
-        tmp.replace(STATUS_PATH)
-    except Exception:
-        pass
 
 
 def _with_download_monitor(hf_repo_id, size_mb, label, pct_start, pct_end, fn):
@@ -120,67 +114,42 @@ def _with_download_monitor(hf_repo_id, size_mb, label, pct_start, pct_end, fn):
     return result
 
 
-def _np_load_tracked(path, pct_start, pct_end, on_progress, chunk=8 * 1024 * 1024):
-    with open(path, "rb") as f:
-        f.read(6)                   # magic \x93NUMPY
-        major = f.read(1)[0]
-        f.read(1)                   # minor version
-        hlen = int.from_bytes(f.read(2 if major == 1 else 4), "little")
-        header = _ast.literal_eval(f.read(hlen).decode("latin1").strip())
-        dtype = np.dtype(header["descr"])
-        shape = tuple(header["shape"])
-        fortran = header.get("fortran_order", False)
-        total = dtype.itemsize * (int(np.prod(shape)) if shape else 1)
-        on_progress(pct_start)
-        chunks, read = [], 0
-        while True:
-            buf = f.read(chunk)
-            if not buf:
-                break
-            chunks.append(buf)
-            read += len(buf)
-            if total > 0:
-                on_progress(pct_start + (pct_end - pct_start) * min(read / total, 1.0))
-    arr = np.frombuffer(b"".join(chunks), dtype=dtype)
-    if shape:
-        arr = arr.reshape(shape, order="F" if fortran else "C")
-    return arr
+def _load_model(hf_repo, model_id, size_mb, label, pct_start, pct_end):
+    if _model_cached(hf_repo):
+        _write_status(f"Loading {label}...", pct_start)
+        return TextEmbedding(model_id)
+    return _with_download_monitor(
+        hf_repo, size_mb, f"Downloading {label}", pct_start, pct_end,
+        lambda: TextEmbedding(model_id),
+    )
+
+
+def _write_status(step, pct):
+    try:
+        tmp = STATUS_PATH.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"step": step, "pct": round(float(pct), 1)}))
+        tmp.replace(STATUS_PATH)
+    except Exception:
+        pass
 
 
 def load():
-    for f in (BASE_CODES, BASE_NAMES, BASE_SEM, BASE_CLIP):
+    required = [BASE_CODES, BASE_NAMES, BASE_SEM, BASE_CLIP,
+                SEM_EMBEDDINGS_PCA, SEM_PCA_MATRIX, SEM_PCA_MEAN,
+                CLIP_EMBEDDINGS_PCA, CLIP_PCA_MATRIX, CLIP_PCA_MEAN]
+    for f in required:
         if not f.exists():
-            print(f"Missing {f.name} - run build-base-emoji-embeddings.py first.", flush=True)
+            print(f"Missing {f.name} - download data.tar.gz from releases.", flush=True)
             sys.exit(1)
 
-    # ── semantic model ────────────────────────────────────────────────────────
     print("Loading models...", flush=True)
-    if _model_cached(_SEM_HF_REPO):
-        _write_status("Loading semantic model...", 5)
-        sem_model = TextEmbedding("sentence-transformers/all-MiniLM-L6-v2")
-    else:
-        sem_model = _with_download_monitor(
-            _SEM_HF_REPO, _SEM_SIZE_MB, "Downloading semantic model", 5, 18,
-            lambda: TextEmbedding("sentence-transformers/all-MiniLM-L6-v2"),
-        )
+    sem_model  = _load_model(_SEM_HF_REPO,  "sentence-transformers/all-MiniLM-L6-v2", _SEM_SIZE_MB,  "semantic model", 5,  18)
+    clip_model = _load_model(_CLIP_HF_REPO, "Qdrant/clip-ViT-B-32-text",              _CLIP_SIZE_MB, "CLIP model",     18, 33)
 
-    # ── CLIP model ────────────────────────────────────────────────────────────
-    if _model_cached(_CLIP_HF_REPO):
-        _write_status("Loading CLIP model...", 18)
-        clip_model = TextEmbedding("Qdrant/clip-ViT-B-32-text")
-    else:
-        clip_model = _with_download_monitor(
-            _CLIP_HF_REPO, _CLIP_SIZE_MB, "Downloading CLIP model", 18, 33,
-            lambda: TextEmbedding("Qdrant/clip-ViT-B-32-text"),
-        )
-
-    # ── warmup ────────────────────────────────────────────────────────────────
-    _write_status("Warming up semantic model...", 33)
+    _write_status("Warming up models...", 33)
     next(sem_model.embed(["warmup"]))
-    _write_status("Warming up CLIP model...", 37)
     next(clip_model.embed(["warmup"]))
 
-    # ── base emoji embeddings ─────────────────────────────────────────────────
     _write_status("Loading base emoji data...", 42)
     print("Loading base emoji embeddings...", flush=True)
     base_codes    = BASE_CODES.read_text().splitlines()
@@ -188,7 +157,6 @@ def load():
     base_clip_emb = np.load(BASE_CLIP).astype(np.float32)
     code_to_idx   = {c: i for i, c in enumerate(base_codes)}
 
-    # ── search index ──────────────────────────────────────────────────────────
     _write_status("Loading search index...", 48)
     print("Loading combo existence map from search index...", flush=True)
     combo_map = {}
@@ -204,40 +172,17 @@ def load():
             c1, c2 = m.group(2), m.group(3)
             combo_map[(c1, c2)] = (url, alt)
 
-    # ── combo embeddings ──────────────────────────────────────────────────────
-    print("Loading full combo embeddings...", flush=True)
+    _write_status("Loading semantic embeddings...", 55)
+    print("Loading combo embeddings...", flush=True)
+    sem_emb_full   = np.load(SEM_EMBEDDINGS_PCA).astype(np.float32)
+    sem_pca_matrix = np.load(SEM_PCA_MATRIX).astype(np.float32)
+    sem_pca_mean   = np.load(SEM_PCA_MEAN).astype(np.float32)
 
-    if SEM_EMBEDDINGS.exists():
-        sem_emb_full   = _np_load_tracked(
-            SEM_EMBEDDINGS, 52, 70,
-            lambda p: _write_status("Loading semantic embeddings...", p),
-        )
-        sem_pca_matrix = None
-        sem_pca_mean   = None
-    else:
-        sem_emb_full   = _np_load_tracked(
-            SEM_EMBEDDINGS_PCA, 52, 70,
-            lambda p: _write_status("Loading semantic embeddings...", p),
-        )
-        sem_pca_matrix = np.load(SEM_PCA_MATRIX).astype(np.float32)
-        sem_pca_mean   = np.load(SEM_PCA_MEAN).astype(np.float32)
+    _write_status("Loading CLIP embeddings...", 75)
+    clip_emb        = np.load(CLIP_EMBEDDINGS_PCA).astype(np.float32)
+    clip_pca_matrix = np.load(CLIP_PCA_MATRIX).astype(np.float32)
+    clip_pca_mean   = np.load(CLIP_PCA_MEAN).astype(np.float32)
 
-    if CLIP_EMBEDDINGS.exists():
-        clip_emb        = _np_load_tracked(
-            CLIP_EMBEDDINGS, 72, 92,
-            lambda p: _write_status("Loading CLIP embeddings...", p),
-        )
-        clip_pca_matrix = None
-        clip_pca_mean   = None
-    else:
-        clip_emb        = _np_load_tracked(
-            CLIP_EMBEDDINGS_PCA, 72, 92,
-            lambda p: _write_status("Loading CLIP embeddings...", p),
-        )
-        clip_pca_matrix = np.load(CLIP_PCA_MATRIX).astype(np.float32)
-        clip_pca_mean   = np.load(CLIP_PCA_MEAN).astype(np.float32)
-
-    # ── finalize ──────────────────────────────────────────────────────────────
     _write_status("Building lookup tables...", 94)
     sem_urls_all = SEM_URLS.read_text().splitlines()
     clip_urls    = CLIP_URLS.read_text().splitlines()
@@ -261,16 +206,6 @@ def rank_base(query_word, sem_model, clip_model, base_sem_emb, base_clip_emb):
     sem_r  = (base_sem_emb @ sq).argsort()[::-1].argsort()
     clip_r = (base_clip_emb @ cq).argsort()[::-1].argsort()
     return sem_r + clip_r
-
-
-def decompose_one(word, sem_model, clip_model,
-                  base_sem_emb, base_clip_emb, combo_map):
-    ranks = rank_base(word, sem_model, clip_model, base_sem_emb, base_clip_emb)
-    best  = int(ranks.argmin())
-    # find best code from combo_map keys that correspond to index `best`
-    # (we need the actual code string - recover via sorted order matching build script)
-    # We stored code_to_idx during load; use a reverse lookup passed in via closure
-    return ranks, best
 
 
 def search_one(word, sem_model, clip_model,
@@ -309,14 +244,12 @@ def search_combined(query, sem_model, clip_model,
                     clip_emb, clip_pca_matrix, clip_pca_mean,
                     clip_alts, clip_urls):
     sq = next(sem_model.embed([query])).astype(np.float32)
-    if sem_pca_matrix is not None:
-        sq = (sq - sem_pca_mean) @ sem_pca_matrix
-        sq /= max(np.linalg.norm(sq), 1e-8)
+    sq = (sq - sem_pca_mean) @ sem_pca_matrix
+    sq /= max(np.linalg.norm(sq), 1e-8)
 
     cq = next(clip_model.embed([query])).astype(np.float32)
-    if clip_pca_matrix is not None:
-        cq = (cq - clip_pca_mean) @ clip_pca_matrix
-        cq /= max(np.linalg.norm(cq), 1e-8)
+    cq = (cq - clip_pca_mean) @ clip_pca_matrix
+    cq /= max(np.linalg.norm(cq), 1e-8)
 
     k = 60
     sr = (sem_emb  @ sq).argsort()[::-1].argsort()
