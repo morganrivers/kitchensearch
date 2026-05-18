@@ -14,11 +14,7 @@ import tkinter as tk
 from tkinter import ttk
 import customtkinter as ctk
 
-try:
-    from PIL import Image, ImageTk, ImageDraw, ImageFont as _ImageFont
-    HAS_PIL = True
-except ImportError:
-    HAS_PIL = False
+from PIL import Image, ImageTk, ImageDraw, ImageFont as _ImageFont
 
 _REPO        = Path(__file__).resolve().parent
 if not (_REPO / "data").exists():
@@ -46,7 +42,7 @@ LOAD_MORE      = "⬇  load more results..."
 HEADER_MARKER  = "__HEADER__"
 STORY_PY    = _REPO / "emoji-story.py"
 STORY_BIN   = _REPO / "emoji-story"
-STORY_OUT   = Path("/tmp/emoji-story.png")
+STORY_OUT   = CACHE_DIR / "emoji-story.png"
 
 PRIORITY_EMOJIS = frozenset({
     "100", "bird", "boom", "bouquet", "brain", "broccoli", "car", "carrot",
@@ -181,11 +177,12 @@ def copy_image_to_clipboard(path):
         subprocess.run(cmd, stdin=f, check=True)
 
 
-def download_data_with_progress(progress_cb):
+def download_data_with_progress(progress_cb, stop_event=None):
     """
-    Download and extract the semantic-models tarball.
+    Download and extract the data tarball.
     progress_cb(downloaded_bytes, total_bytes) called periodically.
-    Returns None on success, error string on failure.
+    stop_event: threading.Event — set it to abort mid-download.
+    Returns None on success, error string on failure/cancellation.
     """
     import tarfile, io
     try:
@@ -197,18 +194,46 @@ def download_data_with_progress(progress_cb):
             buf = io.BytesIO()
             downloaded = 0
             while True:
+                if stop_event and stop_event.is_set():
+                    return "cancelled"
                 chunk = resp.read(65536)
                 if not chunk:
                     break
                 buf.write(chunk)
                 downloaded += len(chunk)
                 progress_cb(downloaded, total)
+        if stop_event and stop_event.is_set():
+            return "cancelled"
         buf.seek(0)
         with tarfile.open(fileobj=buf, mode="r:gz") as tf:
             tf.extractall(_REPO)
         return None
     except Exception as e:
         return str(e)
+
+
+def _cleanup_incomplete_data():
+    """Remove any partially extracted npy files so the next download starts clean."""
+    if _has_semantic_models():
+        return
+    for f in (
+        "base-emoji-sem.npy", "base-emoji-clip.npy",
+        "embeddings-pca340.npy", "embeddings-pca340-matrix.npy", "embeddings-pca340-mean.npy",
+        "clip-embeddings-pca256.npy", "clip-pca256-matrix.npy", "clip-pca256-mean.npy",
+    ):
+        (DATA_DIR / f).unlink(missing_ok=True)
+
+
+def _kill_daemon():
+    if not DAEMON_PID.exists():
+        return
+    try:
+        pid = int(DAEMON_PID.read_text().strip())
+        os.kill(pid, 9)
+    except (ValueError, OSError, ProcessLookupError):
+        pass
+    DAEMON_PID.unlink(missing_ok=True)
+    SOCK_PATH.unlink(missing_ok=True)
 
 
 def _daemon_alive():
@@ -267,7 +292,7 @@ def query_daemon(query, limit=MAX_RESULTS):
     if not SOCK_PATH.exists():
         if not _daemon_alive():
             _spawn_daemon()
-        if not _wait_for_socket(5):
+        if not _wait_for_socket(1):
             return "loading" if _daemon_alive() else None
     try:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -422,49 +447,6 @@ def get_thumb(url):
     return None
 
 
-def set_wallpaper(url, alt):
-    if not HAS_PIL:
-        _notify("Pillow not installed - run: pip install Pillow")
-        return
-    nitrogen_cfg = Path.home() / ".config" / "nitrogen" / "bg-saved.cfg"
-    if not shutil.which("feh") and not shutil.which("nitrogen") and not nitrogen_cfg.exists():
-        _notify("Install feh or nitrogen to set wallpapers")
-        return
-    cached = get_thumb(url)
-    if not cached:
-        _notify(f"Could not get image for: {alt}")
-        return
-    emoji_img = Image.open(cached).convert("RGBA")
-    width, height = 1920, 1080
-    try:
-        out = subprocess.check_output(["xrandr", "--current"], text=True, stderr=subprocess.DEVNULL)
-        for line in out.splitlines():
-            if " connected" in line:
-                m = re.search(r"(\d+)x(\d+)\+", line)
-                if m:
-                    width, height = int(m.group(1)), int(m.group(2))
-                    break
-    except Exception:
-        pass
-    tile_size = int(os.environ.get("EMOJI_TILE_SIZE", TILE_SIZE))
-    emoji_img = emoji_img.resize((tile_size, tile_size), Image.LANCZOS)
-    wallpaper = Image.new("RGBA", (width, height), "white")
-    for y in range(0, height, tile_size):
-        for x in range(0, width, tile_size):
-            wallpaper.paste(emoji_img, (x, y), emoji_img)
-    wallpaper.convert("RGB").save(WALLPAPER_PATH)
-    if nitrogen_cfg.exists() or shutil.which("nitrogen"):
-        try:
-            nitrogen_cfg.parent.mkdir(parents=True, exist_ok=True)
-            nitrogen_cfg.write_text(f"[xin_-1]\nfile={WALLPAPER_PATH}\nmode=5\nbgcolor=#000000\n")
-            subprocess.run(["nitrogen", "--restore"], check=True, capture_output=True)
-            return
-        except Exception:
-            pass
-    try:
-        subprocess.run(["feh", "--bg-fill", str(WALLPAPER_PATH)], check=True, capture_output=True)
-    except Exception:
-        _notify(f"Wallpaper saved but couldn't set it: {WALLPAPER_PATH}")
 
 
 _PIL_EMOJI_FONT  = None   # PIL ImageFont, loaded once
@@ -498,8 +480,6 @@ def _get_pil_emoji_font():
     global _PIL_EMOJI_FONT
     if _PIL_EMOJI_FONT is not None:
         return _PIL_EMOJI_FONT
-    if not HAS_PIL:
-        return None
     from PIL import ImageFont
     ttf = _find_emoji_ttf()
     if not ttf:
@@ -516,7 +496,7 @@ def render_emoji_pil(char, size=20):
     if char in _PIL_EMOJI_CACHE:
         return _PIL_EMOJI_CACHE[char]
     font = _get_pil_emoji_font()
-    if not font or not HAS_PIL:
+    if not font:
         _PIL_EMOJI_CACHE[char] = None
         return None
     try:
@@ -714,22 +694,21 @@ class TkPicker:
                              fill=col, outline="")
             x += stripe_w
             i += 1
-        if HAS_PIL:
-            font_path = _REPO / "fonts" / "BubblegumSans-Regular.ttf"
-            try:
-                pil_font = _ImageFont.truetype(str(font_path), 30)
-                img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-                draw = ImageDraw.Draw(img)
-                draw.text((W // 2, H // 2), "Kitchen Search",
-                          font=pil_font, fill=(255, 255, 255, 255),
-                          stroke_width=3, stroke_fill=(148, 0, 211, 255),
-                          anchor="mm")
-                photo = ImageTk.PhotoImage(img)
-                c.create_image(0, 0, image=photo, anchor="nw")
-                c._title_photo = photo
-                return
-            except Exception:
-                pass
+        font_path = _REPO / "fonts" / "BubblegumSans-Regular.ttf"
+        try:
+            pil_font = _ImageFont.truetype(str(font_path), 30)
+            img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            draw.text((W // 2, H // 2), "Kitchen Search",
+                      font=pil_font, fill=(255, 255, 255, 255),
+                      stroke_width=3, stroke_fill=(148, 0, 211, 255),
+                      anchor="mm")
+            photo = ImageTk.PhotoImage(img)
+            c.create_image(0, 0, image=photo, anchor="nw")
+            c._title_photo = photo
+            return
+        except Exception:
+            pass
         c.create_text(W // 2 + 1, H // 2 + 1,
                       text="Kitchen Search",
                       font=("Helvetica", 18, "bold"),
@@ -744,12 +723,14 @@ class TkPicker:
         if frameless:
             # Bypasses WM entirely — no title bar on any WM including i3.
             # focus_force + grab_set_global in _run() handle keyboard focus.
-            root.overrideredirect(True)
+            # root.overrideredirect(True)
             root.attributes("-topmost", True)
+            print("topmost")
         elif floating and sys.platform.startswith("linux"):
             # WM hint: ask WM to float the window (i3 obeys this).
             # Title bar visibility depends on the WM.
             try:
+                print("trying splash")
                 root.wm_attributes("-type", "splash")
             except tk.TclError:
                 pass
@@ -760,15 +741,17 @@ class TkPicker:
         # With -type splash the WM handles focus; with overrideredirect we need
         # focus_force + grab_set to capture keyboard events.
         def _activate():
-            self.root.focus_force()
-            self._entry.focus_force()
+            # self.root.focus_force()
+            # self._entry.focus_force()
+            # try:
+            #     self.root.grab_set_global()
+            #     print("trying to set global")
+            # except tk.TclError:
             try:
-                self.root.grab_set_global()
+                self.root.grab_set()
+                print("trying to grabset")
             except tk.TclError:
-                try:
-                    self.root.grab_set()
-                except tk.TclError:
-                    pass
+                pass
         self.root.after(50, _activate)
         self.root.mainloop()
         try:
@@ -812,6 +795,8 @@ class TkPicker:
 
     def _cancel(self, e=None):
         self._result = None
+        if self._mode == "loading":
+            _kill_daemon()
         self.root.quit()
 
     def _on_return(self, e=None):
@@ -985,7 +970,7 @@ class TkPicker:
             if kind == "e":
                 for ch in content:
                     pil_img = render_emoji_pil(ch, size=em_size)
-                    if pil_img and HAS_PIL:
+                    if pil_img:
                         from PIL import ImageTk
                         photo = ImageTk.PhotoImage(pil_img)
                         self._img_refs.append(photo)
@@ -1040,7 +1025,7 @@ class TkPicker:
         def _append_header_row(text, color, image_path=None):
             hr = tk.Frame(self._inner, bg=self.BG, bd=0, highlightthickness=0)
             hr.pack(fill="x", padx=6, pady=(6, 2))
-            if image_path and HAS_PIL:
+            if image_path:
                 try:
                     img_size = 30
                     img = Image.open(image_path).convert("RGBA")
@@ -1116,7 +1101,7 @@ class TkPicker:
                 if kind == "e":
                     for ch in content:
                         pil_img = render_emoji_pil(ch, size=em_size)
-                        if pil_img and HAS_PIL:
+                        if pil_img:
                             photo_e = ImageTk.PhotoImage(pil_img)
                             self._img_refs.append(photo_e)
                             txt.image_create("end", image=photo_e, pady=1)
@@ -1176,7 +1161,7 @@ class TkPicker:
 
         def _on_image_ready(rank, label, path, score):
             photo = None
-            if path and HAS_PIL:
+            if path:
                 try:
                     img   = Image.open(path).convert("RGBA")
                     img   = img.resize((thumb, thumb), Image.LANCZOS)
@@ -1197,11 +1182,8 @@ class TkPicker:
                 continue
             if url is None:
                 # LOAD_MORE or similar text-only entry — invisible 1×1 image
-                if HAS_PIL:
-                    photo = ImageTk.PhotoImage(
-                        Image.new("RGBA", (1, 1), (0, 0, 0, 0)))
-                else:
-                    photo = tk.PhotoImage(width=1, height=1)
+                photo = ImageTk.PhotoImage(
+                    Image.new("RGBA", (1, 1), (0, 0, 0, 0)))
                 self._img_refs.append(photo)
                 pending[rank] = (label, photo, None)
                 _flush()
@@ -1231,10 +1213,14 @@ class TkPicker:
         self._prog_lbl_var.set("Starting...")
         self._prog_frame.pack(fill="x")
 
-        result = [None]
+        result  = [None]
+        skipped   = [False]
+        stop_evt  = threading.Event()
 
         def _progress_cb(downloaded, total):
             def _update():
+                if skipped[0]:
+                    return
                 if total:
                     pct = downloaded / total * 100
                     self._prog_var.set(pct)
@@ -1245,9 +1231,11 @@ class TkPicker:
             self.root.after(0, _update)
 
         def _worker():
-            err = download_fn(_progress_cb)
+            err = download_fn(_progress_cb, stop_evt)
             result[0] = err
             def _finish():
+                if skipped[0]:
+                    return
                 if err:
                     self._set_prompt(f"Download failed: {err[:80]}")
                 else:
@@ -1256,8 +1244,47 @@ class TkPicker:
                 self.root.after(600, self.root.quit)
             self.root.after(0, _finish)
 
-        threading.Thread(target=_worker, daemon=True).start()
+        _W, _H, _R = 160, 42, 21
+
+        def _do_skip():
+            skipped[0] = True
+            stop_evt.set()
+            self.root.quit()
+
+        btn_canvas = tk.Canvas(self._inner, width=_W, height=_H,
+                               bg=self.BG, highlightthickness=0, bd=0)
+        btn_canvas.pack(pady=(10, 20))
+
+        def _draw_skip_btn(color):
+            btn_canvas.delete("all")
+            for x0, y0, x1, y1, s, e in [
+                (0, 0, 2*_R, 2*_R, 90, 90),
+                (_W-2*_R, 0, _W, 2*_R, 0, 90),
+                (0, _H-2*_R, 2*_R, _H, 180, 90),
+                (_W-2*_R, _H-2*_R, _W, _H, 270, 90),
+            ]:
+                btn_canvas.create_arc(x0, y0, x1, y1, start=s, extent=e,
+                                      fill=color, outline="")
+            btn_canvas.create_rectangle(_R, 0, _W-_R, _H, fill=color, outline="")
+            btn_canvas.create_rectangle(0, _R, _W, _H-_R, fill=color, outline="")
+            btn_canvas.create_text(_W//2, _H//2, text="Skip for now",
+                                   fill="#ffffff", font=("Helvetica", 13, "bold"))
+
+        _draw_skip_btn(self.ACCENT)
+        btn_canvas.bind("<Enter>",    lambda e: _draw_skip_btn("#4a1f99"))
+        btn_canvas.bind("<Leave>",    lambda e: _draw_skip_btn(self.ACCENT))
+        btn_canvas.bind("<Button-1>", lambda e: _do_skip())
+        self.root.bind("<Escape>", lambda e: _do_skip())
+
+        worker_thread = threading.Thread(target=_worker, daemon=True)
+        worker_thread.start()
         self.root.mainloop()
+        self.root.unbind("<Escape>")
+
+        if skipped[0]:
+            worker_thread.join(timeout=2.0)
+            _cleanup_incomplete_data()
+
         return result[0]
 
     def show_model_loading_progress(self):
@@ -1279,7 +1306,42 @@ class TkPicker:
             font=("Helvetica", 11), anchor="w", padx=14, pady=14,
         ).pack(fill="x")
 
+        cancelled = [False]
+
+        def _do_cancel():
+            cancelled[0] = True
+            self._result = None
+            _kill_daemon()
+            self.root.quit()
+
+        _W, _H, _R = 120, 42, 21
+        btn_canvas = tk.Canvas(self._inner, width=_W, height=_H,
+                               bg=self.BG, highlightthickness=0, bd=0)
+        btn_canvas.pack(pady=(10, 20))
+
+        def _draw_btn(color):
+            btn_canvas.delete("all")
+            for x0, y0, x1, y1, s, e in [
+                (0, 0, 2*_R, 2*_R, 90, 90),
+                (_W-2*_R, 0, _W, 2*_R, 0, 90),
+                (0, _H-2*_R, 2*_R, _H, 180, 90),
+                (_W-2*_R, _H-2*_R, _W, _H, 270, 90),
+            ]:
+                btn_canvas.create_arc(x0, y0, x1, y1, start=s, extent=e,
+                                      fill=color, outline="")
+            btn_canvas.create_rectangle(_R, 0, _W-_R, _H, fill=color, outline="")
+            btn_canvas.create_rectangle(0, _R, _W, _H-_R, fill=color, outline="")
+            btn_canvas.create_text(_W//2, _H//2, text="Cancel",
+                                   fill="#ffffff", font=("Helvetica", 13, "bold"))
+
+        _draw_btn(self.ACCENT)
+        btn_canvas.bind("<Enter>",    lambda e: _draw_btn("#4a1f99"))
+        btn_canvas.bind("<Leave>",    lambda e: _draw_btn(self.ACCENT))
+        btn_canvas.bind("<Button-1>", lambda e: _do_cancel())
+
         def _poll():
+            if cancelled[0]:
+                return
             if SOCK_PATH.exists():
                 self._prog_var.set(100)
                 desc_var.set("Ready!")
@@ -1302,6 +1364,7 @@ class TkPicker:
 
         self.root.after(150, _poll)
         self.root.mainloop()
+        return not cancelled[0]
 
     def show_story_progress(self, cmd):
         """Run a story command and show phrase-by-phrase progress. Returns None or error string."""
@@ -1400,22 +1463,17 @@ class TkPicker:
         self._set_prompt(prompt)
         self._entry.pack_forget()
 
-        if HAS_PIL:
-            self.root.update_idletasks()
-            avail_w = max(self.root.winfo_width() - 20, 100)
-            img = Image.open(image_path)
-            if img.width > avail_w:
-                img = img.resize(
-                    (avail_w, int(img.height * avail_w / img.width)),
-                    Image.LANCZOS,
-                )
-            photo = ImageTk.PhotoImage(img)
-            self._img_refs.append(photo)
-            tk.Label(self._inner, image=photo, bg=self.BG).pack(pady=(10, 6))
-        else:
-            tk.Label(self._inner, text=f"[image: {image_path}]",
-                     bg=self.BG, fg=self.FG,
-                     font=("Helvetica", 11)).pack(pady=20)
+        self.root.update_idletasks()
+        avail_w = max(self.root.winfo_width() - 20, 100)
+        img = Image.open(image_path)
+        if img.width > avail_w:
+            img = img.resize(
+                (avail_w, int(img.height * avail_w / img.width)),
+                Image.LANCZOS,
+            )
+        photo = ImageTk.PhotoImage(img)
+        self._img_refs.append(photo)
+        tk.Label(self._inner, image=photo, bg=self.BG).pack(pady=(10, 6))
 
         tk.Label(self._inner,
                  text="Enter to copy  |  Esc to cancel",
@@ -1445,11 +1503,16 @@ def pick_base_emoji(base_index, prompt, picker):
 
 
 def _has_semantic_models():
-    return (
-        (DATA_DIR / "base-emoji-sem.npy").exists() and
-        ((DATA_DIR / "embeddings.npy").exists() or
-         (DATA_DIR / "embeddings-pca340.npy").exists())
-    )
+    return all((DATA_DIR / f).exists() for f in (
+        "base-emoji-sem.npy",
+        "base-emoji-clip.npy",
+        "embeddings-pca340.npy",
+        "embeddings-pca340-matrix.npy",
+        "embeddings-pca340-mean.npy",
+        "clip-embeddings-pca256.npy",
+        "clip-pca256-matrix.npy",
+        "clip-pca256-mean.npy",
+    ))
 
 
 # ── settings ──────────────────────────────────────────────────────────────────
@@ -1531,19 +1594,25 @@ def _run_settings(picker, settings):
 
 
 def main():
-    if not SEARCH_INDEX.exists():
-        _notify("No search index - run emoji-wallpaper.py first.")
-        sys.exit(1)
-
-    entries  = load_index()
     settings = load_settings()
     picker   = TkPicker(floating=settings["floating"], frameless=settings["frameless"])
 
     try:
+        if not SEARCH_INDEX.exists() or not _has_semantic_models():
+            err = picker.show_download_progress(
+                "Downloading data (~168 MB)...",
+                download_data_with_progress)
+            if err:
+                picker.message(f"Download failed:\n{err}")
+            # If search index still missing (cancelled on first install), cannot continue
+            if not SEARCH_INDEX.exists():
+                picker.message("Search index unavailable. Restart to download.")
+                sys.exit(1)
+
+        entries  = load_index()
         while True:
-            has_sem     = _has_semantic_models()
-            sem_suffix  = ("" if has_sem else "  [models not downloaded]")
-            sem_label   = "semantic search (better, slow)" + sem_suffix
+            has_sem   = _has_semantic_models()
+            sem_label = "semantic search (better, slow)"
             story_label = "emoji story"
 
             # build menu entries with combo thumbnail icons
@@ -1677,21 +1746,29 @@ def main():
             elif mode == sem_label:
                 if not has_sem:
                     err = picker.show_download_progress(
-                        "Downloading semantic models (~150 MB)...",
+                        "Downloading data (~168 MB)...",
                         download_data_with_progress)
                     if err:
                         picker.message(f"Download failed:\n{err}")
                         continue
                     if not _has_semantic_models():
-                        picker.message("Download finished but models not found.")
+                        # Cancelled or incomplete — silently return to menu
                         continue
+                # Spawn daemon now so it loads while user types their query
+                if not _daemon_alive():
+                    _spawn_daemon()
+                # If socket isn't already up, show loading bar immediately
+                if not SOCK_PATH.exists():
+                    if not _daemon_alive():
+                        picker.message(
+                            f"Search daemon failed to start.\nSee {DAEMON_LOG} for details.")
+                        continue
+                    if not picker.show_model_loading_progress():
+                        continue  # user cancelled
                 query = picker.ask("emoji search (semantic):")
                 if not query:
                     continue
                 results = query_daemon(query)
-                if results == "loading":
-                    picker.show_model_loading_progress()
-                    results = query_daemon(query)
                 if not results or results == "loading":
                     picker.message(
                         f"Search daemon failed to start.\nSee {DAEMON_LOG} for details.")
