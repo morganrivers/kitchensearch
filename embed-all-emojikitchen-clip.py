@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Build full CLIP image embeddings for all 147k emoji kitchen images.
-Downloads each image on demand (batch of 64), encodes, then deletes the temp file.
-Images already cached in THUMB_DIR are reused without re-downloading.
+Build jina-clip-v1 image AND text embeddings for all 147k emoji kitchen combos.
+Both encoders share the same 768-dim space, so queries can score against both.
 
 Usage:
-  crawl_emoji_kitchen.py           build / resume
-  crawl_emoji_kitchen.py --reset   delete existing clip files and rebuild from scratch
+  embed-all-emojikitchen-clip.py              # full build / resume
+  embed-all-emojikitchen-clip.py --reset      # delete and rebuild
+  embed-all-emojikitchen-clip.py --limit 1000 # embed first N for testing
 """
 
 import sys
@@ -19,24 +19,22 @@ from pathlib import Path
 try:
     import numpy as np
     from PIL import Image
-    from sentence_transformers import SentenceTransformer
 except ImportError as e:
-    print(f"Missing dependency: {e}", file=__import__("sys").stderr)
-    print("Run: pip install Pillow numpy sentence-transformers torch", file=__import__("sys").stderr)
+    print(f"Missing dependency: {e}", file=sys.stderr)
+    print("Run: pip install onnxruntime Pillow numpy fastembed", file=sys.stderr)
     raise SystemExit(1)
 
-_REPO           = Path(__file__).resolve().parent
-DATA_DIR        = _REPO / "data" / "embeddings"
-CACHE_DIR       = _REPO / "data" / "cache"
-THUMB_DIR       = CACHE_DIR / "thumbs"
-SEM_URLS        = DATA_DIR / "embedding-urls.txt"
-SEM_ALTS        = DATA_DIR / "embedding-alts.txt"
-CLIP_EMBEDDINGS = DATA_DIR / "clip-embeddings.npy"
-CLIP_URLS       = DATA_DIR / "clip-urls.txt"
-CLIP_ALTS       = DATA_DIR / "clip-alts.txt"
+_REPO          = Path(__file__).resolve().parent
+DATA_DIR       = _REPO / "data" / "embeddings"
+CACHE_DIR      = _REPO / "data" / "cache"
+THUMB_DIR      = CACHE_DIR / "thumbs"
+SEARCH_INDEX   = DATA_DIR / "search-index.tsv"
+IMG_EMBEDDINGS = DATA_DIR / "nomic-image-embeddings.npy"
+TXT_EMBEDDINGS = DATA_DIR / "nomic-text-embeddings.npy"
+NOMIC_URLS     = DATA_DIR / "nomic-urls.txt"
+NOMIC_ALTS     = DATA_DIR / "nomic-alts.txt"
 
-MODEL_NAME = "clip-ViT-B-32"
-BATCH      = 64
+BATCH = 32
 
 
 def thumb_path(url):
@@ -44,82 +42,114 @@ def thumb_path(url):
 
 
 def fetch_image(url):
-    """Return (PIL Image, is_temp). Caller must delete temp file if is_temp."""
+    """Return (path, is_temp) or (None, False) on failure."""
     cached = thumb_path(url)
     if cached.exists():
-        return Image.open(cached).convert("RGB"), None
+        try:
+            Image.open(cached)
+            return str(cached), False
+        except Exception:
+            cached.unlink(missing_ok=True)
     tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
     tmp.close()
     try:
         urllib.request.urlretrieve(url, tmp.name)
-        return Image.open(tmp.name).convert("RGB"), tmp.name
+        Image.open(tmp.name)
+        return tmp.name, True
     except Exception:
-        os.unlink(tmp.name)
-        return None, None
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+        return None, False
 
 
 def load_existing():
-    if not CLIP_EMBEDDINGS.exists():
-        return set(), [], [], []
-    done_urls = set(CLIP_URLS.read_text().splitlines())
-    embs = np.load(CLIP_EMBEDDINGS)
-    urls = CLIP_URLS.read_text().splitlines()
-    alts = CLIP_ALTS.read_text().splitlines()
-    return done_urls, embs, urls, alts
+    if not IMG_EMBEDDINGS.exists():
+        return set(), [], [], [], []
+    done_urls = set(NOMIC_URLS.read_text().splitlines())
+    img_embs  = np.load(IMG_EMBEDDINGS)
+    txt_embs  = np.load(TXT_EMBEDDINGS)
+    urls      = NOMIC_URLS.read_text().splitlines()
+    alts      = NOMIC_ALTS.read_text().splitlines()
+    return done_urls, img_embs, txt_embs, urls, alts
 
 
-def save(all_embs, all_urls, all_alts):
-    np.save(CLIP_EMBEDDINGS, np.vstack(all_embs).astype(np.float16))
-    CLIP_URLS.write_text("\n".join(all_urls))
-    CLIP_ALTS.write_text("\n".join(all_alts))
+def save(all_img, all_txt, all_urls, all_alts):
+    np.save(IMG_EMBEDDINGS, np.vstack(all_img).astype(np.float16))
+    np.save(TXT_EMBEDDINGS, np.vstack(all_txt).astype(np.float16))
+    NOMIC_URLS.write_text("\n".join(all_urls))
+    NOMIC_ALTS.write_text("\n".join(all_alts))
 
 
 def main():
-    if "--reset" in sys.argv:
-        for f in (CLIP_EMBEDDINGS, CLIP_URLS, CLIP_ALTS):
+    reset = "--reset" in sys.argv
+    limit = None
+    if "--limit" in sys.argv:
+        limit = int(sys.argv[sys.argv.index("--limit") + 1])
+
+    if reset:
+        for f in (IMG_EMBEDDINGS, TXT_EMBEDDINGS, NOMIC_URLS, NOMIC_ALTS):
             f.unlink(missing_ok=True)
         print("Reset done.")
-    elif CLIP_EMBEDDINGS.exists() and not (CLIP_EMBEDDINGS.with_name("clip-embeddings_old.npy")).exists():
-        import shutil as _shutil
-        backup = CLIP_EMBEDDINGS.with_name("clip-embeddings_old.npy")
-        _shutil.copy2(CLIP_EMBEDDINGS, backup)
-        print(f"Backed up existing embeddings to {backup.name}")
 
-    all_urls_ordered = SEM_URLS.read_text().splitlines()
-    all_alts_ordered = SEM_ALTS.read_text().splitlines()
-    total = len(all_urls_ordered)
+    if not SEARCH_INDEX.exists():
+        print("search-index.tsv not found.", file=sys.stderr)
+        raise SystemExit(1)
 
-    done_urls, existing_embs, done_url_list, done_alt_list = load_existing()
-    todo = [(u, a) for u, a in zip(all_urls_ordered, all_alts_ordered) if u not in done_urls]
+    rows = [line.rstrip("\n").split("\t", 2)
+            for line in SEARCH_INDEX.read_text().splitlines()]
+    all_entries = [(r[0], r[1], r[2]) for r in rows if len(r) == 3]
+    if limit:
+        all_entries = all_entries[:limit]
+    total = len(all_entries)
+
+    done_urls, existing_img, existing_txt, done_url_list, done_alt_list = load_existing()
+    todo = [(u, a, t) for u, a, t in all_entries if u not in done_urls]
 
     print(f"Total: {total:,}  Already done: {len(done_urls):,}  Remaining: {len(todo):,}")
     if not todo:
         print("Nothing to do.")
         return
 
-    model = SentenceTransformer(MODEL_NAME)
+    print("Loading models...", flush=True)
+    import _nomic_vision, _nomic_text
+    if not _nomic_vision.is_cached():
+        _nomic_vision.download()
+    img_model = _nomic_vision.load()
+    if not _nomic_text.is_cached():
+        _nomic_text.download()
+    txt_model = _nomic_text.load()
 
-    # Accumulate in memory; checkpoint every 1000 batches (~64k images)
-    all_embs    = [existing_embs] if len(done_urls) else []
+    THUMB_DIR.mkdir(parents=True, exist_ok=True)
+
+    all_img_buf = [existing_img] if len(done_urls) else []
+    all_txt_buf = [existing_txt] if len(done_urls) else []
     all_url_buf = list(done_url_list)
     all_alt_buf = list(done_alt_list)
 
     processed = 0
     for i in range(0, len(todo), BATCH):
         chunk = todo[i:i + BATCH]
-        images, chunk_urls, chunk_alts, tmps = [], [], [], []
-        for url, alt in chunk:
-            img, tmp = fetch_image(url)
-            if img is not None:
-                images.append(img)
+
+        paths, texts, chunk_urls, chunk_alts, tmps = [], [], [], [], []
+        for url, alt, text in chunk:
+            path, is_temp = fetch_image(url)
+            if path:
+                paths.append(path)
+                texts.append(text)
                 chunk_urls.append(url)
                 chunk_alts.append(alt)
-                if tmp:
-                    tmps.append(tmp)
+                if is_temp:
+                    tmps.append(path)
 
-        if images:
-            embs = model.encode(images, normalize_embeddings=True, batch_size=BATCH)
-            all_embs.append(embs)
+        if paths:
+            img_vecs = img_model.embed(paths)
+            txt_vecs = txt_model.embed(texts)
+            img_vecs /= np.maximum(np.linalg.norm(img_vecs, axis=1, keepdims=True), 1e-8)
+            txt_vecs /= np.maximum(np.linalg.norm(txt_vecs, axis=1, keepdims=True), 1e-8)
+            all_img_buf.append(img_vecs)
+            all_txt_buf.append(txt_vecs)
             all_url_buf.extend(chunk_urls)
             all_alt_buf.extend(chunk_alts)
 
@@ -134,15 +164,16 @@ def main():
         pct = done_total / total * 100
         print(f"  {done_total:>7,}/{total:,}  ({pct:.1f}%)", end="\r", flush=True)
 
-        # Checkpoint every ~4k images
         if processed % 4096 < BATCH:
             print(f"\n  checkpoint at {done_total:,}...", flush=True)
-            save(all_embs, all_url_buf, all_alt_buf)
+            save(all_img_buf, all_txt_buf, all_url_buf, all_alt_buf)
 
     print(flush=True)
-    save(all_embs, all_url_buf, all_alt_buf)
-    final = np.load(CLIP_EMBEDDINGS)
-    print(f"Done. {final.shape[0]:,} embeddings saved ({CLIP_EMBEDDINGS.stat().st_size // 1_000_000}MB)")
+    save(all_img_buf, all_txt_buf, all_url_buf, all_alt_buf)
+    final = np.load(IMG_EMBEDDINGS)
+    print(f"Done. {final.shape[0]:,} embeddings saved  "
+          f"(image {IMG_EMBEDDINGS.stat().st_size // 1_000_000} MB, "
+          f"text {TXT_EMBEDDINGS.stat().st_size // 1_000_000} MB)")
 
 
 if __name__ == "__main__":

@@ -1,26 +1,18 @@
 #!/usr/bin/env python3
 """
-Compress CLIP and text (MiniLM) embeddings via PCA for repo hosting.
+Compress jina-clip-v1 image and text embeddings via a shared PCA.
+PCA is fit on image embeddings; the same matrix is applied to text embeddings
+(valid because jina-clip-v1 puts both modalities in the same 768-dim space).
 
-CLIP:  512 → 256 dims  (~72 MB → fits GitHub)
-Text:  384 → 340 dims  (108 MB → ~95 MB, fits GitHub)
-
-Outputs (CLIP):
-  clip-embeddings-pca256.npy    - compressed embeddings (float16)
-  clip-pca256-matrix.npy        - 512×256 projection matrix (float32)
-  clip-pca256-mean.npy          - mean vector (float32)
-
-Outputs (text):
-  embeddings-pca340.npy         - compressed embeddings (float16)
-  embeddings-pca340-matrix.npy  - 384×340 projection matrix (float32)
-  embeddings-pca340-mean.npy    - mean vector (float32)
+Outputs:
+  jina-image-pca128.npy   - compressed image embeddings (float16)
+  jina-text-pca128.npy    - compressed text embeddings  (float16)
+  jina-pca128-matrix.npy  - 768×128 projection matrix   (float32)
+  jina-pca128-mean.npy    - mean vector                  (float32)
 
 Usage:
-  python3 compress-clip-embeddings.py            # both CLIP + text
-  python3 compress-clip-embeddings.py --clip-only
-  python3 compress-clip-embeddings.py --text-only
-  python3 compress-clip-embeddings.py --dims 128          # override CLIP dims
-  python3 compress-clip-embeddings.py --text-dims 320     # override text dims
+  python3 compress-clip-embeddings.py
+  python3 compress-clip-embeddings.py --dims 256
 """
 
 import sys
@@ -29,53 +21,56 @@ from pathlib import Path
 
 CACHE = Path(__file__).resolve().parent / "data" / "embeddings"
 
-clip_dims = 256
-text_dims = 340
+dims = 128
 if "--dims" in sys.argv:
-    clip_dims = int(sys.argv[sys.argv.index("--dims") + 1])
-if "--text-dims" in sys.argv:
-    text_dims = int(sys.argv[sys.argv.index("--text-dims") + 1])
+    dims = int(sys.argv[sys.argv.index("--dims") + 1])
 
-do_clip = "--text-only" not in sys.argv
-do_text = "--clip-only" not in sys.argv
+img_path = CACHE / "nomic-image-embeddings.npy"
+txt_path = CACHE / "nomic-text-embeddings.npy"
+
+for p in (img_path, txt_path):
+    if not p.exists():
+        print(f"{p.name} not found - run embed-all-emojikitchen-clip.py first.")
+        sys.exit(1)
+
+print("Loading image embeddings...", flush=True)
+img_embs = np.load(img_path).astype(np.float32)
+print(f"  shape: {img_embs.shape}  ({img_embs.nbytes // 1_000_000} MB float32)")
+
+print("Loading text embeddings...", flush=True)
+txt_embs = np.load(txt_path).astype(np.float32)
+print(f"  shape: {txt_embs.shape}")
+
+print(f"Fitting PCA on image embeddings → {dims} dims...", flush=True)
+mean     = img_embs.mean(axis=0)
+centered = img_embs - mean
+_, _, Vt = np.linalg.svd(centered, full_matrices=False)
+components = Vt[:dims].T  # 768 × dims
 
 
-def compress(embeddings_path, dims, prefix):
-    if not embeddings_path.exists():
-        print(f"{embeddings_path.name} not found - skipping.")
-        return
-    print(f"Loading {embeddings_path.name} ...", flush=True)
-    embeddings = np.load(embeddings_path).astype(np.float32)
-    n, d = embeddings.shape
-    print(f"  shape: {embeddings.shape}  ({embeddings.nbytes // 1_000_000} MB float32)")
-
-    print(f"Fitting PCA to {dims} dims ...", flush=True)
-    mean = embeddings.mean(axis=0)
-    centered = embeddings - mean
-    _, _, Vt = np.linalg.svd(centered, full_matrices=False)
-    components = Vt[:dims].T  # d × dims
-
-    projected = centered @ components
+def project(embs):
+    projected = (embs - mean) @ components
     norms = np.linalg.norm(projected, axis=1, keepdims=True)
-    projected = projected / np.maximum(norms, 1e-8)
-
-    out_emb  = CACHE / f"{prefix}-pca{dims}.npy"
-    out_mat  = CACHE / f"{prefix}-pca{dims}-matrix.npy"
-    out_mean = CACHE / f"{prefix}-pca{dims}-mean.npy"
-
-    np.save(out_emb,  projected.astype(np.float16))
-    np.save(out_mat,  components.astype(np.float32))
-    np.save(out_mean, mean.astype(np.float32))
-
-    mb = out_emb.stat().st_size / 1_000_000
-    print(f"Saved {out_emb.name}  ({mb:.1f} MB)")
-    print(f"Saved {out_mat.name}  ({out_mat.stat().st_size // 1000} KB)")
-    print(f"Saved {out_mean.name}")
-    print()
+    return projected / np.maximum(norms, 1e-8)
 
 
-if do_clip:
-    compress(CACHE / "clip-embeddings.npy", clip_dims, "clip-embeddings")
+print("Projecting image embeddings...", flush=True)
+img_pca = project(img_embs)
 
-if do_text:
-    compress(CACHE / "embeddings.npy", text_dims, "embeddings")
+print("Projecting text embeddings...", flush=True)
+txt_pca = project(txt_embs)
+
+out_img  = CACHE / f"nomic-image-pca{dims}.npy"
+out_txt  = CACHE / f"nomic-text-pca{dims}.npy"
+out_mat  = CACHE / f"nomic-pca{dims}-matrix.npy"
+out_mean = CACHE / f"nomic-pca{dims}-mean.npy"
+
+np.save(out_img,  img_pca.astype(np.float16))
+np.save(out_txt,  txt_pca.astype(np.float16))
+np.save(out_mat,  components.astype(np.float32))
+np.save(out_mean, mean.astype(np.float32))
+
+print(f"Saved {out_img.name}   ({out_img.stat().st_size / 1_000_000:.1f} MB)")
+print(f"Saved {out_txt.name}   ({out_txt.stat().st_size / 1_000_000:.1f} MB)")
+print(f"Saved {out_mat.name}   ({out_mat.stat().st_size // 1000} KB)")
+print(f"Saved {out_mean.name}")

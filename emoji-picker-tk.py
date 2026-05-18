@@ -14,6 +14,11 @@ import tkinter as tk
 from tkinter import ttk
 import customtkinter as ctk
 
+try:
+    from screeninfo import get_monitors as _get_monitors
+except ImportError:
+    _get_monitors = None
+
 from PIL import Image, ImageTk, ImageDraw, ImageFont as _ImageFont
 
 _REPO        = Path(__file__).resolve().parent
@@ -217,9 +222,13 @@ def _cleanup_incomplete_data():
     if _has_semantic_models():
         return
     for f in (
-        "base-emoji-sem.npy", "base-emoji-clip.npy",
-        "embeddings-pca340.npy", "embeddings-pca340-matrix.npy", "embeddings-pca340-mean.npy",
-        "clip-embeddings-pca256.npy", "clip-pca256-matrix.npy", "clip-pca256-mean.npy",
+        "base-emoji-nomic.npy",
+        "nomic-image-pca128.npy",
+        "nomic-text-pca128.npy",
+        "nomic-pca128-matrix.npy",
+        "nomic-pca128-mean.npy",
+        "nomic-urls.txt",
+        "nomic-alts.txt",
     ):
         (DATA_DIR / f).unlink(missing_ok=True)
 
@@ -534,11 +543,26 @@ class TkPicker:
         root = tk.Tk()
         root.configure(bg=self.BG)
         root.title("Kitchen Search")
-        sw = root.winfo_screenwidth()
-        sh = root.winfo_screenheight()
-        side = min(sw, sh) // 2
-        root.geometry(f"{side}x{side}+{(sw - side)//2}+{(sh - side)//2}")
         self._floating  = self._setup_floating(root, floating=floating, frameless=frameless)
+        mouse_x = root.winfo_pointerx()
+        mouse_y = root.winfo_pointery()
+        mon = None
+        if _get_monitors:
+            for m in _get_monitors():
+                if m.x <= mouse_x < m.x + m.width and m.y <= mouse_y < m.y + m.height:
+                    mon = m
+                    break
+            if mon is None:
+                mon = _get_monitors()[0]
+            mw, mh, mx, my = mon.width, mon.height, mon.x, mon.y
+        else:
+            mx, my = 0, 0
+            mw = root.winfo_screenwidth()
+            mh = root.winfo_screenheight()
+        side = min(mw, mh) // 2
+        x = mx + (mw - side) // 2
+        y = my + (mh - side) // 2
+        root.geometry(f"{side}x{side}+{x}+{y}")
         self.root       = root
         self._result    = None
         self._mode      = "input"
@@ -1279,7 +1303,7 @@ class TkPicker:
         worker_thread = threading.Thread(target=_worker, daemon=True)
         worker_thread.start()
         self.root.mainloop()
-        self.root.unbind("<Escape>")
+        self.root.bind("<Escape>", self._cancel)
 
         if skipped[0]:
             worker_thread.join(timeout=2.0)
@@ -1504,14 +1528,13 @@ def pick_base_emoji(base_index, prompt, picker):
 
 def _has_semantic_models():
     return all((DATA_DIR / f).exists() for f in (
-        "base-emoji-sem.npy",
-        "base-emoji-clip.npy",
-        "embeddings-pca340.npy",
-        "embeddings-pca340-matrix.npy",
-        "embeddings-pca340-mean.npy",
-        "clip-embeddings-pca256.npy",
-        "clip-pca256-matrix.npy",
-        "clip-pca256-mean.npy",
+        "base-emoji-nomic.npy",
+        "nomic-image-pca128.npy",
+        "nomic-text-pca128.npy",
+        "nomic-pca128-matrix.npy",
+        "nomic-pca128-mean.npy",
+        "nomic-urls.txt",
+        "nomic-alts.txt",
     ))
 
 
@@ -1598,13 +1621,12 @@ def main():
     picker   = TkPicker(floating=settings["floating"], frameless=settings["frameless"])
 
     try:
-        if not SEARCH_INDEX.exists() or not _has_semantic_models():
+        if not SEARCH_INDEX.exists():
             err = picker.show_download_progress(
-                "Downloading data (~168 MB)...",
+                "Downloading emoji kitchen search data (~168 MB)...",
                 download_data_with_progress)
             if err:
                 picker.message(f"Download failed:\n{err}")
-            # If search index still missing (cancelled on first install), cannot continue
             if not SEARCH_INDEX.exists():
                 picker.message("Search index unavailable. Restart to download.")
                 sys.exit(1)
@@ -1746,7 +1768,7 @@ def main():
             elif mode == sem_label:
                 if not has_sem:
                     err = picker.show_download_progress(
-                        "Downloading data (~168 MB)...",
+                        "Downloading emoji kitchen search data (~168 MB)...",
                         download_data_with_progress)
                     if err:
                         picker.message(f"Download failed:\n{err}")
