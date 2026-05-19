@@ -18,4 +18,4 @@ echo "Installing Python dependencies..."
 "$VENV/bin/pip" install -r "requirements.txt"
 
 echo "Extracting data assets..."
-tar -xzf data/ui_assets.tar.gz
+tar -xzf data/app_assets.tar.gz
