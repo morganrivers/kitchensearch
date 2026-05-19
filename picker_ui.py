@@ -229,7 +229,7 @@ class TkPicker:
                              fill=col, outline="")
             x += stripe_w
             i += 1
-        font_path = _REPO / "fonts" / "BubblegumSans-Regular.ttf"
+        font_path = _REPO / "data" / "fonts" / "BubblegumSans-Regular.ttf"
         try:
             pil_font = _ImageFont.truetype(str(font_path), 30)
             img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
