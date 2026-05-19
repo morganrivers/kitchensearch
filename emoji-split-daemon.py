@@ -26,12 +26,12 @@ from pathlib import Path
 import numpy as np
 import _nomic_text
 
-_REPO        = Path(__file__).resolve().parent
-if not (_REPO / "data").exists():
-    _REPO = Path(sys.executable).resolve().parent
+from platformdirs import user_cache_dir
+
+_REPO         = Path(sys.argv[0]).resolve().parent
 DATA_DIR      = _REPO / "data" / "embeddings"
 UI_ASSETS_DIR = _REPO / "data" / "ui_assets"
-CACHE_DIR     = _REPO / "data" / "cache"
+CACHE_DIR     = Path(user_cache_dir("kitchensearch"))
 SOCK_PATH     = CACHE_DIR / "split-daemon.sock"
 STATUS_PATH   = CACHE_DIR / "split-daemon-loading.json"
 SEARCH_INDEX  = UI_ASSETS_DIR / "search-index.tsv"
