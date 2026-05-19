@@ -2,57 +2,48 @@
 
 ![demo](demo.gif)
 
-I know a bank where the wild thyme blows, 🌿
-
-Where oxlips and the nodding violet grows, 💜
-
-Quite over-canopied with luscious woodbine, 🍃
-
-With sweet musk-roses and with eglantine. 🌹
-
----
-
-A collection of Python tools for searching [Google Emoji Kitchen](https://emojikitchen.dev/) mashups on your Linux desktop.
+A collection of Python tools for searching [Emoji Kitchen](https://emojikitchen.dev/) combos on your Linux desktop. 
 
 Emojikitchen has approximately 147,000 images. Many of them are *delightful*.
 
-## Tools
+I found the existing Emoji Kitchen options missing essential features like a proper image search, or lacking features like quickly combining specific emojis. I use this app all the time when messaging friends on my desktop. It's convenient to set a keyboard shortcut to launch it like `alt+shift+i`, search or browse for fun emojis, and copy them into your messaging app of choice.
+## Easy install (tested on Ubuntu, MacOS, Windows)
+## Linux/MacOS
+Manual install:
+* Go to the [releases](https://github.com/morganrivers/kitchensearch/releases) page 
+* Download `kitchensearch-linux-x86_64.tar.gz`
+* Extract the ZIP file
+* Run `kitchensearch`
 
-| Script | What it does |
-|---|---|
-| `emoji-picker-tk.py` | Tkinter GUI — keyword, semantic, and CLIP search; emoji combos; story generator |
-| `emoji-split-daemon.py` | Background ML daemon (auto-started, 10 min idle timeout) |
-| `emoji-story.py` | Converts a phrase into a PNG emoji strip |
-| `emoji-wallpaper.py` | Sets a random mashup as a tiled wallpaper each day |
+Or, on the terminal (zsh/bash/fish) just run:
+```bash
+wget https://github.com/morganrivers/kitchensearch/releases/download/v1.0.0/kitchensearch-linux-x86_64.tar.gz
+tar -xzf kitchensearch-linux-x86_64.tar.gz
+cd kitchensearch
+./kitchensearch
+```
+## Windows
 
-## Requirements
+* Go to the [releases](https://github.com/morganrivers/kitchensearch/releases) page 
+* Download `kitchensearch-windows-x86_64.zip`
+* Extract the ZIP file
+* Run `kitchensearch.exe`
+## Installing from source (tested on Ubuntu)
 
 - Linux with X11 or Wayland
-- **Python 3.8+** with `python3-tk`
-- **curl**: used by the installer
-- **xclip** (X11) or **wl-clipboard** (Wayland): for copying emojis to clipboard (`sudo apt install xclip` / `sudo apt install wl-clipboard`)
-
-## Optional
-
-- **feh** or **nitrogen**: for setting wallpapers - if installed, `emoji-wallpaper` sets a random emoji kitchen tile as your desktop background
-
-## Install
-
+- **Python 3.8+**
+- Tkinter (e.g. `sudo apt install python3-tk`)
 ```bash
-curl -sSL https://github.com/morganrivers/kitchensearch/releases/latest/download/install.sh | bash
+git clone https://github.com/morganrivers/kitchensearch.git
+sudo apt install python3-tk # install tkinter (python UI)
+./install_from_source.sh # installs a venv and unzips app assets
+.venv/bin/python3 emoji-picker-tk.py
 ```
 
-This will:
-1. Download the scripts to `~/.local/share/kitchensearch/`
-2. Download the embedding data (~150 MB)
-3. Create a Python virtualenv and install dependencies (~220 MB)
-4. Add `emoji-*` commands to `~/.local/bin/`
-
-Then run `emoji-picker` from your terminal.
 
 ### Disk usage
 
-The base install uses ~370 MB (scripts + embedding data + Python virtualenv).
+The base install uses ~100 MB (scripts + embedding data + Python virtualenv).
 
 When you first select `semantic search` or `emoji story` from the rofi menu, a background daemon will automatically download ML models (~340 MB total) - this only happens once:
 
