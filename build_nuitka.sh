@@ -6,6 +6,7 @@ CTK_DIR=/home/dmrivers/micromamba/envs/py311/lib/python3.11/site-packages/custom
 echo "=== [1/3] Building emoji-split-daemon ==="
 micromamba run -n py311 python -m nuitka \
   --standalone \
+  --enable-plugin=numpy \
   --output-dir="$REPO_DIR/nuitka-build" \
   emoji-split-daemon.py
 echo "=== daemon done ==="
@@ -13,6 +14,7 @@ echo "=== daemon done ==="
 echo "=== [2/3] Building emoji-story ==="
 micromamba run -n py311 python -m nuitka \
   --standalone \
+  --include-package=PIL \
   --output-dir="$REPO_DIR/nuitka-build" \
   emoji-story.py
 echo "=== story done ==="
@@ -24,7 +26,7 @@ micromamba run -n py311 python -m nuitka \
   --include-package=customtkinter \
   --include-package=Xlib \
   --include-data-dir="$CTK_DIR=customtkinter" \
-  --include-data-dir="$REPO_DIR/fonts=fonts" \
+  --include-data-dir="$REPO_DIR/data/fonts=data/fonts" \
   --output-dir="$REPO_DIR/nuitka-build" \
   emoji-picker-tk.py
 echo "=== picker done ==="
