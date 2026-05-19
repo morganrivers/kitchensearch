@@ -5,6 +5,8 @@ __pycache__
 emoji-story.png
 nuitka-build/
 test/
-# runtime cache — sockets, thumbnails, wallpaper images
+# runtime cache and extracted data — see data/ui_assets.tar.gz
 dataold/
 data/cache/
+data/ui_assets/
+data/fonts/
