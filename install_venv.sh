@@ -16,4 +16,4 @@ if [ ! -d "$VENV" ]; then
 fi
 
 echo "Installing Python dependencies..."
-"$VENV/bin/pip" install --quiet -r "requirements.txt"
+"$VENV/bin/pip" install -r "requirements.txt"
