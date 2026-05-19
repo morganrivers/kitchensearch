@@ -8,7 +8,3 @@ test/
 # runtime cache — sockets, thumbnails, wallpaper images
 dataold/
 data/cache/
-
-# embedding data — distributed via GitHub Releases as data.tar.gz
-data/embeddings/
-data.tar.gz
