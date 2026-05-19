@@ -29,21 +29,22 @@ import _nomic_text
 _REPO        = Path(__file__).resolve().parent
 if not (_REPO / "data").exists():
     _REPO = Path(sys.executable).resolve().parent
-DATA_DIR     = _REPO / "data" / "embeddings"
-CACHE_DIR    = _REPO / "data" / "cache"
-SOCK_PATH    = CACHE_DIR / "split-daemon.sock"
-STATUS_PATH  = CACHE_DIR / "split-daemon-loading.json"
-SEARCH_INDEX = DATA_DIR / "search-index.tsv"
+DATA_DIR      = _REPO / "data" / "embeddings"
+UI_ASSETS_DIR = _REPO / "data" / "ui_assets"
+CACHE_DIR     = _REPO / "data" / "cache"
+SOCK_PATH     = CACHE_DIR / "split-daemon.sock"
+STATUS_PATH   = CACHE_DIR / "split-daemon-loading.json"
+SEARCH_INDEX  = UI_ASSETS_DIR / "search-index.tsv"
 
-BASE_CODES     = DATA_DIR / "base-emoji-codes.txt"
-BASE_NAMES     = DATA_DIR / "base-emoji-names.txt"
+BASE_CODES     = UI_ASSETS_DIR / "base-emoji-codes.txt"
+BASE_NAMES     = UI_ASSETS_DIR / "base-emoji-names.txt"
 BASE_NOMIC     = DATA_DIR / "base-emoji-nomic.npy"
 IMG_EMBEDDINGS = DATA_DIR / "nomic-image-pca128.npy"
 TXT_EMBEDDINGS = DATA_DIR / "nomic-text-pca128.npy"
 PCA_MATRIX     = DATA_DIR / "nomic-pca128-matrix.npy"
 PCA_MEAN       = DATA_DIR / "nomic-pca128-mean.npy"
-NOMIC_URLS     = DATA_DIR / "nomic-urls.txt"
-NOMIC_ALTS     = DATA_DIR / "nomic-alts.txt"
+NOMIC_URLS     = UI_ASSETS_DIR / "nomic-urls.txt"
+NOMIC_ALTS     = UI_ASSETS_DIR / "nomic-alts.txt"
 
 IDLE_TIMEOUT = 600
 

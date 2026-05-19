@@ -26,13 +26,14 @@ except ImportError as e:
 
 _REPO          = Path(__file__).resolve().parent
 DATA_DIR       = _REPO / "data" / "embeddings"
+UI_ASSETS_DIR  = _REPO / "data" / "ui_assets"
 CACHE_DIR      = _REPO / "data" / "cache"
 THUMB_DIR      = CACHE_DIR / "thumbs"
-SEARCH_INDEX   = DATA_DIR / "search-index.tsv"
+SEARCH_INDEX   = UI_ASSETS_DIR / "search-index.tsv"
 IMG_EMBEDDINGS = DATA_DIR / "nomic-image-embeddings.npy"
 TXT_EMBEDDINGS = DATA_DIR / "nomic-text-embeddings.npy"
-NOMIC_URLS     = DATA_DIR / "nomic-urls.txt"
-NOMIC_ALTS     = DATA_DIR / "nomic-alts.txt"
+NOMIC_URLS     = UI_ASSETS_DIR / "nomic-urls.txt"
+NOMIC_ALTS     = UI_ASSETS_DIR / "nomic-alts.txt"
 
 BATCH = 32
 
@@ -65,7 +66,7 @@ def fetch_image(url):
 
 
 def load_existing():
-    if not IMG_EMBEDDINGS.exists():
+    if not all(f.exists() for f in (IMG_EMBEDDINGS, TXT_EMBEDDINGS, NOMIC_URLS, NOMIC_ALTS)):
         return set(), [], [], [], []
     done_urls = set(NOMIC_URLS.read_text().splitlines())
     img_embs  = np.load(IMG_EMBEDDINGS)
@@ -76,10 +77,18 @@ def load_existing():
 
 
 def save(all_img, all_txt, all_urls, all_alts):
-    np.save(IMG_EMBEDDINGS, np.vstack(all_img).astype(np.float16))
-    np.save(TXT_EMBEDDINGS, np.vstack(all_txt).astype(np.float16))
-    NOMIC_URLS.write_text("\n".join(all_urls))
-    NOMIC_ALTS.write_text("\n".join(all_alts))
+    img_tmp  = IMG_EMBEDDINGS.with_suffix(".npy.tmp")
+    txt_tmp  = TXT_EMBEDDINGS.with_suffix(".npy.tmp")
+    urls_tmp = NOMIC_URLS.with_suffix(".tmp")
+    alts_tmp = NOMIC_ALTS.with_suffix(".tmp")
+    np.save(img_tmp,  np.vstack(all_img).astype(np.float16))
+    np.save(txt_tmp,  np.vstack(all_txt).astype(np.float16))
+    urls_tmp.write_text("\n".join(all_urls))
+    alts_tmp.write_text("\n".join(all_alts))
+    img_tmp.replace(IMG_EMBEDDINGS)
+    txt_tmp.replace(TXT_EMBEDDINGS)
+    urls_tmp.replace(NOMIC_URLS)
+    alts_tmp.replace(NOMIC_ALTS)
 
 
 def main():

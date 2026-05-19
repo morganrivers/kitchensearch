@@ -21,12 +21,13 @@ from pathlib import Path
 
 import numpy as np
 
-_REPO        = Path(__file__).resolve().parent
-DATA_DIR     = _REPO / "data" / "embeddings"
-SEARCH_INDEX = DATA_DIR / "search-index.tsv"
-CODES_FILE   = DATA_DIR / "base-emoji-codes.txt"
-NAMES_FILE   = DATA_DIR / "base-emoji-names.txt"
-NOMIC_FILE   = DATA_DIR / "base-emoji-nomic.npy"
+_REPO         = Path(__file__).resolve().parent
+DATA_DIR      = _REPO / "data" / "embeddings"
+UI_ASSETS_DIR = _REPO / "data" / "ui_assets"
+SEARCH_INDEX  = UI_ASSETS_DIR / "search-index.tsv"
+CODES_FILE    = UI_ASSETS_DIR / "base-emoji-codes.txt"
+NAMES_FILE    = UI_ASSETS_DIR / "base-emoji-names.txt"
+NOMIC_FILE    = DATA_DIR / "base-emoji-nomic.npy"
 
 
 def extract_base_emojis():
