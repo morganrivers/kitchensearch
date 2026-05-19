@@ -44,7 +44,19 @@ DAEMON_PY     = _REPO / "emoji-split-daemon.py"
 DAEMON_BIN    = _REPO / "emoji-split-daemon"
 DAEMON_PID    = CACHE_DIR / "split-daemon.pid"
 DAEMON_LOG    = CACHE_DIR / "split-daemon.log"
-DATA_TARBALL_URL = "https://github.com/morganrivers/kitchensearch/releases/latest/download/data.tar.gz"
+
+def _ensure_data():
+    if SEARCH_INDEX.exists():
+        return
+    tarball = _REPO / "data" / "app_assets.tar.gz"
+    if not tarball.exists():
+        sys.exit(f"Data files missing and {tarball} not found. Please re-download the app.")
+    import tarfile
+    UI_ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(tarball) as tf:
+        tf.extractall(_REPO)
+
+_ensure_data()
 
 TILE_SIZE   = 200
 MAX_RESULTS = 5000
@@ -187,41 +199,6 @@ def copy_image_to_clipboard(path):
         return
     with open(path, "rb") as f:
         subprocess.run(cmd, stdin=f, check=True)
-
-
-def download_data_with_progress(progress_cb, stop_event=None):
-    """
-    Download and extract the data tarball.
-    progress_cb(downloaded_bytes, total_bytes) called periodically.
-    stop_event: threading.Event — set it to abort mid-download.
-    Returns None on success, error string on failure/cancellation.
-    """
-    import tarfile, io
-    try:
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        req = urllib.request.Request(DATA_TARBALL_URL,
-                                     headers={"User-Agent": "emojikitchen"})
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            total = int(resp.headers.get("Content-Length", 0))
-            buf = io.BytesIO()
-            downloaded = 0
-            while True:
-                if stop_event and stop_event.is_set():
-                    return "cancelled"
-                chunk = resp.read(65536)
-                if not chunk:
-                    break
-                buf.write(chunk)
-                downloaded += len(chunk)
-                progress_cb(downloaded, total)
-        if stop_event and stop_event.is_set():
-            return "cancelled"
-        buf.seek(0)
-        with tarfile.open(fileobj=buf, mode="r:gz") as tf:
-            tf.extractall(_REPO)
-        return None
-    except Exception as e:
-        return str(e)
 
 
 def _cleanup_incomplete_data():

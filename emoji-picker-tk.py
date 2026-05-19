@@ -15,7 +15,6 @@ from picker_utils import (
   DAEMON_LOG,                                                                                                                                                                              
   BATCH_SIZE, LOAD_MORE, MAX_RESULTS, HEADER_MARKER,                                                                                                                                     
   _has_semantic_models, _notify,                                                                                                                                                           
-  download_data_with_progress,                                                                                                                                                             
   load_index, search, build_base_emoji_index, format_label,
   get_thumb, render_emoji_pil,                                                                                                                                                             
   copy_image_to_clipboard,                                                                                                                                                               
@@ -163,7 +162,7 @@ def main():
         entries     = load_index()
         while True:
             has_sem     = _has_semantic_models()
-            has_data    = _has_semantic_models()
+            has_data    = SEARCH_INDEX.exists()
             sem_label   = "semantic search (better, slow)"
             story_label = "emoji story"
             _nd         = "  (not downloaded)"
@@ -210,16 +209,6 @@ def main():
 
             # ── story ────────────────────────────────────────────────────
             elif mode.startswith(story_label):
-                if not has_data:
-                    err = picker.show_download_progress(
-                        "Downloading emoji kitchen search data (~168 MB)...",
-                        download_data_with_progress)
-                    if err and err not in ("cancelled",):
-                        picker.message(f"Download failed:\n{err}")
-                        continue
-                    if not SEARCH_INDEX.exists():
-                        continue
-                    entries  = load_index()
                 text = picker.ask("story text:")
                 if not text:
                     continue
@@ -308,16 +297,8 @@ def main():
             # ── semantic ─────────────────────────────────────────────────
             elif mode.startswith(sem_label):
                 if not has_sem:
-                    err = picker.show_download_progress(
-                        "Downloading emoji kitchen search data (~168 MB)...",
-                        download_data_with_progress)
-                    if err and err not in ("cancelled",):
-                        picker.message(f"Download failed:\n{err}")
-                        continue
-                    if not _has_semantic_models():
-                        continue
-                    if not entries:
-                        entries = load_index()
+                    picker.message("Semantic search data not available.")
+                    continue
                 if not _daemon_alive():
                     _spawn_daemon()
                 query = picker.ask_with_loading_bar("emoji search (semantic):")
