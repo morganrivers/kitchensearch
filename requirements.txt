@@ -1,2 +1,4 @@
 Pillow
-fastembed
+customtkinter
+numpy
+platformdirs

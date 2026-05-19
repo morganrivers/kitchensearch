@@ -27,23 +27,23 @@ def _dbg(msg, include_tb=False):
             f.write("\n".join(lines) + "\n")
 
 
-_REPO        = Path(__file__).resolve().parent
-if not (_REPO / "data").exists():
-    _REPO = Path(sys.executable).resolve().parent
-DATA_DIR     = _REPO / "data" / "embeddings"
+from platformdirs import user_cache_dir
+
+_REPO         = Path(sys.argv[0]).resolve().parent
+DATA_DIR      = _REPO / "data" / "embeddings"
 UI_ASSETS_DIR = _REPO / "data" / "ui_assets"
-CACHE_DIR    = _REPO / "data" / "cache"
-_VENV_PY     = _REPO / ".venv" / "bin" / "python3"
-_PYTHON      = str(_VENV_PY) if _VENV_PY.exists() else sys.executable
-SEARCH_INDEX = UI_ASSETS_DIR / "search-index.tsv"
-THUMB_DIR    = CACHE_DIR / "thumbs"
-WALLPAPER_PATH   = CACHE_DIR / "wallpaper.png"
-SOCK_PATH     = CACHE_DIR / "split-daemon.sock"
-DAEMON_STATUS = CACHE_DIR / "split-daemon-loading.json"
-DAEMON_PY    = _REPO / "emoji-split-daemon.py"
-DAEMON_BIN   = _REPO / "emoji-split-daemon"
-DAEMON_PID   = CACHE_DIR / "split-daemon.pid"
-DAEMON_LOG   = CACHE_DIR / "split-daemon.log"
+CACHE_DIR     = Path(user_cache_dir("kitchensearch"))
+_VENV_PY      = _REPO / ".venv" / "bin" / "python3"
+_PYTHON       = str(_VENV_PY) if _VENV_PY.exists() else sys.executable
+SEARCH_INDEX  = UI_ASSETS_DIR / "search-index.tsv"
+THUMB_DIR     = CACHE_DIR / "thumbs"
+WALLPAPER_PATH    = CACHE_DIR / "wallpaper.png"
+SOCK_PATH      = CACHE_DIR / "split-daemon.sock"
+DAEMON_STATUS  = CACHE_DIR / "split-daemon-loading.json"
+DAEMON_PY     = _REPO / "emoji-split-daemon.py"
+DAEMON_BIN    = _REPO / "emoji-split-daemon"
+DAEMON_PID    = CACHE_DIR / "split-daemon.pid"
+DAEMON_LOG    = CACHE_DIR / "split-daemon.log"
 DATA_TARBALL_URL = "https://github.com/morganrivers/kitchensearch/releases/latest/download/data.tar.gz"
 
 TILE_SIZE   = 200
