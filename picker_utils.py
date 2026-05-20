@@ -12,11 +12,15 @@ from PIL import Image, ImageDraw, ImageFont as _ImageFont
 
 
 # ── debug log ─────────────────────────────────────────────────────────────────
+_DBG_ENABLED  = "--logging" in sys.argv
 _DBG_LOG_PATH = Path("/tmp/emojipicker-debug.log")
-_DBG_LOG_PATH.write_text("")  # truncate on each launch
+if _DBG_ENABLED:
+    _DBG_LOG_PATH.write_text("")  # truncate on each launch
 _dbg_lock = threading.Lock()
 
 def _dbg(msg, include_tb=False):
+    if not _DBG_ENABLED:
+        return
     ts = time.strftime("%H:%M:%S") + f".{int(time.time()*1000)%1000:03d}"
     tid = threading.get_ident()
     lines = [f"[{ts}][tid={tid}] {msg}"]
