@@ -19,6 +19,9 @@ micromamba run -n py311 python -m nuitka \
   emoji-story.py
 echo "=== story done ==="
 
+echo "=== Stamping build info ==="
+python3 -c "import json, time; open('$REPO_DIR/build_info.json','w').write(json.dumps({'build_ts_ms': int(time.time()*1000)}))"
+
 echo "=== [3/3] Building emoji-picker-tk ==="
 micromamba run -n py311 python -m nuitka \
   --standalone \
@@ -27,6 +30,9 @@ micromamba run -n py311 python -m nuitka \
   --include-package=Xlib \
   --include-data-dir="$CTK_DIR=customtkinter" \
   --include-data-dir="$REPO_DIR/data/fonts=data/fonts" \
+  --include-data-dir="$REPO_DIR/data/ui_assets=data/ui_assets" \
+  --include-data-files="$REPO_DIR/data/kofi_button.png=data/kofi_button.png" \
+  --include-data-files="$REPO_DIR/build_info.json=build_info.json" \
   --output-dir="$REPO_DIR/nuitka-build" \
   emoji-picker-tk.py
 echo "=== picker done ==="

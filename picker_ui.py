@@ -658,9 +658,9 @@ class TkPicker:
             row.pack(fill="x", padx=2, pady=1)
             inner_widgets = self._pack_rich_label(row, label, rbg,
                                                   font=("Helvetica", 12, "bold"), pady=5)
-            is_link = "buy me a coffee" in label
+            is_link = "Ko-fi" in label
             if is_link:
-                link_url = "https://buymeacoffee.com/morganrivers"
+                link_url = "https://ko-fi.com/morganrivers"
                 link_color, link_hover = "#4fa3e8", "#82c4ff"
                 link_font = ("Helvetica", 12, "bold underline")
                 text_widgets = [w for w in inner_widgets
@@ -754,8 +754,8 @@ class TkPicker:
                 all_widgets = [row] + inner_ws
                 bg_widgets  = all_widgets
                 extra       = {}
-                if "buy me a coffee" in label:
-                    link_url             = "https://buymeacoffee.com/morganrivers"
+                if "Ko-fi" in label:
+                    link_url             = "https://ko-fi.com/morganrivers"
                     link_color           = "#4fa3e8"
                     link_hover           = "#82c4ff"
                     link_font            = ("Helvetica", 12, "bold underline")
@@ -810,7 +810,12 @@ class TkPicker:
             self._select(min(initial_sel, len(self._rows) - 1))
         return self._run()
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None):
+    KOFI_BANNER_LABEL  = "__KOFI_BANNER__"
+    KOFI_DISMISS_LABEL = "__KOFI_DISMISS__"
+    KOFI_BORDER_COLOR  = "#ff9999"  # light red
+
+    def pick_with_images(self, prompt, entries, on_url, on_select=None,
+                         thumb_size=None, patterns=None, banner=None):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
         gen = self._gen_id  # capture generation ID for stale-callback detection
@@ -954,6 +959,14 @@ class TkPicker:
             if len(self._rows) == 1:
                 self._select(0)
 
+        total_entries   = len(entries)
+        banner_appended = [False]
+
+        def _maybe_append_banner():
+            if banner and not banner_appended[0] and next_rank[0] >= total_entries:
+                self._append_kofi_banner(banner)
+                banner_appended[0] = True
+
         def _flush():
             _dbg(f"FLUSH gen={gen} cur_gen={self._gen_id} next_rank={next_rank[0]} pending_keys={sorted(pending.keys())}")
             while next_rank[0] in pending:
@@ -965,6 +978,7 @@ class TkPicker:
                     _append_header_row(item[1], item[2], item[3] if len(item) > 3 else None)
                 else:
                     _append_row(*item)
+            _maybe_append_banner()
 
         def _on_image_ready(rank, label, path, score):
             cur_gen = self._gen_id
@@ -1007,7 +1021,101 @@ class TkPicker:
 
             threading.Thread(target=_worker, daemon=True).start()
 
+        # Banner is appended by _flush() once all entries have rendered;
+        # also call once here to cover the all-synchronous case.
+        _maybe_append_banner()
+
         return self._run()
+
+    def _append_kofi_banner(self, banner):
+        """Append a Ko-fi support banner pinned to the bottom of the list.
+        Rainbow stripes on the left, light red border, optional headline,
+        the Ko-fi button image (or text fallback), and a small dismiss button.
+        Keyboard-focusable as the last row."""
+        # Outer frame holds the border by being filled with KOFI_BORDER_COLOR
+        # and packing an inner frame with 2px padding on every side.
+        outer = tk.Frame(self._inner, bg=self.KOFI_BORDER_COLOR,
+                         bd=0, highlightthickness=0)
+        outer.pack(side="bottom", fill="x", padx=4, pady=(8, 4))
+
+        row = tk.Frame(outer, bg=self.BG, cursor="hand2",
+                       bd=0, highlightthickness=0)
+        row.pack(fill="x", padx=2, pady=2)
+
+        # Rainbow stripe column on the left
+        stripe_w = 8
+        stripe = tk.Frame(row, width=stripe_w, bg=self.BG,
+                          bd=0, highlightthickness=0)
+        stripe.pack(side="left", fill="y")
+        stripe.pack_propagate(False)
+        for c in self.RAINBOW_VIVID:
+            tk.Frame(stripe, bg=c, bd=0, highlightthickness=0).pack(
+                side="top", fill="both", expand=True)
+
+        # Right-side dismiss button — packed first so it reserves the slot
+        dismiss = tk.Label(row, text="✕  no thanks",
+                           bg=self.BG, fg=self.FG_DIM, cursor="hand2",
+                           font=("Helvetica", 9), padx=8)
+        dismiss.pack(side="right", padx=(4, 8))
+
+        # Body: optional headline ABOVE the Ko-fi image (stacked, not side-by-side)
+        body = tk.Frame(row, bg=self.BG)
+        body.pack(side="left", fill="both", expand=True, padx=(10, 4), pady=6)
+
+        headline_widgets = []
+        if banner.get("headline"):
+            head_row = tk.Frame(body, bg=self.BG)
+            head_row.pack(fill="x", anchor="w")
+            headline_widgets = self._pack_rich_label(
+                head_row, banner["headline"], self.BG,
+                font=("Helvetica", 11, "bold"), pady=(0, 4))
+            headline_widgets.append(head_row)
+
+        img_path = banner.get("image")
+        img_lbl  = None
+        max_btn_w = 200  # keep button compact so dismiss stays visible
+        if img_path:
+            try:
+                img = Image.open(img_path).convert("RGBA")
+                if img.width > max_btn_w:
+                    ratio = max_btn_w / img.width
+                    img = img.resize((max_btn_w, int(img.height * ratio)),
+                                     Image.LANCZOS)
+                photo = ImageTk.PhotoImage(img)
+                self._img_refs.append(photo)
+                img_lbl = tk.Label(body, image=photo, bg=self.BG, cursor="hand2")
+                img_lbl.pack(anchor="w")
+            except Exception:
+                img_lbl = None
+        if img_lbl is None:
+            img_lbl = tk.Label(body, text="❤  Buy me a coffee",
+                               bg="#587180", fg="#ffffff", cursor="hand2",
+                               font=("Helvetica", 12, "bold"), padx=14, pady=6)
+            img_lbl.pack(anchor="w")
+
+        idx = len(self._rows)
+        # Widgets that activate the Ko-fi action (everything except dismiss)
+        action_widgets = [row, body, img_lbl] + headline_widgets
+        bg_widgets     = [row, body, img_lbl] + headline_widgets
+        self._rows.append({
+            "frame":       row,
+            "label":       self.KOFI_BANNER_LABEL,
+            "row_bg":      self.BG,
+            "all_widgets": action_widgets,
+            "bg_widgets":  bg_widgets,
+        })
+        for w in action_widgets:
+            w.bind("<Button-1>",   lambda e, i=idx: self._click_row(i))
+            w.bind("<MouseWheel>", self._on_scroll)
+            w.bind("<Button-4>",   self._on_scroll)
+            w.bind("<Button-5>",   self._on_scroll)
+
+        def _on_dismiss(e=None):
+            self._result = self.KOFI_DISMISS_LABEL
+            self.root.quit()
+        dismiss.bind("<Button-1>", _on_dismiss)
+        dismiss.bind("<Enter>",    lambda e: dismiss.configure(fg=self.FG))
+        dismiss.bind("<Leave>",    lambda e: dismiss.configure(fg=self.FG_DIM))
 
     def show_download_progress(self, title, download_fn):
         """

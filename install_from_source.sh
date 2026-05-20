@@ -19,3 +19,6 @@ echo "Installing Python dependencies..."
 
 echo "Extracting data assets..."
 tar -xzf data/app_assets.tar.gz
+
+echo "Stamping build info..."
+python3 -c "import json, time; open('build_info.json','w').write(json.dumps({'build_ts_ms': int(time.time()*1000)}))"

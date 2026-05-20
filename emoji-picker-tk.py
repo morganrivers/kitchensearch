@@ -21,7 +21,9 @@ from picker_utils import (
   query_daemon,                                                                                                                                                                            
   _trim_thumb_cache, _spawn_daemon, _daemon_alive,                                                                                                                                 
 )                                                                                                                                                                                            
-from picker_ui import TkPicker, pick_base_emoji                                                                                                                                         
+from picker_ui import TkPicker, pick_base_emoji
+import time
+import payment_ab
 
 
 # ── settings ──────────────────────────────────────────────────────────────────
@@ -36,15 +38,26 @@ _DEFAULT_SETTINGS = {
     "show_story":     True,
     "floating":       True,
     "frameless":      False,
+    # Ko-fi A/B state
+    "first_install_time":      None,
+    "copy_count":              0,
+    "kofi_banner_unlocked":    False,
+    "kofi_banner_dismissed":   False,
+    # Update-check state
+    "last_update_check":       0,
+    "latest_known_version":    None,
 }
 
 
 def load_settings():
     try:
         data = json.loads(SETTINGS_FILE.read_text())
-        return {**_DEFAULT_SETTINGS, **data}
+        s = {**_DEFAULT_SETTINGS, **data}
     except Exception:
-        return dict(_DEFAULT_SETTINGS)
+        s = dict(_DEFAULT_SETTINGS)
+    if not s.get("first_install_time"):
+        s["first_install_time"] = int(time.time())
+    return s
 
 
 def save_settings(s):
@@ -53,6 +66,12 @@ def save_settings(s):
         SETTINGS_FILE.write_text(json.dumps(s, indent=2))
     except Exception:
         pass
+
+
+def _on_copy(settings):
+    """Increment copy counter, re-check banner unlock threshold, persist."""
+    payment_ab.record_copy(settings)
+    save_settings(settings)
 
 
 def _find_combo_url(entries, name1, name2):
@@ -132,7 +151,7 @@ def _run_settings(picker, settings):
             _lbl("exit_on_select", "Exit app when emoji selected"),
             _lbl("floating",       "Start as floating window (takes effect on restart)"),
             _lbl("frameless",      "Start frameless & no title bar (takes effect on restart)"),
-            "buy me a coffee ☕",
+            "support me on Ko-fi ❤",
         ]
         choice = picker.pick_settings("Settings", items, initial_sel=sel_idx)
         if not choice:
@@ -148,15 +167,21 @@ def _run_settings(picker, settings):
         elif "emoji story"    in choice: settings["show_story"]     = not settings["show_story"]
         elif "floating window" in choice: settings["floating"]      = not settings["floating"]
         elif "no title bar"   in choice: settings["frameless"]      = not settings["frameless"]
-        elif "buy me a coffee" in choice:
-            webbrowser.open("https://buymeacoffee.com/morganrivers")
+        elif "Ko-fi" in choice:
+            webbrowser.open(payment_ab.KOFI_URL)
             return
         save_settings(settings)
 
 
 def main():
     settings = load_settings()
+    save_settings(settings)  # persist first_install_time if just set
     picker   = TkPicker(floating=settings["floating"], frameless=settings["frameless"])
+
+    payment_ab.maybe_run_update_check(
+        settings, save_settings,
+        on_new_version=lambda v: None,  # next launch will see latest_known_version
+    )
 
     try:
         entries     = load_index()
@@ -184,10 +209,31 @@ def main():
             menu_entries.append(("settings",
                                  _find_combo_url_or_emoji(entries, "computer", "face_with_raised_eyebrow")))
 
-            mode = picker.pick_with_images("Use quick keyword search directly or select an option below.", menu_entries, _menu_on_url,
-                                           thumb_size=48)
+            update_label = None
+            if payment_ab.is_update_available(settings):
+                update_label = f"⬆ update available (v{settings['latest_known_version']})"
+                menu_entries.append((update_label,
+                                     _find_combo_url_or_emoji(entries, "sparkles", "package") or "✨📦"))
+
+            banner = payment_ab.get_banner_config(settings)
+
+            mode = picker.pick_with_images(
+                "Use quick keyword search directly or select an option below.",
+                menu_entries, _menu_on_url,
+                thumb_size=48, banner=banner)
             if not mode:
                 sys.exit(0)
+
+            if mode == TkPicker.KOFI_BANNER_LABEL:
+                webbrowser.open(payment_ab.KOFI_URL)
+                continue
+            if mode == TkPicker.KOFI_DISMISS_LABEL:
+                settings["kofi_banner_dismissed"] = True
+                save_settings(settings)
+                continue
+            if update_label and mode == update_label:
+                webbrowser.open("https://github.com/morganrivers/kitchensearch/releases/latest")
+                continue
 
             # ── settings ─────────────────────────────────────────────────
             if mode == "settings":
@@ -222,6 +268,7 @@ def main():
                     str(STORY_OUT))
                 if action == "copy":
                     copy_image_to_clipboard(str(STORY_OUT))
+                    _on_copy(settings)
                     _notify("Story copied to clipboard")
                 continue
 
@@ -280,6 +327,7 @@ def main():
                             path = get_thumb(url)
                             if path:
                                 copy_image_to_clipboard(path)
+                                _on_copy(settings)
                                 _notify("Copied to clipboard")
                             break
 
@@ -346,6 +394,7 @@ def main():
                             path = get_thumb(url)
                             if path:
                                 copy_image_to_clipboard(path)
+                                _on_copy(settings)
                                 _notify("Copied to clipboard")
                             break
 
