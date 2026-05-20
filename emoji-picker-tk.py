@@ -198,7 +198,8 @@ def main():
             _dbg("MENU_SHOW_START")
             mode = picker.pick_with_images("Use quick keyword search directly or select an option below.", menu_entries, _menu_on_url,
                                            thumb_size=48, preload=True,
-                                           placeholder="type to keyword search...")
+                                           placeholder="type to keyword search...",
+                                           filter=False)
             _dbg(f"MENU_SHOW_DONE mode={mode!r}")
             if not mode:
                 sys.exit(0)
