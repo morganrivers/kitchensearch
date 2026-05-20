@@ -344,11 +344,11 @@ class TkPicker:
     _PH_TEXT  = "start typing to filter"
     _PH_COLOR = "#aaaaaa"
 
-    def _show_ph(self):
+    def _show_ph(self, text=None):
         if self._ph_active:
             return
         self._ph_active = True
-        self._entry_var.set(self._PH_TEXT)
+        self._entry_var.set(text if text is not None else self._PH_TEXT)
         self._entry.config(fg=self._PH_COLOR)
         self._entry.icursor(0)
 
@@ -1066,7 +1066,7 @@ class TkPicker:
             self._select(min(initial_sel, len(self._rows) - 1))
         return self._run()
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False):
+    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
         gen = self._gen_id  # capture generation ID for stale-callback detection
@@ -1282,7 +1282,7 @@ class TkPicker:
 
         _dbg(f"PICK_WITH_IMAGES: {'preloaded' if preload else 'all workers dispatched'} gen={gen}, calling _run")
         self._trace_id = self._entry_var.trace_add("write", self._filter_cb)
-        self._show_ph()
+        self._show_ph(placeholder)
         result = self._run()
         _dbg(f"PICK_WITH_IMAGES: _run done gen={gen} result={result!r}")
         return result
