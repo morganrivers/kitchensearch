@@ -21,11 +21,12 @@ from multiprocessing.connection import Client
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
+from platformdirs import user_cache_dir
 
 _REPO      = Path(__file__).resolve().parent
 if not (_REPO / "data").exists():
     _REPO = Path(sys.executable).resolve().parent
-CACHE_DIR  = _REPO / "data" / "cache"
+CACHE_DIR  = Path(user_cache_dir("kitchensearch"))
 THUMB_DIR  = CACHE_DIR / "thumbs"
 DAEMON_PY  = _REPO / "emoji-split-daemon.py"
 DAEMON_BIN = _REPO / "emoji-split-daemon"
