@@ -6,22 +6,22 @@ Results appear one-by-one as thumbnails download. Borderless, half-screen, cente
 Bind in i3 config:
   bindsym $mod+shift+e exec --no-startup-id python3 ~/.local/bin/emoji-picker-tk.py
 """
-import sys, re, json, hashlib, webbrowser                                                                                                                                                    
-from PIL import Image                                                                                                                                                                        
-from picker_utils import (                                                                                                                                                                   
-  DATA_DIR, UI_ASSETS_DIR, CACHE_DIR, THUMB_DIR,                                                                                                                                           
-  SEARCH_INDEX, _REPO, _PYTHON,                                                                                                                                                            
-  STORY_OUT, STORY_PY, STORY_BIN,
-  DAEMON_LOG,                                                                                                                                                                              
-  BATCH_SIZE, LOAD_MORE, MAX_RESULTS, HEADER_MARKER,                                                                                                                                     
-  _has_semantic_models, _notify,                                                                                                                                                           
-  load_index, search, build_base_emoji_index, format_label,
-  get_thumb, render_emoji_pil,                                                                                                                                                             
-  copy_image_to_clipboard,                                                                                                                                                               
-  query_daemon,                                                                                                                                                                            
-  _trim_thumb_cache, _spawn_daemon, _daemon_alive,                                                                                                                                 
-)                                                                                                                                                                                            
-from picker_ui import TkPicker, pick_base_emoji                                                                                                                                         
+import sys, re, json, hashlib, webbrowser 
+from PIL import Image
+from picker_utils import (  
+    DATA_DIR, UI_ASSETS_DIR, CACHE_DIR, THUMB_DIR,      
+    SEARCH_INDEX, _REPO, _PYTHON,  
+    STORY_OUT, STORY_PY, STORY_BIN,
+    DAEMON_LOG,      
+    BATCH_SIZE, LOAD_MORE, MAX_RESULTS, HEADER_MARKER,
+    _has_semantic_models, _notify, 
+    load_index, search, build_base_emoji_index, format_label,
+    get_thumb, render_emoji_pil,   
+    copy_image_to_clipboard,     
+    query_daemon,    
+    _trim_thumb_cache, _spawn_daemon, _daemon_alive,   
+)      
+from picker_ui import TkPicker, pick_base_emoji    
 
 
 # ── settings ──────────────────────────────────────────────────────────────────

@@ -11,12 +11,12 @@ from picker_utils import (
     _dbg,
     _get_monitors,
     _REPO,
-    SOCK_PATH,
     DAEMON_STATUS,
     HEADER_MARKER,
     LOAD_MORE,
     render_emoji_pil,
     _daemon_alive,
+    _daemon_ready,
     _cleanup_incomplete_data,
 )                                                                                                                                                                      
 
@@ -67,7 +67,8 @@ class TkPicker:
         self._sel       = -1
         self._img_refs  = []
         self._options   = []
-        self._trace_id   = None
+        self._trace_id      = None
+        self._filter_after_id = None
         self._filter_mode = False
         self._on_select  = None
         self._gen_id      = 0  # incremented on each _reset() to detect stale callbacks
@@ -363,19 +364,10 @@ class TkPicker:
             self._result = val or None
             self.root.quit()
         elif self._mode == "list":
-            val = self._entry_var.get().strip()
-            if self._filter_mode and val:
-                q = val.lower()
-                filtered = [o for o in self._options if q in o.lower()] if q else self._options
-                self._build_text_rows(filtered)
-                if self._rows:
-                    self._select(0)
-                self._entry_var.set("")
-                return
             if self._sel >= 0 and self._rows:
                 self._result = self._rows[self._sel]["label"]
             else:
-                self._result = val or None
+                self._result = self._entry_var.get().strip() or None
             self.root.quit()
         elif self._mode == "imagelist":
             val = self._entry_var.get().strip()
@@ -462,6 +454,9 @@ class TkPicker:
             try: self._entry_var.trace_remove("write", self._trace_id)
             except Exception: pass
             self._trace_id = None
+        if self._filter_after_id:
+            self.root.after_cancel(self._filter_after_id)
+            self._filter_after_id = None
         for w in self._inner.winfo_children():
             w.destroy()
         _dbg(f"RESET yview_moveto(0) gen={self._gen_id}")
@@ -497,7 +492,7 @@ class TkPicker:
         self._mode = "input"
         self._set_prompt(prompt)
 
-        if SOCK_PATH.exists():
+        if _daemon_ready():
             return self._run()
 
         self._prog_var.set(0)
@@ -529,7 +524,7 @@ class TkPicker:
         self.root.bind("<Return>",   _submit)
 
         def _poll():
-            if SOCK_PATH.exists():
+            if _daemon_ready():
                 daemon_ready[0] = True
                 self._prog_var.set(100)
                 desc_var.set("Ready!")
@@ -583,9 +578,17 @@ class TkPicker:
         self._build_text_rows(self._options)
         if self._rows:
             self._select(min(initial_sel, len(self._rows) - 1))
+        if filter:
+            self._trace_id = self._entry_var.trace_add("write", self._filter_cb)
         return self._run()
 
     def _filter_cb(self, *_):
+        if self._filter_after_id:
+            self.root.after_cancel(self._filter_after_id)
+        self._filter_after_id = self.root.after(300, self._do_filter)
+
+    def _do_filter(self):
+        self._filter_after_id = None
         q = self._entry_var.get().lower()
         filtered = [o for o in self._options if q in o.lower()] if q else self._options
         prev = self._sel
@@ -1003,7 +1006,10 @@ class TkPicker:
 
             def _worker(rank=rank, label=label, url=url, score=score):
                 path = on_url(url)
-                self.root.after(0, lambda: _on_image_ready(rank, label, path, score))
+                try:
+                    self.root.after(0, lambda: _on_image_ready(rank, label, path, score))
+                except RuntimeError:
+                    pass
 
             threading.Thread(target=_worker, daemon=True).start()
 
@@ -1162,7 +1168,7 @@ class TkPicker:
         def _poll():
             if cancelled[0]:
                 return
-            if SOCK_PATH.exists():
+            if _daemon_ready():
                 self._prog_var.set(100)
                 desc_var.set("Ready!")
                 self.root.after(350, self.root.quit)
