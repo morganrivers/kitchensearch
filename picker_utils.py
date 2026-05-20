@@ -1,5 +1,6 @@
-import sys, os, re, json, hashlib, shutil, socket, subprocess                                                                                                                                
-import time, urllib.request, threading, random as _random, traceback                                                                                                                         
+import sys, os, re, json, hashlib, shutil, signal, subprocess
+import time, urllib.request, threading, random as _random, traceback, getpass
+from multiprocessing.connection import Client
 from pathlib import Path                                                                                                                                                                     
                                                                                                                                                                                              
 try:                                                                                                                                                                                       
@@ -38,12 +39,24 @@ _PYTHON       = str(_VENV_PY) if _VENV_PY.exists() else sys.executable
 SEARCH_INDEX  = UI_ASSETS_DIR / "search-index.tsv"
 THUMB_DIR     = CACHE_DIR / "thumbs"
 WALLPAPER_PATH    = CACHE_DIR / "wallpaper.png"
-SOCK_PATH      = CACHE_DIR / "split-daemon.sock"
+def _ipc_address() -> str:
+    """Cross-platform IPC endpoint: Unix socket on POSIX, named pipe on Windows.
+
+    Named pipes are global to the machine, so namespace by username to avoid
+    collisions on shared systems.
+    """
+    if sys.platform == "win32":
+        return r"\\.\pipe\kitchensearch-" + getpass.getuser()
+    return str(CACHE_DIR / "split-daemon.sock")
+
+
+IPC_ADDRESS    = _ipc_address()
+IS_NAMED_PIPE  = IPC_ADDRESS.startswith(r"\\.\pipe")
 DAEMON_STATUS  = CACHE_DIR / "split-daemon-loading.json"
-DAEMON_PY     = _REPO / "emoji-split-daemon.py"
-DAEMON_BIN    = _REPO / "emoji-split-daemon"
-DAEMON_PID    = CACHE_DIR / "split-daemon.pid"
-DAEMON_LOG    = CACHE_DIR / "split-daemon.log"
+DAEMON_PY      = _REPO / "emoji-split-daemon.py"
+DAEMON_BIN     = _REPO / "emoji-split-daemon"
+DAEMON_PID     = CACHE_DIR / "split-daemon.pid"
+DAEMON_LOG     = CACHE_DIR / "split-daemon.log"
 
 def _ensure_data():
     if SEARCH_INDEX.exists():
@@ -213,16 +226,42 @@ def _cleanup_incomplete_data():
         (UI_ASSETS_DIR / f).unlink(missing_ok=True)
 
 
+def _process_exists(pid: int) -> bool:
+    """Portable existence check: True if a process with this PID is running."""
+    if sys.platform == "win32":
+        import ctypes
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return False
+        exit_code = ctypes.c_ulong()
+        ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
+        kernel32.CloseHandle(handle)
+        return bool(ok) and exit_code.value == STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
 def _kill_daemon():
     if not DAEMON_PID.exists():
         return
     try:
         pid = int(DAEMON_PID.read_text().strip())
-        os.kill(pid, 9)
+        os.kill(pid, signal.SIGTERM)
     except (ValueError, OSError, ProcessLookupError):
         pass
     DAEMON_PID.unlink(missing_ok=True)
-    SOCK_PATH.unlink(missing_ok=True)
+    if not IS_NAMED_PIPE:
+        Path(IPC_ADDRESS).unlink(missing_ok=True)
 
 
 def _daemon_alive():
@@ -233,19 +272,7 @@ def _daemon_alive():
     except (ValueError, OSError):
         DAEMON_PID.unlink(missing_ok=True)
         return False
-    proc_dir = Path(f"/proc/{pid}")
-    if not proc_dir.exists():
-        DAEMON_PID.unlink(missing_ok=True)
-        return False
-    try:
-        for line in (proc_dir / "status").read_text().splitlines():
-            if line.startswith("State:") and "Z" in line.split(":", 1)[1]:
-                DAEMON_PID.unlink(missing_ok=True)
-                return False
-        if b"emoji-split-daemon" not in (proc_dir / "cmdline").read_bytes():
-            DAEMON_PID.unlink(missing_ok=True)
-            return False
-    except OSError:
+    if not _process_exists(pid):
         DAEMON_PID.unlink(missing_ok=True)
         return False
     return True
@@ -255,55 +282,65 @@ def _spawn_daemon():
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     log = open(DAEMON_LOG, "wb")
     cmd = [str(DAEMON_BIN)] if DAEMON_BIN.exists() else [_PYTHON, str(DAEMON_PY)]
-    proc = subprocess.Popen(cmd,
-                             stdout=log, stderr=subprocess.STDOUT,
-                             start_new_session=True)
+    kwargs = {"stdout": log, "stderr": subprocess.STDOUT}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = (
+            subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+    else:
+        kwargs["start_new_session"] = True
+    proc = subprocess.Popen(cmd, **kwargs)
     DAEMON_PID.write_text(str(proc.pid))
     return proc
 
 
-def _wait_for_socket(timeout):
+def _try_connect():
+    """Open a Client to the daemon, or None if it isn't accepting connections."""
+    try:
+        return Client(IPC_ADDRESS)
+    except (FileNotFoundError, ConnectionRefusedError, OSError):
+        return None
+
+
+def _daemon_ready():
+    """True if the daemon is accepting connections (i.e. finished loading)."""
+    conn = _try_connect()
+    if conn is None:
+        return False
+    conn.close()
+    return True
+
+
+def _wait_for_daemon(timeout):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        if SOCK_PATH.exists():
-            try:
-                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                s.connect(str(SOCK_PATH))
-                s.close()
-                return True
-            except OSError:
-                pass
+        conn = _try_connect()
+        if conn is not None:
+            conn.close()
+            return True
         time.sleep(0.2)
     return False
 
 
 def query_daemon(query, limit=MAX_RESULTS):
-    if not SOCK_PATH.exists():
+    conn = _try_connect()
+    if conn is None:
         if not _daemon_alive():
             _spawn_daemon()
-        if not _wait_for_socket(1):
+        if not _wait_for_daemon(1):
+            return "loading" if _daemon_alive() else None
+        conn = _try_connect()
+        if conn is None:
             return "loading" if _daemon_alive() else None
     try:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.settimeout(30)
-        s.connect(str(SOCK_PATH))
-        s.sendall((json.dumps({"query": query, "limit": limit}) + "\n").encode())
-        data = b""
-        while True:
-            chunk = s.recv(65536)
-            if not chunk:
-                break
-            data += chunk
-            if data.endswith(b"\n"):
-                break
-        s.close()
-        results = json.loads(data.decode())
+        conn.send_bytes(json.dumps({"query": query, "limit": limit}).encode())
+        results = json.loads(conn.recv_bytes().decode())
         if isinstance(results, list):
             return [(r["rank"], r["alt"], r["url"], "") for r in results]
     except Exception:
-        if SOCK_PATH.exists():
-            SOCK_PATH.unlink()
         return "loading" if _daemon_alive() else None
+    finally:
+        conn.close()
     return None
 
 

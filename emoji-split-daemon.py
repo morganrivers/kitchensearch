@@ -14,13 +14,15 @@ Protocol: newline-terminated JSON each direction.
   Response: [{"alt": "...", "url": "...", "rank": 0}, ...]
 """
 
-import os
+import getpass
 import json
+import os
 import re
 import signal
-import socket
 import sys
 import threading
+import time
+from multiprocessing.connection import Listener
 from pathlib import Path
 
 import numpy as np
@@ -32,7 +34,21 @@ _REPO         = Path(sys.argv[0]).resolve().parent
 DATA_DIR      = _REPO / "data" / "embeddings"
 UI_ASSETS_DIR = _REPO / "data" / "ui_assets"
 CACHE_DIR     = Path(user_cache_dir("kitchensearch"))
-SOCK_PATH     = CACHE_DIR / "split-daemon.sock"
+
+
+def _ipc_address() -> str:
+    """Cross-platform IPC endpoint: Unix socket on POSIX, named pipe on Windows.
+
+    Named pipes are global to the machine, so namespace by username to avoid
+    collisions on shared systems.
+    """
+    if sys.platform == "win32":
+        return r"\\.\pipe\kitchensearch-" + getpass.getuser()
+    return str(CACHE_DIR / "split-daemon.sock")
+
+
+IPC_ADDRESS = _ipc_address()
+IS_NAMED_PIPE = IPC_ADDRESS.startswith(r"\\.\pipe")
 STATUS_PATH   = CACHE_DIR / "split-daemon-loading.json"
 SEARCH_INDEX  = UI_ASSETS_DIR / "search-index.tsv"
 
@@ -159,18 +175,13 @@ def search_combined(query, model, img_emb, txt_emb, pca_matrix, pca_mean,
     return [(float(combined[i]), nomic_alts[i], nomic_urls[i]) for i in top_idx]
 
 
+_last_activity = [0.0]
+
+
 def handle(conn, model, base_nomic, code_to_idx, combo_map,
            img_emb, txt_emb, pca_matrix, pca_mean, nomic_alts, nomic_urls):
     try:
-        data = b""
-        while True:
-            chunk = conn.recv(4096)
-            if not chunk:
-                break
-            data += chunk
-            if data.endswith(b"\n"):
-                break
-        req   = json.loads(data.decode())
+        req   = json.loads(conn.recv_bytes().decode())
         query = req["query"]
         limit = req.get("limit", 5000)
         words = query.strip().split()
@@ -189,42 +200,50 @@ def handle(conn, model, base_nomic, code_to_idx, combo_map,
         merged = decomposed + [(r, a, u) for r, a, u in fallback if u not in seen]
 
         results = [{"alt": a, "url": u, "rank": r} for r, a, u in merged[:limit]]
-        conn.sendall((json.dumps(results) + "\n").encode())
+        conn.send_bytes(json.dumps(results).encode())
     except Exception as e:
         try:
-            conn.sendall((json.dumps({"error": str(e)}) + "\n").encode())
+            conn.send_bytes(json.dumps({"error": str(e)}).encode())
         except Exception:
             pass
     finally:
+        _last_activity[0] = time.monotonic()
         conn.close()
+
+
+def _idle_watchdog():
+    while True:
+        time.sleep(30)
+        if time.monotonic() - _last_activity[0] > IDLE_TIMEOUT:
+            print("Idle timeout - exiting.", flush=True)
+            os._exit(0)
 
 
 def main():
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    if SOCK_PATH.exists():
-        SOCK_PATH.unlink()
-    if STATUS_PATH.exists():
-        STATUS_PATH.unlink()
+    STATUS_PATH.unlink(missing_ok=True)
+    if not IS_NAMED_PIPE:
+        Path(IPC_ADDRESS).unlink(missing_ok=True)
 
     (model, base_nomic, code_to_idx, combo_map,
      img_emb, txt_emb, pca_matrix, pca_mean,
      nomic_alts, nomic_urls) = load()
 
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    server.bind(str(SOCK_PATH))
-    server.listen(8)
-    server.settimeout(IDLE_TIMEOUT)
+    listener = Listener(IPC_ADDRESS)
 
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-    print(f"Listening on {SOCK_PATH}", flush=True)
+    print(f"Listening on {IPC_ADDRESS}", flush=True)
+
+    _last_activity[0] = time.monotonic()
+    threading.Thread(target=_idle_watchdog, daemon=True).start()
 
     try:
         while True:
             try:
-                conn, _ = server.accept()
-            except socket.timeout:
-                print("Idle timeout - exiting.", flush=True)
+                conn = listener.accept()
+            except OSError:
                 break
+            _last_activity[0] = time.monotonic()
             threading.Thread(
                 target=handle,
                 args=(conn, model, base_nomic, code_to_idx, combo_map,
@@ -233,11 +252,10 @@ def main():
                 daemon=True,
             ).start()
     finally:
-        server.close()
-        if SOCK_PATH.exists():
-            SOCK_PATH.unlink()
-        if STATUS_PATH.exists():
-            STATUS_PATH.unlink()
+        listener.close()
+        STATUS_PATH.unlink(missing_ok=True)
+        if not IS_NAMED_PIPE:
+            Path(IPC_ADDRESS).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

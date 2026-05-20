@@ -13,10 +13,11 @@ import re
 import json
 import hashlib
 import shutil
-import socket
+import getpass
 import subprocess
 import time
 import urllib.request
+from multiprocessing.connection import Client
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -26,9 +27,24 @@ if not (_REPO / "data").exists():
     _REPO = Path(sys.executable).resolve().parent
 CACHE_DIR  = _REPO / "data" / "cache"
 THUMB_DIR  = CACHE_DIR / "thumbs"
-SOCK_PATH  = CACHE_DIR / "split-daemon.sock"
 DAEMON_PY  = _REPO / "emoji-split-daemon.py"
 DAEMON_BIN = _REPO / "emoji-split-daemon"
+
+
+def _ipc_address() -> str:
+    if sys.platform == "win32":
+        return r"\\.\pipe\kitchensearch-" + getpass.getuser()
+    return str(CACHE_DIR / "split-daemon.sock")
+
+
+IPC_ADDRESS = _ipc_address()
+
+
+def _try_connect():
+    try:
+        return Client(IPC_ADDRESS)
+    except (FileNotFoundError, ConnectionRefusedError, OSError):
+        return None
 
 # Layout
 CANVAS_W    = 820
@@ -76,43 +92,32 @@ def _start_daemon():
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(75):
         time.sleep(0.2)
-        if SOCK_PATH.exists():
-            try:
-                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                s.connect(str(SOCK_PATH))
-                s.close()
-                return True
-            except OSError:
-                pass
+        conn = _try_connect()
+        if conn is not None:
+            conn.close()
+            return True
     return False
 
 
 def query_daemon(phrase, limit=10):
     """Return a best-first list of candidate URLs, or [] on failure."""
     for attempt in range(2):
-        if not SOCK_PATH.exists():
+        conn = _try_connect()
+        if conn is None:
             if attempt > 0 or not _start_daemon():
                 return []
+            conn = _try_connect()
+            if conn is None:
+                continue
         try:
-            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.settimeout(30)
-            s.connect(str(SOCK_PATH))
-            s.sendall((json.dumps({"query": phrase, "limit": limit}) + "\n").encode())
-            data = b""
-            while True:
-                chunk = s.recv(65536)
-                if not chunk:
-                    break
-                data += chunk
-                if data.endswith(b"\n"):
-                    break
-            s.close()
-            results = json.loads(data.decode())
+            conn.send_bytes(json.dumps({"query": phrase, "limit": limit}).encode())
+            results = json.loads(conn.recv_bytes().decode())
             if isinstance(results, list):
                 return [r["url"] for r in results]
         except Exception:
-            if SOCK_PATH.exists():
-                SOCK_PATH.unlink()
+            pass
+        finally:
+            conn.close()
     return []
 
 

@@ -20,7 +20,7 @@ Or, on the terminal (zsh/bash/fish) just run:
 wget https://github.com/morganrivers/kitchensearch/releases/download/v1.0.0/kitchensearch-linux-x86_64.tar.gz
 tar -xzf kitchensearch-linux-x86_64.tar.gz
 cd kitchensearch
-./kitchensearch
+./kitchensearch # launch the app
 ```
 ## Windows
 
@@ -37,7 +37,7 @@ cd kitchensearch
 git clone https://github.com/morganrivers/kitchensearch.git
 sudo apt install python3-tk # install tkinter (python UI)
 ./install_from_source.sh # installs a venv and unzips app assets
-.venv/bin/python3 emoji-picker-tk.py
+.venv/bin/python3 emoji-picker-tk.py # launch the app
 ```
 
 
