@@ -1066,7 +1066,7 @@ class TkPicker:
             self._select(min(initial_sel, len(self._rows) - 1))
         return self._run()
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None):
+    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
         gen = self._gen_id  # capture generation ID for stale-callback detection
@@ -1281,7 +1281,22 @@ class TkPicker:
             self._sb.pack_forget()
 
         _dbg(f"PICK_WITH_IMAGES: {'preloaded' if preload else 'all workers dispatched'} gen={gen}, calling _run")
-        self._trace_id = self._entry_var.trace_add("write", self._filter_cb)
+        if filter:
+            self._trace_id = self._entry_var.trace_add("write", self._filter_cb)
+        else:
+            def _no_filter_cb(*_):
+                if self._ph_active:
+                    return
+                q = self._entry_var.get().strip()
+                if q:
+                    if self._sel >= 0:
+                        self._color_row(self._sel, selected=False)
+                        self._sel = -1
+                else:
+                    self._show_ph(placeholder)
+                    if self._rows:
+                        self._select(0)
+            self._trace_id = self._entry_var.trace_add("write", _no_filter_cb)
         self._show_ph(placeholder)
         result = self._run()
         _dbg(f"PICK_WITH_IMAGES: _run done gen={gen} result={result!r}")
