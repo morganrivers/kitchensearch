@@ -197,7 +197,8 @@ def main():
 
             _dbg("MENU_SHOW_START")
             mode = picker.pick_with_images("Use quick keyword search directly or select an option below.", menu_entries, _menu_on_url,
-                                           thumb_size=48, preload=True)
+                                           thumb_size=48, preload=True,
+                                           placeholder="type to keyword search...")
             _dbg(f"MENU_SHOW_DONE mode={mode!r}")
             if not mode:
                 sys.exit(0)
@@ -273,7 +274,6 @@ def main():
                 _match_img    = str(_ui_assets / "face_holding_back_tears_turtle.png")
                 _no_match_img = str(_ui_assets / "cry_turtle.png")
                 all_combo = exact + rest
-                count = f"({len(exact)} exact, {len(rest)} similar)"
 
                 def _copy_combo(label, _all=all_combo):
                     m = re.match(r'^\S+', label)
@@ -291,7 +291,13 @@ def main():
                 offset = 0
                 while True:
                     batch_rest = rest[offset:offset + BATCH_SIZE]
+                    shown_end  = offset + len(batch_rest)
+                    if len(rest) > 0:
+                        similar_range = f"{offset+1}-{shown_end} of {len(rest)}"
+                    else:
+                        similar_range = "0"
                     if exact:
+                        count = f"({len(exact)} exact, {similar_range} similar)"
                         combo_entries = [
                             ("Match found!", HEADER_MARKER, "#228844", _match_img),
                             *[(format_label(alt, url, text), url, ts)
@@ -301,6 +307,7 @@ def main():
                               for ts, alt, url, text in batch_rest],
                         ]
                     else:
+                        count = f"({similar_range} similar)"
                         combo_entries = [
                             ("Match could not be found", HEADER_MARKER, "#8B0000", _no_match_img),
                             ("Other similar combos", HEADER_MARKER, "#999999"),
