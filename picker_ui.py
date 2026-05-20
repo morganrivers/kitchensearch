@@ -1,4 +1,5 @@
 import sys
+import re
 import threading
 import json
 import subprocess
@@ -1223,11 +1224,21 @@ class TkPicker:
                 self._prog_var.set(done[0])
                 desc_var.set(f"Fetched {done[0]} / {total[0]} emojis")
 
+        from picker_utils import CACHE_DIR as _CACHE_DIR
+        log_path = _CACHE_DIR / "story.log"
+
         def _worker():
+            captured = []
             try:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                logf = open(log_path, "w")
+                logf.write("$ " + " ".join(cmd) + "\n")
                 proc = subprocess.Popen(
                     cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 for line in proc.stdout:
+                    logf.write(line)
+                    logf.flush()
+                    captured.append(line)
                     m = re.match(r'(\d+) phrases', line)
                     if m:
                         total[0] = int(m.group(1))
@@ -1236,10 +1247,13 @@ class TkPicker:
                         done[0] += 1
                         self.root.after(0, _update)
                 proc.wait()
+                logf.write(f"\n[exit {proc.returncode}]\n")
+                logf.close()
                 if proc.returncode != 0:
-                    error[0] = "Story generation failed."
+                    tail = "".join(captured[-15:]).rstrip()
+                    error[0] = f"Story generation failed (exit {proc.returncode}). Log: {log_path}\n\n{tail}"
             except Exception as exc:
-                error[0] = str(exc)
+                error[0] = f"{exc}\nLog: {log_path}"
             self.root.after(0, self.root.quit)
 
         threading.Thread(target=_worker, daemon=True).start()

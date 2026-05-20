@@ -215,7 +215,7 @@ def main():
                 _story_cmd = ([str(STORY_BIN)] if STORY_BIN.exists() else [_PYTHON, str(STORY_PY)]) + ["--output", str(STORY_OUT), text]
                 err = picker.show_story_progress(_story_cmd)
                 if err:
-                    picker.message("Story generation failed.")
+                    picker.message(err)
                     continue
                 action = picker.show_image(
                     "Emoji story  (Enter to copy  |  Esc to cancel)",
