@@ -66,7 +66,8 @@ class TkPicker:
         root.geometry(self._geometry)
         root.withdraw()  # stay hidden until _run() so first paint is fully populated
         self.root       = root
-        self._result    = None
+        self._result       = None
+        self.result_typed  = False
         self._mode      = "input"
         self._rows      = []
         self._sel       = -1
@@ -355,8 +356,8 @@ class TkPicker:
     def _hide_ph(self):
         if not self._ph_active:
             return
+        self._entry_var.set("")   # trace fires here; _ph_active still True → no-op
         self._ph_active = False
-        self._entry_var.set("")
         self._entry.config(fg=self.FG)
 
     def _real_text(self):
@@ -465,10 +466,13 @@ class TkPicker:
             val = self._real_text().strip()
             if val:
                 self._result = val
+                self.result_typed = True
             elif self._sel >= 0 and self._rows:
                 self._result = self._rows[self._sel]["label"]
+                self.result_typed = False
             else:
                 self._result = None
+                self.result_typed = False
             self.root.quit()
         elif self._mode == "showimage":
             self._result = "copy"

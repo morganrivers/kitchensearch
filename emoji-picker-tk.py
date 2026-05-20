@@ -211,7 +211,7 @@ def main():
 
             # ── typed text → keyword search ───────────────────────────────
             mode_names = {e[0] for e in menu_entries}
-            if mode not in mode_names:
+            if picker.result_typed or mode not in mode_names:
                 query   = mode
                 results = search(entries, query)
                 if not results:
