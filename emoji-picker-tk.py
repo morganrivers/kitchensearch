@@ -8,19 +8,19 @@ Bind in i3 config:
 """
 import sys, re, json, hashlib, webbrowser 
 from PIL import Image
-from picker_utils import (  
-    DATA_DIR, UI_ASSETS_DIR, CACHE_DIR, THUMB_DIR,      
-    SEARCH_INDEX, _REPO, _PYTHON,  
+from picker_utils import (
+    DATA_DIR, UI_ASSETS_DIR, CACHE_DIR, THUMB_DIR,
+    SEARCH_INDEX, _REPO, _PYTHON,
     STORY_OUT, STORY_PY, STORY_BIN,
-    DAEMON_LOG,      
+    DAEMON_LOG,
     BATCH_SIZE, LOAD_MORE, MAX_RESULTS, HEADER_MARKER,
-    _has_semantic_models, _notify, 
+    _has_semantic_models, _notify, _dbg,
     load_index, search, build_base_emoji_index, format_label,
-    get_thumb, render_emoji_pil,   
-    copy_image_to_clipboard,     
-    query_daemon,    
-    _trim_thumb_cache, _spawn_daemon, _daemon_alive,   
-)      
+    get_thumb, render_emoji_pil,
+    copy_image_to_clipboard,
+    query_daemon,
+    _trim_thumb_cache, _spawn_daemon, _daemon_alive,
+)
 from picker_ui import TkPicker, pick_base_emoji    
 
 
@@ -29,10 +29,11 @@ from picker_ui import TkPicker, pick_base_emoji
 SETTINGS_FILE = CACHE_DIR / "picker-settings.json"
 
 _DEFAULT_SETTINGS = {
+    "notify_on_copy":  True,
     "exit_on_select": True,
     "show_keyword":   True,
-    "show_combo":     True,
     "show_semantic":  True,
+    "show_combo":     True,
     "show_story":     True,
     "floating":       True,
     "frameless":      False,
@@ -125,9 +126,10 @@ def _run_settings(picker, settings):
         def _lbl(key, text):
             return f"{'[x]' if settings[key] else '[ ]'} {text}"
         items = [
+            _lbl("notify_on_copy",  "Show notification when copied"),
             _lbl("show_keyword",   "Show keyword search on front menu"),
-            _lbl("show_combo",     "Show combo search on front menu"),
             _lbl("show_semantic",  "Show semantic search on front menu"),
+            _lbl("show_combo",     "Show combo search on front menu"),
             _lbl("show_story",     "Show emoji story on front menu"),
             _lbl("exit_on_select", "Exit app when emoji selected"),
             _lbl("floating",       "Start as floating window (takes effect on restart)"),
@@ -141,10 +143,11 @@ def _run_settings(picker, settings):
             sel_idx = items.index(choice)
         except ValueError:
             sel_idx = 0
-        if "Exit app when emoji selected"   in choice: settings["exit_on_select"] = not settings["exit_on_select"]
+        if "notification when copied" in choice: settings["notify_on_copy"]  = not settings["notify_on_copy"]
+        elif "Exit app when emoji selected"   in choice: settings["exit_on_select"] = not settings["exit_on_select"]
         elif "keyword search" in choice: settings["show_keyword"]   = not settings["show_keyword"]
-        elif "combo"          in choice: settings["show_combo"]     = not settings["show_combo"]
         elif "semantic"       in choice: settings["show_semantic"]  = not settings["show_semantic"]
+        elif "combo"          in choice: settings["show_combo"]     = not settings["show_combo"]
         elif "emoji story"    in choice: settings["show_story"]     = not settings["show_story"]
         elif "floating window" in choice: settings["floating"]      = not settings["floating"]
         elif "no title bar"   in choice: settings["frameless"]      = not settings["frameless"]
@@ -155,11 +158,17 @@ def _run_settings(picker, settings):
 
 
 def main():
+    _dbg("APP_START")
     settings = load_settings()
+    _dbg("APP: TkPicker init start")
     picker   = TkPicker(floating=settings["floating"], frameless=settings["frameless"])
+    _dbg("APP: TkPicker init done")
 
     try:
+        _dbg("APP: load_index start")
         entries     = load_index()
+        _dbg(f"APP: load_index done n_entries={len(entries)}")
+        base_index  = build_base_emoji_index(entries)
         while True:
             has_sem     = _has_semantic_models()
             has_data    = SEARCH_INDEX.exists()
@@ -168,24 +177,28 @@ def main():
             _nd         = "  (not downloaded)"
 
             # build menu entries with combo thumbnail icons
+            _dbg("MENU_BUILD_START")
             menu_entries = []
             if settings["show_keyword"]:
                 menu_entries.append(("keyword search",
                                      _find_combo_url_or_emoji(entries, "tornado", "mag_right")))
-            if settings["show_combo"]:
-                menu_entries.append(("combo",
-                                     _find_combo_url_or_emoji(entries, "fire", "slot_machine")))
             if settings["show_semantic"]:
                 menu_entries.append((sem_label + ("" if has_sem else _nd),
                                      _find_combo_url_or_emoji(entries, "sunrise_over_mountains", "mag_right")))
+            if settings["show_combo"]:
+                menu_entries.append(("combo",
+                                     _find_combo_url_or_emoji(entries, "fire", "slot_machine")))
             if settings["show_story"]:
                 menu_entries.append((story_label + ("" if has_data else _nd),
                                      _find_combo_url_or_emoji(entries, "llama", "fire")))
             menu_entries.append(("settings",
                                  _find_combo_url_or_emoji(entries, "computer", "face_with_raised_eyebrow")))
+            _dbg(f"MENU_BUILD_DONE n={len(menu_entries)}")
 
+            _dbg("MENU_SHOW_START")
             mode = picker.pick_with_images("Use quick keyword search directly or select an option below.", menu_entries, _menu_on_url,
-                                           thumb_size=48)
+                                           thumb_size=48, preload=True)
+            _dbg(f"MENU_SHOW_DONE mode={mode!r}")
             if not mode:
                 sys.exit(0)
 
@@ -222,24 +235,31 @@ def main():
                     str(STORY_OUT))
                 if action == "copy":
                     copy_image_to_clipboard(str(STORY_OUT))
-                    _notify("Story copied to clipboard")
+                    if settings["notify_on_copy"]:
+                        _notify("Story copied to clipboard")
                 continue
 
             # ── combo ────────────────────────────────────────────────────
             elif mode == "combo":
-                base_index = build_base_emoji_index(entries)
+                _dbg("COMBO_SELECTED")
+                _dbg("COMBO: pick_first_emoji start")
                 first = pick_base_emoji(base_index, "first emoji:", picker)
+                _dbg(f"COMBO: pick_first_emoji done first={first!r}")
                 if not first:
                     continue
                 emoji1, term1 = first
+                _dbg(f"COMBO: pick_second_emoji start term1={term1!r}")
                 second = pick_base_emoji(
                     base_index,
                     f"second emoji (+ {emoji1}{' ' + term1 if emoji1 else term1}):",
                     picker)
+                _dbg(f"COMBO: pick_second_emoji done second={second!r}")
                 if not second:
                     continue
                 emoji2, term2 = second
+                _dbg(f"COMBO: search start query={term1!r}+{term2!r}")
                 results = search(entries, f"{term1} {term2}")
+                _dbg(f"COMBO: search done n_results={len(results)}")
                 if not results:
                     picker.message(f"No results for '{term1} {term2}'")
                     continue
@@ -249,27 +269,10 @@ def main():
                 patterns    = [re.compile(re.escape(term1)), re.compile(re.escape(term2))]
                 query_label = f"'{term1}+{term2}'"
 
-                # Build combo icon_entries with match/no-match header
                 _ui_assets = _REPO / "data" / "ui_assets"
                 _match_img    = str(_ui_assets / "face_holding_back_tears_turtle.png")
                 _no_match_img = str(_ui_assets / "cry_turtle.png")
                 all_combo = exact + rest
-                if exact:
-                    combo_entries = [
-                        ("Match found!", HEADER_MARKER, "#228844", _match_img),
-                        *[(format_label(alt, url, text), url, ts)
-                          for ts, alt, url, text in exact],
-                        ("Other similar combos", HEADER_MARKER, "#999999"),
-                        *[(format_label(alt, url, text), url, ts)
-                          for ts, alt, url, text in rest],
-                    ]
-                else:
-                    combo_entries = [
-                        ("Match could not be found", HEADER_MARKER, "#8B0000", _no_match_img),
-                        ("Other similar combos", HEADER_MARKER, "#999999"),
-                        *[(format_label(alt, url, text), url, ts)
-                          for ts, alt, url, text in rest],
-                    ]
                 count = f"({len(exact)} exact, {len(rest)} similar)"
 
                 def _copy_combo(label, _all=all_combo):
@@ -280,15 +283,44 @@ def main():
                             path = get_thumb(url)
                             if path:
                                 copy_image_to_clipboard(path)
-                                _notify("Copied to clipboard")
+                                if settings["notify_on_copy"]:
+                                    _notify("Copied to clipboard")
                             break
 
                 on_sel_combo = None if settings["exit_on_select"] else _copy_combo
-                result = picker.pick_with_images(
-                    f"{query_label} {count}:", combo_entries, get_thumb,
-                    on_select=on_sel_combo, patterns=patterns)
-                if result and settings["exit_on_select"]:
-                    _copy_combo(result)
+                offset = 0
+                while True:
+                    batch_rest = rest[offset:offset + BATCH_SIZE]
+                    if exact:
+                        combo_entries = [
+                            ("Match found!", HEADER_MARKER, "#228844", _match_img),
+                            *[(format_label(alt, url, text), url, ts)
+                              for ts, alt, url, text in exact],
+                            ("Other similar combos", HEADER_MARKER, "#999999"),
+                            *[(format_label(alt, url, text), url, ts)
+                              for ts, alt, url, text in batch_rest],
+                        ]
+                    else:
+                        combo_entries = [
+                            ("Match could not be found", HEADER_MARKER, "#8B0000", _no_match_img),
+                            ("Other similar combos", HEADER_MARKER, "#999999"),
+                            *[(format_label(alt, url, text), url, ts)
+                              for ts, alt, url, text in batch_rest],
+                        ]
+                    if offset + BATCH_SIZE < len(rest):
+                        combo_entries.append((LOAD_MORE, None))
+                    _dbg(f"COMBO: pick_with_images offset={offset} n_entries={len(combo_entries)}")
+                    result = picker.pick_with_images(
+                        f"{query_label} {count}:", combo_entries, get_thumb,
+                        on_select=on_sel_combo, patterns=patterns)
+                    _dbg(f"COMBO: pick_with_images done result={result!r}")
+                    if result == LOAD_MORE:
+                        offset += BATCH_SIZE
+                        continue
+                    if result and settings["exit_on_select"]:
+                        _copy_combo(result)
+                    break
+
                 _trim_thumb_cache()
                 if settings["exit_on_select"] and result and result != LOAD_MORE:
                     break
@@ -346,7 +378,8 @@ def main():
                             path = get_thumb(url)
                             if path:
                                 copy_image_to_clipboard(path)
-                                _notify("Copied to clipboard")
+                                if settings["notify_on_copy"]:
+                                    _notify("Copied to clipboard")
                             break
 
                 on_sel = None if settings["exit_on_select"] else _copy_selected

@@ -106,7 +106,24 @@ def _keyword_priority(alt):
 
 
 def _notify(msg):
-    if shutil.which("notify-send"):
+    if sys.platform == "darwin":
+        subprocess.run(
+            ["osascript", "-e",
+             f'display notification "{msg}" with title "Emoji Kitchen"'],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    elif sys.platform == "win32":
+        ps = (
+            "Add-Type -AssemblyName System.Windows.Forms;"
+            "$b = New-Object System.Windows.Forms.NotifyIcon;"
+            "$b.Icon = [System.Drawing.SystemIcons]::Information;"
+            "$b.BalloonTipTitle = 'Emoji Kitchen';"
+            f"$b.BalloonTipText = '{msg}';"
+            "$b.Visible = $true;"
+            "$b.ShowBalloonTip(3000)"
+        )
+        subprocess.run(["powershell", "-c", ps],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    elif shutil.which("notify-send"):
         subprocess.run(["notify-send", "-t", "3000", "Emoji Kitchen", msg],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
@@ -368,6 +385,7 @@ def _score_entry(alt, words, is_single):
 
 
 def search(entries, query, limit=MAX_RESULTS):
+    _dbg(f"SEARCH start query={query!r} n_entries={len(entries)}")
     words    = query.lower().split()
     patterns = [re.compile(r'\b' + re.escape(w) + r'\b') for w in words]
     is_single = len(words) == 1
@@ -379,14 +397,18 @@ def search(entries, query, limit=MAX_RESULTS):
             scored.append((sq, ns, text_score, alt, url, text))
     scored.sort(key=lambda x: (-x[0], -x[1], -x[2], _keyword_priority(x[3])))
     if scored:
-        return [(ts, alt, url, text) for _, _, ts, alt, url, text in scored[:limit]]
+        result = [(ts, alt, url, text) for _, _, ts, alt, url, text in scored[:limit]]
+        _dbg(f"SEARCH done (exact pass) n_results={len(result)}")
+        return result
     for url, alt, text in entries:
         text_score = sum(1 for w in words if w in text.lower())
         if text_score > 0:
             sq, ns = _score_entry(alt, words, is_single)
             scored.append((sq, ns, text_score, alt, url, text))
     scored.sort(key=lambda x: (-x[0], -x[1], -x[2], _keyword_priority(x[3])))
-    return [(ts, alt, url, text) for _, _, ts, alt, url, text in scored[:limit]]
+    result = [(ts, alt, url, text) for _, _, ts, alt, url, text in scored[:limit]]
+    _dbg(f"SEARCH done (fuzzy pass) n_results={len(result)}")
+    return result
 
 
 def url_to_base_emojis(url):
@@ -409,6 +431,7 @@ def format_label(alt, url, text):
 
 
 def build_base_emoji_index(entries):
+    _dbg(f"BUILD_BASE_EMOJI_INDEX start n_entries={len(entries)}")
     seen = {}
     for url, alt, _text in entries:
         m = re.search(r'/u([0-9a-f]+)(?:-u[0-9a-f]+)*_u([0-9a-f]+)(?:-u[0-9a-f]+)*\.png$',
@@ -424,7 +447,9 @@ def build_base_emoji_index(entries):
                     seen[hex_code] = (chr(int(hex_code, 16)), name)
                 except (ValueError, OverflowError):
                     pass
-    return sorted(seen.items(), key=lambda x: x[1][1])
+    result = sorted(seen.items(), key=lambda x: x[1][1])
+    _dbg(f"BUILD_BASE_EMOJI_INDEX done n_unique={len(result)}")
+    return result
 
 
 _THUMB_LIMIT = 200 * 1024 * 1024

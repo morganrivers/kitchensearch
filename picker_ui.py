@@ -36,11 +36,13 @@ class TkPicker:
     SEL_BG        = "#dde0ff"
     RAINBOW_VIVID = ["#FF0000", "#FF8C00", "#FFD700", "#32CD32", "#1E90FF", "#8B00FF"]
     TITLE_H       = 52
+    _VIRT_ROW_H   = 34  # fixed row height for virtual text list
 
     def __init__(self, floating=False, frameless=True):
         root = tk.Tk()
         root.configure(bg=self.BG)
         root.title("Kitchen Search")
+        self._frameless = frameless
         self._floating  = self._setup_floating(root, floating=floating, frameless=frameless)
         mouse_x = root.winfo_pointerx()
         mouse_y = root.winfo_pointery()
@@ -60,13 +62,16 @@ class TkPicker:
         side = min(mw, mh) // 2
         x = mx + (mw - side) // 2
         y = my + (mh - side) // 2
-        root.geometry(f"{side}x{side}+{x}+{y}")
+        self._geometry   = f"{side}x{side}+{x}+{y}"
+        root.geometry(self._geometry)
+        root.withdraw()  # stay hidden until _run() so first paint is fully populated
         self.root       = root
         self._result    = None
         self._mode      = "input"
         self._rows      = []
         self._sel       = -1
-        self._img_refs  = []
+        self._img_refs        = []
+        self._prompt_img_refs = []
         self._options   = []
         self._trace_id      = None
         self._filter_after_id = None
@@ -74,6 +79,12 @@ class TkPicker:
         self._on_select  = None
         self._gen_id      = 0  # incremented on each _reset() to detect stale callbacks
         self._active_popup = None
+        self._shown             = False
+        self._virt_mode         = False
+        self._virt_items        = {}   # idx -> {rect, cids, photos}
+        self._virt_photo_cache  = {}   # (char, size) -> PhotoImage, lives for session
+        self._all_image_children = []  # ("h", frame) | ("d", frame, rd) in insertion order
+        self._ph_active = False
         self._build()
 
     def _build(self):
@@ -108,14 +119,21 @@ class TkPicker:
                                highlightcolor=self.ACCENT)
         self._entry.pack(fill="x", pady=(4, 0))
 
-        self._entry.bind("<Escape>", self._cancel)
-        self._entry.bind("<Return>", self._on_return)
-        self._entry.bind("<space>",  self._on_space_key)
-        self._entry.bind("<Up>",     lambda e: (self._up(),   "break")[1])
-        self._entry.bind("<Down>",   lambda e: (self._down(), "break")[1])
-        self._entry.bind("<Home>",   lambda e: (self._home(), "break")[1])
-        self._entry.bind("<End>",    lambda e: (self._end(),  "break")[1])
-        self._entry.bind("<Key>",    self._dbg_keypress)
+        self._entry.bind("<Escape>",       self._cancel)
+        self._entry.bind("<Return>",       self._on_return)
+        self._entry.bind("<space>",        self._on_space_key)
+        self._entry.bind("<Up>",           lambda e: (self._up(),            "break")[1])
+        self._entry.bind("<Down>",         lambda e: (self._down(),          "break")[1])
+        self._entry.bind("<Home>",         lambda e: (self._home(),          "break")[1])
+        self._entry.bind("<End>",          lambda e: (self._end(),           "break")[1])
+        self._entry.bind("<Control-Down>",      lambda e: (_dbg("ENTRY Ctrl+Down"), self._next_page(), "break")[2])
+        self._entry.bind("<Control-Up>",        lambda e: (_dbg("ENTRY Ctrl+Up"),   self._prev_page(), "break")[2])
+        self._entry.bind("<Control-BackSpace>", self._delete_word_before_cursor)
+        self._entry.bind("<Control-Delete>",    self._delete_word_after_cursor)
+        self._entry.bind("<Next>",         lambda e: (_dbg("ENTRY PageDown"),  self._next_page(), "break")[2])
+        self._entry.bind("<Prior>",        lambda e: (_dbg("ENTRY PageUp"),    self._prev_page(), "break")[2])
+        self._entry.bind("<Key>",          self._dbg_keypress)
+        self._entry.bind("<Key>",          self._on_entry_key_for_ph, add="+")
 
         # ── progress bar (hidden until explicitly shown) ──────────────────
         self._prog_frame = tk.Frame(cf, bg=self.BG)
@@ -155,27 +173,36 @@ class TkPicker:
         self._inner = tk.Frame(self._canvas, bg=self.BG)
         self._win_id = self._canvas.create_window((0, 0), window=self._inner, anchor="nw")
         def _on_inner_configure(e):
+            if self._virt_mode:
+                return
             sr = self._canvas.bbox("all")
             _dbg(f"INNER_CONFIGURE scrollregion={sr} inner_h={self._inner.winfo_reqheight()} gen={self._gen_id} nrows={len(self._rows)}")
             self._canvas.configure(scrollregion=sr)
         self._inner.bind("<Configure>", _on_inner_configure)
-        self._canvas.bind("<Configure>",
-            lambda e: self._canvas.itemconfig(self._win_id, width=e.width))
+        self._canvas.bind("<Configure>", self._on_canvas_configure)
 
         for w in (self._canvas, self._inner):
-            w.bind("<MouseWheel>", self._on_scroll)
-            w.bind("<Button-4>",   self._on_scroll)
-            w.bind("<Button-5>",   self._on_scroll)
+            w.bind("<MouseWheel>",    self._on_scroll)
+            w.bind("<Button-4>",      self._on_scroll)
+            w.bind("<Button-5>",      self._on_scroll)
+            w.bind("<Control-Down>",  self._next_page)
+            w.bind("<Control-Up>",    self._prev_page)
+            w.bind("<Next>",          self._next_page)
+            w.bind("<Prior>",         self._prev_page)
 
         self._canvas.bind("<ButtonPress-1>", lambda e: self._dismiss_popup(), add="+")
         root.bind("<FocusOut>", lambda e: self._dismiss_popup(), add="+")
 
-        root.bind("<Escape>", self._cancel)
-        root.bind("<Up>",     self._up)
-        root.bind("<Down>",   self._down)
-        root.bind("<Home>",   self._home)
-        root.bind("<End>",    self._end)
-        root.bind("<Return>", self._on_return)
+        root.bind("<Escape>",       self._cancel)
+        root.bind("<Up>",           self._up)
+        root.bind("<Down>",         self._down)
+        root.bind("<Home>",         self._home)
+        root.bind("<End>",          self._end)
+        root.bind("<Return>",       self._on_return)
+        root.bind("<Control-Down>", self._next_page)
+        root.bind("<Control-Up>",   self._prev_page)
+        root.bind("<Next>",         self._next_page)
+        root.bind("<Prior>",        self._prev_page)
 
     def _make_rainbow_border(self, root):
         colors = self.RAINBOW_VIVID
@@ -290,13 +317,20 @@ class TkPicker:
         # Defer focus/grab so the window is fully mapped before we grab input.
         # With -type splash the WM handles focus; with overrideredirect we need
         # focus_force + grab_set to capture keyboard events.
+        if not self._shown:
+            self._shown = True
+            self.root.deiconify()
+            if self._frameless:
+                self.root.geometry(self._geometry)
         def _activate():
             self.root.focus_force()
             if self._entry.winfo_ismapped():
                 self._entry.focus_set()
             try:
-                self.root.grab_set_global()
-                # self.root.grab_set()
+                if self._frameless:
+                    self.root.grab_set_global()
+                else:
+                    self.root.grab_set()
             except tk.TclError:
                 pass
         self.root.after(50, _activate)
@@ -307,19 +341,71 @@ class TkPicker:
             pass
         return self._result
 
+    _PH_TEXT  = "start typing to filter"
+    _PH_COLOR = "#aaaaaa"
+
+    def _show_ph(self):
+        if self._ph_active:
+            return
+        self._ph_active = True
+        self._entry_var.set(self._PH_TEXT)
+        self._entry.config(fg=self._PH_COLOR)
+        self._entry.icursor(0)
+
+    def _hide_ph(self):
+        if not self._ph_active:
+            return
+        self._ph_active = False
+        self._entry_var.set("")
+        self._entry.config(fg=self.FG)
+
+    def _real_text(self):
+        return "" if self._ph_active else self._entry_var.get()
+
+    def _on_entry_key_for_ph(self, e):
+        if self._ph_active:
+            if e.char and e.char.isprintable():
+                self._hide_ph()
+            elif e.keysym in ("BackSpace", "Delete"):
+                return "break"
+
     def _set_prompt(self, text):
         for w in self._prompt_frame.winfo_children():
             w.destroy()
+        self._prompt_img_refs = []
         widgets = self._pack_rich_label(
             self._prompt_frame, text, self.BG,
-            font=("Helvetica", 11, "bold"), pady=2)
+            font=("Helvetica", 11, "bold"), pady=2,
+            img_refs=self._prompt_img_refs)
         for w in widgets:
             w.configure(fg=self.ACCENT)
 
     def _on_space_key(self, e=None):
-        if not self._entry_var.get() and self._mode in ("list", "imagelist"):
+        if not self._real_text() and self._mode in ("list", "imagelist"):
             self._on_return()
             return "break"
+
+    def _delete_word_after_cursor(self, e):
+        idx = self._entry.index("insert")
+        text = self._entry.get()
+        i = idx
+        while i < len(text) and text[i] == " ":
+            i += 1
+        while i < len(text) and text[i] != " ":
+            i += 1
+        self._entry.delete(idx, i)
+        return "break"
+
+    def _delete_word_before_cursor(self, e):
+        idx = self._entry.index("insert")
+        text = self._entry.get()
+        i = idx
+        while i > 0 and text[i - 1] == " ":
+            i -= 1
+        while i > 0 and text[i - 1] != " ":
+            i -= 1
+        self._entry.delete(i, idx)
+        return "break"
 
     def _dbg_keypress(self, e):
         _dbg(f"KEY keysym={e.keysym!r} char={e.char!r} mode={self._mode!r} entry={self._entry_var.get()!r} gen={self._gen_id}")
@@ -328,15 +414,20 @@ class TkPicker:
 
     def _on_yscroll(self, first, last):
         _dbg(f"YSCROLL first={first} last={last} mode={self._mode!r} gen={self._gen_id} nrows={len(self._rows)} inner_children={len(self._inner.winfo_children())}")
-        if float(first) <= 0.0 and float(last) >= 1.0:
+        if float(first) <= 0.001 and float(last) >= 0.999:
             self._sb.pack_forget()
         else:
             self._sb.pack(side="right", fill="y")
         self._sb.set(first, last)
+        if self._virt_mode:
+            self._virt_refresh()
 
     def _on_scroll(self, e):
-        # Treat scroll wheel as Up/Down so the selection moves (rofi-style).
-        if e.num == 5 or (e.num == 0 and (e.delta or 0) < 0):
+        going_down = e.num == 5 or (e.num == 0 and (e.delta or 0) < 0)
+        if not self._rows:
+            # No list rows — pan the canvas directly (story/image view)
+            self._canvas.yview_scroll(1 if going_down else -1, "units")
+        elif going_down:
             self._down()
         else:
             self._up()
@@ -368,10 +459,10 @@ class TkPicker:
             if self._sel >= 0 and self._rows:
                 self._result = self._rows[self._sel]["label"]
             else:
-                self._result = self._entry_var.get().strip() or None
+                self._result = self._real_text().strip() or None
             self.root.quit()
         elif self._mode == "imagelist":
-            val = self._entry_var.get().strip()
+            val = self._real_text().strip()
             if val:
                 self._result = val
             elif self._sel >= 0 and self._rows:
@@ -399,6 +490,16 @@ class TkPicker:
         if self._rows:
             self._select(len(self._rows) - 1)
 
+    def _next_page(self, e=None):
+        first, last = self._canvas.yview()
+        if last < 1.0:
+            self._canvas.yview_scroll(1, "pages")
+
+    def _prev_page(self, e=None):
+        first, last = self._canvas.yview()
+        if first > 0.0:
+            self._canvas.yview_scroll(-1, "pages")
+
     # ── selection ─────────────────────────────────────────────────────────────
 
     def _select(self, idx, scroll=True):
@@ -411,6 +512,21 @@ class TkPicker:
                 self._scroll_into_view(idx)
 
     def _scroll_into_view(self, idx):
+        if self._virt_mode:
+            total_h = len(self._rows) * self._VIRT_ROW_H
+            if total_h <= 0:
+                return
+            row_y    = idx * self._VIRT_ROW_H
+            canvas_h = self._canvas.winfo_height() or 400
+            view_top = self._canvas.yview()[0] * total_h
+            view_bot = self._canvas.yview()[1] * total_h
+            if row_y < view_top:
+                self._canvas.yview_moveto(row_y / total_h)
+            elif row_y + self._VIRT_ROW_H > view_bot:
+                self._canvas.yview_moveto(
+                    (row_y + self._VIRT_ROW_H - canvas_h) / total_h)
+            self._virt_refresh()
+            return
         self.root.update_idletasks()
         row = self._rows[idx]["frame"]
         row_y = row.winfo_y()
@@ -427,6 +543,11 @@ class TkPicker:
             self._canvas.yview_moveto((row_y + row_h - canvas_h) / total_h)
 
     def _color_row(self, idx, selected):
+        if self._virt_mode:
+            bg = self.SEL_BG if selected else self._rows[idx]["row_bg"]
+            if idx in self._virt_items:
+                self._canvas.itemconfig(self._virt_items[idx]["rect"], fill=bg)
+            return
         rd = self._rows[idx]
         bg = self.SEL_BG if selected else rd["row_bg"]
         for w in rd.get("bg_widgets", rd["all_widgets"]):
@@ -450,7 +571,7 @@ class TkPicker:
 
     def _reset(self):
         self._gen_id += 1
-        _dbg(f"RESET gen={self._gen_id} mode={self._mode!r} nrows={len(self._rows)} inner_children={len(self._inner.winfo_children())}", include_tb=True)
+        _dbg(f"RESET gen={self._gen_id} mode={self._mode!r} nrows={len(self._rows)} inner_children={len(self._inner.winfo_children())}")
         if self._trace_id:
             try: self._entry_var.trace_remove("write", self._trace_id)
             except Exception: pass
@@ -458,14 +579,21 @@ class TkPicker:
         if self._filter_after_id:
             self.root.after_cancel(self._filter_after_id)
             self._filter_after_id = None
+        self._virt_mode = False
+        self._canvas.itemconfig(self._win_id, height=0)  # restore natural sizing
+        self._canvas.delete("vrow")
+        self._virt_items.clear()
         for w in self._inner.winfo_children():
             w.destroy()
         _dbg(f"RESET yview_moveto(0) gen={self._gen_id}")
         self._canvas.yview_moveto(0)
-        self._rows        = []
-        self._img_refs    = []
-        self._sel         = -1
-        self._filter_mode = False
+        self._rows               = []
+        self._img_refs           = []
+        self._sel                = -1
+        self._filter_mode        = False
+        self._all_image_children = []
+        self._ph_active = False
+        self._entry.config(fg=self.FG)
         self._entry_var.set("")
         self._prog_frame.pack_forget()
         self._progbar.configure(mode="determinate")
@@ -571,31 +699,77 @@ class TkPicker:
         return self._run()
 
     def pick(self, prompt, options, filter=True, initial_sel=0):
+        _dbg(f"PICK start prompt={prompt!r} n_options={len(options)}")
         self._reset()
         self._mode        = "list"
         self._options     = list(options)
         self._filter_mode = filter
         self._set_prompt(prompt)
+        _dbg(f"PICK: _build_text_rows start n={len(self._options)}")
         self._build_text_rows(self._options)
+        _dbg(f"PICK: _build_text_rows done n_rows={len(self._rows)}")
         if self._rows:
             self._select(min(initial_sel, len(self._rows) - 1))
         if filter:
             self._trace_id = self._entry_var.trace_add("write", self._filter_cb)
-        return self._run()
+            self._show_ph()
+        _dbg("PICK: _run start")
+        result = self._run()
+        _dbg(f"PICK: _run done result={result!r}")
+        return result
 
     def _filter_cb(self, *_):
+        if self._ph_active:
+            return
         if self._filter_after_id:
             self.root.after_cancel(self._filter_after_id)
-        self._filter_after_id = self.root.after(300, self._do_filter)
+        fn = self._do_image_filter if self._mode == "imagelist" else self._do_filter
+        self._filter_after_id = self.root.after(300, fn)
 
     def _do_filter(self):
         self._filter_after_id = None
+        if self._ph_active:
+            return
         q = self._entry_var.get().lower()
         filtered = [o for o in self._options if q in o.lower()] if q else self._options
         prev = self._sel
         self._build_text_rows(filtered)
         if self._rows:
             self._select(min(prev, len(self._rows) - 1) if prev >= 0 else 0)
+        if not q and self._filter_mode:
+            self._show_ph()
+
+    def _do_image_filter(self):
+        self._filter_after_id = None
+        if self._ph_active:
+            return
+        q = self._entry_var.get().lower().strip()
+        # Pack_forget all children first, then re-pack in original order so
+        # headers and data rows always appear in the right sequence.
+        for item in self._all_image_children:
+            item[1].pack_forget()
+        visible = []
+        for item in self._all_image_children:
+            if item[0] == "h":
+                item[1].pack(fill="x", padx=6, pady=(6, 2))
+            else:
+                rd = item[2]
+                if not q or q in rd["label"].lower():
+                    rd["frame"].pack(fill="x", padx=2, pady=1)
+                    visible.append(rd)
+        self._rows = visible
+        self._sel  = -1
+        if visible:
+            self._select(0)
+        if not q:
+            self._show_ph()
+
+    def _click_image_row(self, rd):
+        try:
+            idx = self._rows.index(rd)
+        except ValueError:
+            return
+        self._click_row(idx)
 
     @staticmethod
     def _is_emoji_char(ch):
@@ -604,12 +778,14 @@ class TkPicker:
                 0x2B00 <= cp <= 0x2BFF or   # Misc Symbols and Arrows
                 0x1F000 <= cp <= 0x1FFFF)   # Main emoji block
 
-    def _pack_rich_label(self, parent, text, bg, font=("Helvetica", 12), pady=5):
+    def _pack_rich_label(self, parent, text, bg, font=("Helvetica", 12), pady=5, img_refs=None):
         """
         Pack a series of Label widgets into parent for text that may contain
         emoji characters. Emoji are rendered via PIL; plain text uses font.
         Returns a list of all created widgets (for click-binding).
         """
+        if img_refs is None:
+            img_refs = self._img_refs
         # Segment the string into alternating text/emoji runs
         segments, buf, in_emoji = [], "", False
         for ch in text:
@@ -633,7 +809,7 @@ class TkPicker:
                     if pil_img:
                         from PIL import ImageTk
                         photo = ImageTk.PhotoImage(pil_img)
-                        self._img_refs.append(photo)
+                        img_refs.append(photo)
                         w = tk.Label(parent, image=photo, bg=bg,
                                      width=em_size + 4, height=em_size + 4)
                         w.pack(side="left", pady=pady)
@@ -651,56 +827,132 @@ class TkPicker:
                 widgets.append(w)
         return widgets
 
+    def _on_canvas_configure(self, e):
+        self._canvas.itemconfig(self._win_id, width=e.width)
+        if self._virt_mode:
+            # Invalidate all rendered items so they're redrawn at the new width
+            for item in self._virt_items.values():
+                self._canvas.delete(item["rect"])
+                for cid in item["cids"]:
+                    self._canvas.delete(cid)
+            self._virt_items.clear()
+            total_h = max(len(self._rows) * self._VIRT_ROW_H, 1)
+            self._canvas.configure(scrollregion=(0, 0, e.width, total_h))
+            self._virt_refresh()
+
     def _build_text_rows(self, opts):
+        _dbg(f"BUILD_TEXT_ROWS start n={len(opts)}")
+        # Clear previous state
+        self._canvas.delete("vrow")
+        self._virt_items.clear()
         for w in self._inner.winfo_children():
             w.destroy()
-        self._rows = []
-        self._sel  = -1
+        self._img_refs = []
+        self._rows     = []
+        self._sel      = -1
+        self._virt_mode = True
+        self._canvas.itemconfig(self._win_id, height=1)  # hide _inner behind virt items
+
         for i, label in enumerate(opts):
-            rbg = self.ROW_COLORS[i % len(self.ROW_COLORS)]
-            row = tk.Frame(self._inner, bg=rbg, cursor="hand2")
-            row.pack(fill="x", padx=2, pady=1)
-            inner_widgets = self._pack_rich_label(row, label, rbg,
-                                                  font=("Helvetica", 12, "bold"), pady=5)
-            is_link = "buy me a coffee" in label
-            if is_link:
-                link_url = "https://buymeacoffee.com/morganrivers"
-                link_color, link_hover = "#4fa3e8", "#82c4ff"
-                link_font = ("Helvetica", 12, "bold underline")
-                text_widgets = [w for w in inner_widgets
-                                if isinstance(w, tk.Label) and w.cget("text")]
-                for tw in text_widgets:
-                    tw.configure(fg=link_color, font=link_font)
-                def _enter(e, ws=text_widgets, c=link_hover):
-                    for tw in ws: tw.configure(fg=c)
-                def _leave(e, ws=text_widgets, c=link_color):
-                    for tw in ws: tw.configure(fg=c)
-                def _show_link_menu(e, url=link_url):
-                    self._dismiss_popup()
-                    menu = tk.Menu(self.root, tearoff=0)
-                    menu.add_command(label="Open in browser",
-                                     command=lambda: webbrowser.open(url))
-                    menu.add_command(label="Copy link address",
-                                     command=lambda: (
-                                         self.root.clipboard_clear(),
-                                         self.root.clipboard_append(url)))
-                    self._active_popup = menu
-                    try:
-                        menu.tk_popup(e.x_root, e.y_root)
-                    finally:
-                        menu.grab_release()
-                for w in [row] + inner_widgets:
-                    w.bind("<Enter>", _enter)
-                    w.bind("<Leave>", _leave)
-                    w.bind("<Button-3>", _show_link_menu)
-            all_widgets = [row] + inner_widgets
-            self._rows.append({"frame": row, "label": label,
-                                "row_bg": rbg, "all_widgets": all_widgets})
-            for w in all_widgets:
-                w.bind("<Button-1>",   lambda e, i=i: self._click_row(i))
-                w.bind("<MouseWheel>", self._on_scroll)
-                w.bind("<Button-4>",   self._on_scroll)
-                w.bind("<Button-5>",   self._on_scroll)
+            self._rows.append({"label": label,
+                                "row_bg": self.ROW_COLORS[i % len(self.ROW_COLORS)]})
+
+        self._canvas.yview_moveto(0)
+        total_h = max(len(opts) * self._VIRT_ROW_H, 1)
+        cw = max(self._canvas.winfo_width(), 100)
+        self._canvas.configure(scrollregion=(0, 0, cw, total_h))
+        self._virt_refresh()
+        _dbg(f"BUILD_TEXT_ROWS done n_rows={len(self._rows)}")
+
+    def _virt_refresh(self):
+        if not self._virt_mode or not self._rows:
+            return
+        canvas   = self._canvas
+        n        = len(self._rows)
+        total_h  = n * self._VIRT_ROW_H
+        cw       = max(canvas.winfo_width(), 100)
+        canvas_h = max(canvas.winfo_height(), 100)
+
+        y0_frac = canvas.yview()[0]
+        y0_px   = y0_frac * total_h
+
+        BUFFER    = 3
+        first_vis = max(0, int(y0_px / self._VIRT_ROW_H) - BUFFER)
+        last_vis  = min(n - 1, int((y0_px + canvas_h) / self._VIRT_ROW_H) + BUFFER)
+
+        # Remove items that scrolled outside the buffered window
+        to_remove = [i for i in self._virt_items if i < first_vis or i > last_vis]
+        for i in to_remove:
+            item = self._virt_items.pop(i)
+            canvas.delete(item["rect"])
+            for cid in item["cids"]:
+                canvas.delete(cid)
+
+        # Create rows newly entering the buffered window
+        EM = 20
+        for i in range(first_vis, last_vis + 1):
+            if i in self._virt_items:
+                continue
+            rd    = self._rows[i]
+            bg    = self.SEL_BG if i == self._sel else rd["row_bg"]
+            y     = i * self._VIRT_ROW_H
+            yc    = y + self._VIRT_ROW_H // 2
+            label = rd["label"]
+
+            rect = canvas.create_rectangle(
+                2, y, cw - 2, y + self._VIRT_ROW_H - 1,
+                fill=bg, outline="", tags="vrow")
+
+            cids   = []
+            photos = []  # kept alive via virt_items, not _img_refs
+            x = 10
+
+            # Segment label into emoji / plain-text runs
+            segs, buf, in_em = [], "", False
+            for ch in label:
+                is_e = self._is_emoji_char(ch)
+                if is_e != in_em:
+                    if buf:
+                        segs.append(("e" if in_em else "t", buf))
+                    buf, in_em = ch, is_e
+                else:
+                    buf += ch
+            if buf:
+                segs.append(("e" if in_em else "t", buf))
+
+            for kind, content in segs:
+                if kind == "e":
+                    for ch in content:
+                        pil_img = render_emoji_pil(ch, size=EM)
+                        if pil_img:
+                            key = (ch, EM)
+                            photo = self._virt_photo_cache.get(key)
+                            if photo is None:
+                                photo = ImageTk.PhotoImage(pil_img)
+                                self._virt_photo_cache[key] = photo
+                            photos.append(photo)
+                            cid = canvas.create_image(
+                                x + EM // 2, yc, image=photo,
+                                anchor="center", tags="vrow")
+                            cids.append(cid)
+                            x += EM + 6
+                        else:
+                            cid = canvas.create_text(
+                                x, yc, text=ch, anchor="w",
+                                font=("Helvetica", 12), fill=self.FG, tags="vrow")
+                            cids.append(cid)
+                            x += 18
+                else:
+                    cid = canvas.create_text(
+                        x, yc, text=content, anchor="w",
+                        font=("Helvetica", 12, "bold"), fill=self.FG, tags="vrow")
+                    cids.append(cid)
+
+            self._virt_items[i] = {"rect": rect, "cids": cids, "photos": photos}
+
+            for cid in [rect] + cids:
+                canvas.tag_bind(cid, "<Button-1>",
+                                lambda e, i=i: self._click_row(i))
 
     def _build_settings_rows(self, opts):
         for w in self._inner.winfo_children():
@@ -814,7 +1066,7 @@ class TkPicker:
             self._select(min(initial_sel, len(self._rows) - 1))
         return self._run()
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None):
+    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
         gen = self._gen_id  # capture generation ID for stale-callback detection
@@ -830,6 +1082,7 @@ class TkPicker:
         def _append_header_row(text, color, image_path=None):
             hr = tk.Frame(self._inner, bg=self.BG, bd=0, highlightthickness=0)
             hr.pack(fill="x", padx=6, pady=(6, 2))
+            self._all_image_children.append(("h", hr))
             if image_path:
                 try:
                     img_size = 30
@@ -948,10 +1201,12 @@ class TkPicker:
                     txt.insert("end", kw_part, "kw_normal")
 
             all_widgets = [row, img_lbl, txt]
-            self._rows.append({"frame": row, "label": label,
-                                "row_bg": rbg, "all_widgets": all_widgets})
+            rd = {"frame": row, "label": label,
+                  "row_bg": rbg, "all_widgets": all_widgets}
+            self._rows.append(rd)
+            self._all_image_children.append(("d", row, rd))
             for w in all_widgets:
-                w.bind("<Button-1>",   lambda e, i=i: self._click_row(i))
+                w.bind("<Button-1>",   lambda e, _rd=rd: self._click_image_row(_rd))
                 w.bind("<MouseWheel>", self._on_scroll)
                 w.bind("<Button-4>",   self._on_scroll)
                 w.bind("<Button-5>",   self._on_scroll)
@@ -987,6 +1242,7 @@ class TkPicker:
             pending[rank] = None if photo is None else (label, photo, score)
             _flush()
 
+        _dbg(f"PICK_WITH_IMAGES: dispatching workers gen={gen} n_entries={len(entries)} preload={preload}")
         for rank, entry in enumerate(entries):
             label      = entry[0]
             url        = entry[1] if len(entry) > 1 else None
@@ -1005,16 +1261,31 @@ class TkPicker:
                 _flush()
                 continue
 
-            def _worker(rank=rank, label=label, url=url, score=score):
+            if preload:
+                # Synchronous load: rows fully built before _run(), no empty-then-populate flash
                 path = on_url(url)
-                try:
-                    self.root.after(0, lambda: _on_image_ready(rank, label, path, score))
-                except RuntimeError:
-                    pass
+                _on_image_ready(rank, label, path, score)
+            else:
+                def _worker(rank=rank, label=label, url=url, score=score):
+                    _dbg(f"WORKER start rank={rank} url={url[:60]!r}")
+                    path = on_url(url)
+                    _dbg(f"WORKER done  rank={rank} path_ok={path is not None}")
+                    try:
+                        self.root.after(0, lambda: _on_image_ready(rank, label, path, score))
+                    except RuntimeError:
+                        pass
+                threading.Thread(target=_worker, daemon=True).start()
 
-            threading.Thread(target=_worker, daemon=True).start()
+        if preload:
+            self.root.update_idletasks()
+            self._sb.pack_forget()
 
-        return self._run()
+        _dbg(f"PICK_WITH_IMAGES: {'preloaded' if preload else 'all workers dispatched'} gen={gen}, calling _run")
+        self._trace_id = self._entry_var.trace_add("write", self._filter_cb)
+        self._show_ph()
+        result = self._run()
+        _dbg(f"PICK_WITH_IMAGES: _run done gen={gen} result={result!r}")
+        return result
 
     def show_download_progress(self, title, download_fn):
         """
@@ -1313,7 +1584,9 @@ class TkPicker:
             )
         photo = ImageTk.PhotoImage(img)
         self._img_refs.append(photo)
-        tk.Label(self._inner, image=photo, bg=self.BG).pack(pady=(10, 6))
+        img_label = tk.Label(self._inner, image=photo, bg=self.BG, cursor="hand2")
+        img_label.pack(pady=(10, 6))
+        img_label.bind("<Button-1>", self._on_return)
 
         tk.Label(self._inner,
                  text="Enter to copy  |  Esc to cancel",
