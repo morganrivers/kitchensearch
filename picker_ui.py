@@ -1,7 +1,11 @@
 import sys
 import re
+import math
 import threading
 import json
+import time
+import hashlib
+from datetime import date, timedelta, datetime as _datetime
 import subprocess
 import webbrowser
 import tkinter as tk
@@ -12,6 +16,7 @@ from picker_utils import (
     _dbg,
     _get_monitors,
     _REPO,
+    THUMB_DIR,
     DAEMON_STATUS,
     HEADER_MARKER,
     LOAD_MORE,
@@ -19,26 +24,62 @@ from picker_utils import (
     _daemon_alive,
     _daemon_ready,
     _cleanup_incomplete_data,
+    get_buymeacoffee_url,
 )                                                                                                                                                                      
 
 
 # ── TkPicker ──────────────────────────────────────────────────────────────────
 
 class TkPicker:
-    BG       = "#ffffff"
-    FG       = "#222222"
-    FG_DIM   = "#999999"
-    ENTRY_BG = "#f5f5f5"
-    ACCENT   = "#6633cc"
-    THUMB    = 96
+    LIGHT = {
+        "BG":           "#ffffff",
+        "FG":           "#222222",
+        "FG_DIM":       "#999999",
+        "ENTRY_BG":     "#f5f5f5",
+        "ACCENT":       "#6633cc",
+        "ROW_COLORS":   ["#f5f5f5", "#ffffff"],
+        "SEL_BG":       "#dde0ff",
+        "SB_TRACK":     "#e0e0e0",
+        "SB_BTN":       "#888888",
+        "SB_HOVER":     "#555555",
+        "ENTRY_BORDER": "#dddddd",
+        "BANNER_FG":    "#a05000",
+    }
+    DARK = {
+        "BG":           "#1c1b2e",
+        "FG":           "#e2e0f0",
+        "FG_DIM":       "#888899",
+        "ENTRY_BG":     "#2a2940",
+        "ACCENT":       "#9966ff",
+        "ROW_COLORS":   ["#252440", "#1c1b2e"],
+        "SEL_BG":       "#3d3560",
+        "SB_TRACK":     "#2e2d45",
+        "SB_BTN":       "#555566",
+        "SB_HOVER":     "#888899",
+        "ENTRY_BORDER": "#444455",
+        "BANNER_FG":    "#ffaa44",
+    }
 
-    ROW_COLORS    = ["#f5f5f5", "#ffffff"]
-    SEL_BG        = "#dde0ff"
+    THUMB         = 96
     RAINBOW_VIVID = ["#FF0000", "#FF8C00", "#FFD700", "#32CD32", "#1E90FF", "#8B00FF"]
     TITLE_H       = 52
-    _VIRT_ROW_H   = 34  # fixed row height for virtual text list
+    _VIRT_ROW_H   = 34
+    _DM_SIZE      = 26
 
-    def __init__(self, floating=False, frameless=True):
+    def _apply_theme(self, theme):
+        self.BG         = theme["BG"]
+        self.FG         = theme["FG"]
+        self.FG_DIM     = theme["FG_DIM"]
+        self.ENTRY_BG   = theme["ENTRY_BG"]
+        self.ACCENT     = theme["ACCENT"]
+        self.ROW_COLORS = theme["ROW_COLORS"]
+        self.SEL_BG     = theme["SEL_BG"]
+        self._theme     = theme
+
+    def __init__(self, floating=False, frameless=True, dark=False, on_dark_toggle=None):
+        self._dark            = dark
+        self._on_dark_toggle  = on_dark_toggle
+        self._apply_theme(self.DARK if dark else self.LIGHT)
         root = tk.Tk()
         root.configure(bg=self.BG)
         root.title("Kitchen Search")
@@ -204,6 +245,170 @@ class TkPicker:
         root.bind("<Control-Up>",   self._prev_page)
         root.bind("<Next>",         self._next_page)
         root.bind("<Prior>",        self._prev_page)
+
+        self._make_dm_button()
+
+    # ── dark mode button ──────────────────────────────────────────────────────
+
+    def _make_dm_button(self):
+        btn = tk.Canvas(self._content_frame,
+                        width=self._DM_SIZE, height=self._DM_SIZE,
+                        bg=self.BG, highlightthickness=0, bd=0,
+                        cursor="hand2", takefocus=True)
+        self._dm_btn = btn
+        self._dm_draw()
+        # starts hidden; pick_with_images(show_dark_btn=True) makes it visible
+        btn.bind("<Button-1>", lambda e: self._toggle_dark_mode())
+        btn.bind("<Return>",   lambda e: self._toggle_dark_mode())
+        btn.bind("<space>",    lambda e: self._toggle_dark_mode())
+        btn.bind("<FocusIn>",  lambda e: btn.configure(
+            highlightthickness=2, highlightbackground=self.ACCENT))
+        btn.bind("<FocusOut>", lambda e: btn.configure(highlightthickness=0))
+
+    def _dm_draw(self):
+        btn = self._dm_btn
+        btn.delete("all")
+        s = self._DM_SIZE
+        c = s // 2
+        btn.configure(bg=self.BG)
+        if self._dark:
+            # Sun — gold disc + 8 short rays
+            r = s // 4
+            btn.create_oval(c - r, c - r, c + r, c + r,
+                            fill="#FFD700", outline="")
+            for deg in range(0, 360, 45):
+                rad = math.radians(deg)
+                x1 = c + (r + 2) * math.cos(rad)
+                y1 = c + (r + 2) * math.sin(rad)
+                x2 = c + (r + 5) * math.cos(rad)
+                y2 = c + (r + 5) * math.sin(rad)
+                btn.create_line(x1, y1, x2, y2,
+                                fill="#FFD700", width=2, capstyle="round")
+        else:
+            # Moon — crescent via two overlapping circles
+            r = s // 2 - 3
+            btn.create_oval(c - r, c - r, c + r, c + r,
+                            fill="#7755bb", outline="")
+            btn.create_oval(c - r + 5, c - r - 2,
+                            c + r + 5, c + r - 2,
+                            fill=self.BG, outline="")
+
+    @staticmethod
+    def _norm_color(color):
+        """Normalise to lowercase 6-digit hex; X11 cget returns 12-digit."""
+        if isinstance(color, str) and color.startswith("#") and len(color) == 13:
+            return "#" + color[1:3] + color[5:7] + color[9:11]
+        return color
+
+    def _walk_retheme(self, widget, color_map):
+        for attr in ("background", "foreground"):
+            try:
+                old = self._norm_color(widget.cget(attr))
+                new = color_map.get(old)
+                if new:
+                    widget.configure(**{attr: new})
+            except (tk.TclError, ValueError):
+                pass
+        for child in widget.winfo_children():
+            self._walk_retheme(child, color_map)
+
+    def _toggle_dark_mode(self):
+        old_theme = self.DARK if self._dark else self.LIGHT
+        new_theme = self.LIGHT if self._dark else self.DARK
+
+        # Unified old→new color map (includes ROW_COLORS list entries)
+        color_map = {}
+        for key, old_val in old_theme.items():
+            new_val = new_theme[key]
+            if isinstance(old_val, list):
+                for o, n in zip(old_val, new_val):
+                    color_map[o] = n
+            else:
+                color_map[old_val] = new_val
+
+        self._dark = not self._dark
+        self._apply_theme(new_theme)
+
+        self.root.configure(bg=self.BG)
+        self._walk_retheme(self.root, color_map)
+
+        # Entry-specific attrs not caught by the widget walk
+        self._entry.configure(
+            insertbackground=self.FG,
+            highlightbackground=new_theme["ENTRY_BORDER"],
+            highlightcolor=self.ACCENT,
+        )
+        if self._ph_active:
+            self._entry.config(fg=self._PH_COLOR)
+
+        # TTK progressbar style
+        style = ttk.Style()
+        style.configure("lgt.Horizontal.TProgressbar",
+                        troughcolor=self.ENTRY_BG, background=self.ACCENT,
+                        bordercolor=self.BG, lightcolor=self.ACCENT,
+                        darkcolor=self.ACCENT)
+
+        # CTK scrollbar (uses custom attrs, not standard bg/fg)
+        self._sb.configure(
+            fg_color=new_theme["SB_TRACK"],
+            button_color=new_theme["SB_BTN"],
+            button_hover_color=new_theme["SB_HOVER"],
+        )
+
+        # Virtual canvas items (rectangles and text, not widget children)
+        if self._virt_mode:
+            for i, item in self._virt_items.items():
+                bg = self.SEL_BG if i == self._sel else self._rows[i]["row_bg"]
+                self._canvas.itemconfig(item["rect"], fill=bg)
+                for cid in item["cids"]:
+                    try:
+                        self._canvas.itemconfig(cid, fill=self.FG)
+                    except tk.TclError:
+                        pass
+            for i, rd in enumerate(self._rows):
+                rd["row_bg"] = self.ROW_COLORS[i % 2]
+        else:
+            for i, rd in enumerate(self._rows):
+                old_bg = rd.get("row_bg")
+                new_bg = color_map.get(old_bg) if old_bg else None
+                if new_bg:
+                    rd["row_bg"] = new_bg
+                    for w in rd.get("bg_widgets", rd.get("all_widgets", [])):
+                        try:
+                            w.configure(bg=new_bg)
+                        except tk.TclError:
+                            pass
+                # Foreground on every Label in the row
+                for w in rd.get("all_widgets", []):
+                    if isinstance(w, tk.Label):
+                        try:
+                            old_fg = self._norm_color(w.cget("foreground"))
+                            new_fg = color_map.get(old_fg)
+                            if new_fg:
+                                w.configure(fg=new_fg)
+                        except tk.TclError:
+                            pass
+
+        # tk.Text tag foreground (not a widget attr, not caught by walk)
+        def _fix_text_tags(w):
+            for child in w.winfo_children():
+                if isinstance(child, tk.Text):
+                    child.tag_configure("alt_bold",  foreground=self.FG)
+                    child.tag_configure("kw_normal", foreground=self.FG_DIM)
+                    child.tag_configure("kw_bold",   foreground=self.FG)
+                _fix_text_tags(child)
+        _fix_text_tags(self._inner)
+
+        # Redraw title (uses both canvas fill and PIL)
+        self._draw_title(
+            self._title_canvas.winfo_width(),
+            self._title_canvas.winfo_height())
+
+        self._dm_draw()
+        self.root.tk.call('raise', self._dm_btn._w)
+
+        if self._on_dark_toggle:
+            self._on_dark_toggle(self._dark)
 
     def _make_rainbow_border(self, root):
         colors = self.RAINBOW_VIVID
@@ -603,6 +808,7 @@ class TkPicker:
         self._progbar.configure(mode="determinate")
         if not self._entry.winfo_ismapped():
             self._entry.pack(fill="x", pady=(4, 0))
+        self._dm_btn.place_forget()
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -1015,7 +1221,7 @@ class TkPicker:
                 bg_widgets  = all_widgets
                 extra       = {}
                 if "buy me a coffee" in label:
-                    link_url             = "https://buymeacoffee.com/morganrivers"
+                    link_url             = get_buymeacoffee_url()
                     link_color           = "#4fa3e8"
                     link_hover           = "#82c4ff"
                     link_font            = ("Helvetica", 12, "bold underline")
@@ -1036,7 +1242,10 @@ class TkPicker:
                                          command=lambda: (
                                              self.root.clipboard_clear(),
                                              self.root.clipboard_append(url)))
-                        self._active_popup = menu
+                        # Do NOT assign _active_popup here: tk_popup triggers a
+                        # FocusOut on root which would call _dismiss_popup() and
+                        # instantly unpost the menu. tk.Menu manages its own
+                        # lifetime via Tk's internal bind-all ButtonPress handler.
                         try:
                             menu.tk_popup(e.x_root, e.y_root)
                         finally:
@@ -1070,9 +1279,172 @@ class TkPicker:
             self._select(min(initial_sel, len(self._rows) - 1))
         return self._run()
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True):
+    BMC_BANNER_LABEL  = "__BMC_BANNER__"
+    BMC_DISMISS_LABEL = "__BMC_DISMISS__"
+    BMC_SNOOZE_LABEL  = "__BMC_SNOOZE__"
+    BMC_BORDER_COLOR  = "#ff9999"
+
+    def _make_snooze_btn(self, parent, row_bg):
+        BLUE       = "#4a90d9"
+        BLUE_HOVER = "#2270c0"
+        PURPLE     = "#7744cc"
+        W, H, R, OW = 92, 28, 8, 2
+
+        cv = tk.Canvas(parent, width=W, height=H,
+                       bg=row_bg, highlightthickness=0, bd=0, cursor="hand2")
+
+        def _draw(fill):
+            cv.delete("all")
+            x1, y1, x2, y2 = OW, OW, W - OW, H - OW
+            # Fill rounded rect
+            cv.create_arc(x1,      y1,      x1+2*R, y1+2*R, start=90,  extent=90, fill=fill,   outline=fill,   style="pieslice")
+            cv.create_arc(x2-2*R,  y1,      x2,     y1+2*R, start=0,   extent=90, fill=fill,   outline=fill,   style="pieslice")
+            cv.create_arc(x1,      y2-2*R,  x1+2*R, y2,     start=180, extent=90, fill=fill,   outline=fill,   style="pieslice")
+            cv.create_arc(x2-2*R,  y2-2*R,  x2,     y2,     start=270, extent=90, fill=fill,   outline=fill,   style="pieslice")
+            cv.create_rectangle(x1+R, y1, x2-R, y2, fill=fill, outline=fill)
+            cv.create_rectangle(x1, y1+R, x2, y2-R, fill=fill, outline=fill)
+            # Purple outline
+            cv.create_arc(x1,      y1,      x1+2*R, y1+2*R, start=90,  extent=90, outline=PURPLE, width=OW, style="arc")
+            cv.create_arc(x2-2*R,  y1,      x2,     y1+2*R, start=0,   extent=90, outline=PURPLE, width=OW, style="arc")
+            cv.create_arc(x1,      y2-2*R,  x1+2*R, y2,     start=180, extent=90, outline=PURPLE, width=OW, style="arc")
+            cv.create_arc(x2-2*R,  y2-2*R,  x2,     y2,     start=270, extent=90, outline=PURPLE, width=OW, style="arc")
+            cv.create_line(x1+R, y1, x2-R, y1, fill=PURPLE, width=OW)
+            cv.create_line(x2,   y1+R, x2,   y2-R, fill=PURPLE, width=OW)
+            cv.create_line(x1+R, y2, x2-R, y2, fill=PURPLE, width=OW)
+            cv.create_line(x1,   y1+R, x1,   y2-R, fill=PURPLE, width=OW)
+            # White text (always white regardless of theme)
+            cv.create_text(W // 2, H // 2, text="💤 snooze",
+                           fill="#ffffff", font=("Helvetica", 10, "bold"))
+
+        _draw(BLUE)
+        cv.bind("<Enter>", lambda e: _draw(BLUE_HOVER))
+        cv.bind("<Leave>", lambda e: _draw(BLUE))
+        return cv
+
+    def _append_bmc_banner(self, banner):
+        outer = tk.Frame(self._inner, bg=self.BMC_BORDER_COLOR,
+                         bd=0, highlightthickness=0)
+        outer.pack(side="bottom", fill="x", padx=4, pady=(8, 4))
+
+        row = tk.Frame(outer, bg=self.BG, cursor="hand2",
+                       bd=0, highlightthickness=0)
+        row.pack(fill="x", padx=2, pady=2)
+
+        stripe = tk.Frame(row, width=8, bg=self.BG, bd=0, highlightthickness=0)
+        stripe.pack(side="left", fill="y")
+        stripe.pack_propagate(False)
+        for c in self.RAINBOW_VIVID:
+            tk.Frame(stripe, bg=c, bd=0, highlightthickness=0).pack(
+                side="top", fill="both", expand=True)
+
+        dismiss = tk.Label(row, text="✕  no thanks",
+                           bg=self.BG, fg=self.FG_DIM, cursor="hand2",
+                           font=("Helvetica", 9), padx=8)
+        dismiss.pack(side="right", padx=(4, 8))
+
+        snooze = self._make_snooze_btn(row, self.BG)
+        snooze.pack(side="right", padx=(0, 4), pady=4)
+
+        body = tk.Frame(row, bg=self.BG)
+        body.pack(side="left", fill="both", expand=True, padx=(10, 4), pady=6)
+
+        if banner.get("headline"):
+            tk.Label(body, text=banner["headline"], bg=self.BG,
+                     fg=self._theme["BANNER_FG"],
+                     font=("Helvetica", 11, "bold"), anchor="w").pack(fill="x")
+
+        img_path = banner.get("image")
+        img_lbl  = None
+        if img_path:
+            try:
+                img = Image.open(img_path).convert("RGBA")
+                max_w = 200
+                if img.width > max_w:
+                    img = img.resize((max_w, int(img.height * max_w / img.width)),
+                                     Image.LANCZOS)
+                photo = ImageTk.PhotoImage(img)
+                self._img_refs.append(photo)
+                img_lbl = tk.Label(body, image=photo, bg=self.BG, cursor="hand2")
+                img_lbl.pack(anchor="w")
+            except Exception:
+                pass
+        if img_lbl is None:
+            img_lbl = tk.Label(body, text="❤  Buy me a coffee",
+                               bg="#587180", fg="#ffffff", cursor="hand2",
+                               font=("Helvetica", 12, "bold"), padx=14, pady=6)
+            img_lbl.pack(anchor="w")
+
+        idx = len(self._rows)
+        action_widgets = [row, body, img_lbl]
+        self._rows.append({"frame": row, "label": self.BMC_BANNER_LABEL,
+                            "row_bg": self.BG, "all_widgets": action_widgets})
+        url = banner["url"]
+
+        def _show_banner_menu(e):
+            self._dismiss_popup()
+            menu = tk.Menu(self.root, tearoff=0)
+            menu.add_command(label="Open in browser",
+                             command=lambda: self._click_row(idx))
+            menu.add_command(label="Copy link address",
+                             command=lambda: (
+                                 self.root.clipboard_clear(),
+                                 self.root.clipboard_append(url)))
+            try:
+                menu.tk_popup(e.x_root, e.y_root)
+            finally:
+                menu.grab_release()
+
+            # Delay binding dismiss handlers so that any FocusOut/ButtonPress
+            # events queued during tk_popup have already fired before we listen.
+            def _setup_dismiss():
+                bid_root = [None]
+                bid_key  = [None]
+
+                def _close(*_):
+                    try:
+                        menu.unpost()
+                    except Exception:
+                        pass
+                    try:
+                        self.root.unbind("<ButtonPress-1>", bid_root[0])
+                    except Exception:
+                        pass
+                    try:
+                        self._entry.unbind("<Key>", bid_key[0])
+                    except Exception:
+                        pass
+
+                bid_root[0] = self.root.bind("<ButtonPress-1>", lambda e: _close(), add="+")
+                bid_key[0]  = self._entry.bind("<Key>", lambda e: _close(), add="+")
+                menu.bind("<Unmap>", _close)
+
+            self.root.after(50, _setup_dismiss)
+
+        for w in action_widgets:
+            w.bind("<Button-1>",   lambda e, i=idx: self._click_row(i))
+            w.bind("<Button-3>",   _show_banner_menu)
+            w.bind("<MouseWheel>", self._on_scroll)
+            w.bind("<Button-4>",   self._on_scroll)
+            w.bind("<Button-5>",   self._on_scroll)
+
+        def _on_dismiss(e=None):
+            self._result = self.BMC_DISMISS_LABEL
+            self.root.quit()
+        dismiss.bind("<Button-1>", _on_dismiss)
+        dismiss.bind("<Enter>",    lambda e: dismiss.configure(fg=self.FG))
+        dismiss.bind("<Leave>",    lambda e: dismiss.configure(fg=self.FG_DIM))
+
+        def _on_snooze(e=None):
+            self._result = self.BMC_SNOOZE_LABEL
+            self.root.quit()
+        snooze.bind("<Button-1>", _on_snooze)
+
+    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, banner=None, show_dark_btn=False):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
+        if show_dark_btn:
+            self._dm_btn.place(relx=1.0, rely=1.0, anchor="se", x=-6, y=-6)
+            self.root.tk.call('raise', self._dm_btn._w)
         gen = self._gen_id  # capture generation ID for stale-callback detection
         self._mode = "imagelist"
         self._on_select = on_select
@@ -1080,8 +1452,16 @@ class TkPicker:
 
         entries   = list(entries)
         _dbg(f"PICK_WITH_IMAGES gen={gen} n_entries={len(entries)} prompt={prompt!r}")
-        next_rank = [0]
-        pending   = {}
+
+        next_rank       = [0]
+        pending         = {}
+        banner_appended = [False]
+        total_entries   = len(entries)
+
+        def _maybe_append_banner():
+            if banner and not banner_appended[0] and next_rank[0] >= total_entries:
+                self._append_bmc_banner(banner)
+                banner_appended[0] = True
 
         def _append_header_row(text, color, image_path=None):
             hr = tk.Frame(self._inner, bg=self.BG, bd=0, highlightthickness=0)
@@ -1228,6 +1608,7 @@ class TkPicker:
                     _append_header_row(item[1], item[2], item[3] if len(item) > 3 else None)
                 else:
                     _append_row(*item)
+            _maybe_append_banner()
 
         def _on_image_ready(rank, label, path, score):
             cur_gen = self._gen_id
@@ -1281,6 +1662,7 @@ class TkPicker:
                 threading.Thread(target=_worker, daemon=True).start()
 
         if preload:
+            _maybe_append_banner()
             self.root.update_idletasks()
             self._sb.pack_forget()
 

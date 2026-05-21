@@ -32,12 +32,13 @@ def _dbg(msg, include_tb=False):
             f.write("\n".join(lines) + "\n")
 
 
-from platformdirs import user_cache_dir
+from platformdirs import user_cache_dir, user_config_dir
 
 _REPO         = Path(sys.argv[0]).resolve().parent
 DATA_DIR      = _REPO / "data" / "embeddings"
 UI_ASSETS_DIR = _REPO / "data" / "ui_assets"
 CACHE_DIR     = Path(user_cache_dir("kitchensearch"))
+CONFIG_DIR    = Path(user_config_dir("kitchensearch"))
 _VENV_PY      = _REPO / ".venv" / "bin" / "python3"
 _PYTHON       = str(_VENV_PY) if _VENV_PY.exists() else sys.executable
 SEARCH_INDEX  = UI_ASSETS_DIR / "search-index.tsv"
@@ -500,6 +501,70 @@ def get_thumb(url):
             if attempt == 0:
                 time.sleep(0.3)
     return None
+
+
+
+
+_AB_BASE_URL      = "https://www.buymeacoffee.com/morganrivers"
+_AB_BUTTON_PATH   = _REPO / "data" / "ui_assets" / "buymeacoffee_button.png"
+_AB_TIMING_HOURS  = {"A": 36, "B": 48, "C": 72}
+
+
+def _next_tuesday_ts():
+    """Timestamp of midnight at the start of the next Tuesday (local time)."""
+    today = date.today()
+    days  = (1 - today.weekday()) % 7  # days until Tuesday; 0 means today is Tuesday. 
+    if days == 0:
+        days = 7
+    next_tue = today + timedelta(days=days)
+    return _datetime(next_tue.year, next_tue.month, next_tue.day).timestamp()
+
+
+def _ab_mtime_ms():
+    """Return THUMB_DIR mtime as integer milliseconds, or None if not yet created."""
+    try:
+        return int(THUMB_DIR.stat().st_mtime * 1000)
+    except OSError:
+        return None
+
+
+def _ab_bucket():
+    mt = _ab_mtime_ms()
+    return mt % 6 if mt is not None else 0
+
+
+def _ab_version():
+    mt = _ab_mtime_ms()
+    return f"{(mt & 0xFFFFFFF):07x}" if mt is not None else "0000000"
+
+
+def _ab_hours_elapsed():
+    try:
+        return (time.time() - THUMB_DIR.stat().st_mtime) / 3600
+    except OSError:
+        return 0
+
+
+def get_buymeacoffee_url():
+    return f"{_AB_BASE_URL}?version={_ab_version()}"
+
+
+def should_show_banner():
+    bucket   = _ab_bucket()
+    timing_v = ("A", "B", "C")[bucket % 3]
+    return _ab_hours_elapsed() >= _AB_TIMING_HOURS[timing_v]
+
+
+def get_banner_config():
+    if not should_show_banner():
+        return None
+    copy_v = "indie" if _ab_bucket() >= 3 else "simple"
+    return {
+        "headline": "🥹 Support an indie developer!" if copy_v == "indie" else None,
+        "image":    str(_AB_BUTTON_PATH) if _AB_BUTTON_PATH.exists() else None,
+        "url":      get_buymeacoffee_url(),
+        "variant":  copy_v,
+    }
 
 
 
