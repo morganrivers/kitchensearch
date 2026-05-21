@@ -1,77 +1,84 @@
+"""
+Test SVG conversion of cached emoji PNGs.
+
+Usage (from repo root):
+    pip install vtracer
+    python3 test_svg_convert.py
+
+Reads PNGs from ~/.local/share/kitchensearch/data/cache/thumbs/
+Writes SVGs to /tmp/emoji_svg_test/
+"""
+import gzip
+import os
 import random
-import subprocess
 import tarfile
 import urllib.request
-import os
-import time
-import vtracer
 from pathlib import Path
 
+import vtracer
+
+CACHE_DIR = Path.home() / ".local/share/kitchensearch/data/cache/thumbs"
 OUT_DIR = Path("/tmp/emoji_svg_test")
 OUT_DIR.mkdir(exist_ok=True)
 
-# Load URLs from asset bundle
-with tarfile.open("data/app_assets.tar.gz") as tar:
-    f = tar.extractfile("data/ui_assets/urls.txt")
-    urls = [line.decode().strip() for line in f if line.strip()]
+PRESETS = {
+    "medium": dict(filter_speckle=8,  color_precision=4, layer_difference=32, length_threshold=6.0,  path_precision=2),
+    "low":    dict(filter_speckle=16, color_precision=3, layer_difference=48, length_threshold=10.0, path_precision=1),
+    "tiny":   dict(filter_speckle=32, color_precision=2, layer_difference=64, length_threshold=15.0, path_precision=1),
+}
 
-sample = random.sample(urls, 100)
+def convert(png_path: Path, svg_path: Path, params: dict):
+    vtracer.convert_image_to_svg_py(
+        str(png_path), str(svg_path),
+        colormode="color", hierarchical="stacked", mode="spline",
+        corner_threshold=60, max_iterations=10, splice_threshold=45,
+        **params,
+    )
 
-results = {"ok": 0, "fail": 0, "errors": []}
+def gzip_size(path: Path) -> int:
+    return len(gzip.compress(path.read_bytes(), compresslevel=9))
 
-for i, url in enumerate(sample):
-    name = url.split("/")[-1].replace(".png", "")
-    png_path = str(OUT_DIR / f"{name}.png")
-    svg_path = str(OUT_DIR / f"{name}.svg")
+def main():
+    pngs = list(CACHE_DIR.glob("*.png"))
+    if not pngs:
+        print(f"No cached PNGs found in {CACHE_DIR}")
+        print("Run the app first to populate the cache, then re-run this script.")
+        return
 
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "emojikitchen-picker"})
-        with urllib.request.urlopen(req, timeout=10) as resp, open(png_path, "wb") as fout:
-            fout.write(resp.read())
-    except Exception as e:
-        results["fail"] += 1
-        results["errors"].append(f"download {url}: {e}")
-        continue
+    sample = random.sample(pngs, min(len(pngs), 200))
+    print(f"Converting {len(sample)} PNGs from cache...\n")
 
-    try:
-        vtracer.convert_image_to_svg_py(
-            png_path,
-            svg_path,
-            colormode="color",
-            hierarchical="stacked",
-            mode="spline",
-            filter_speckle=4,
-            color_precision=6,
-            layer_difference=16,
-            corner_threshold=60,
-            length_threshold=4.0,
-            max_iterations=10,
-            splice_threshold=45,
-            path_precision=3,
-        )
-        png_kb = os.path.getsize(png_path) / 1024
-        svg_kb = os.path.getsize(svg_path) / 1024
-        results["ok"] += 1
-        if i % 10 == 0:
-            print(f"[{i+1}/100] {name}: PNG {png_kb:.1f}KB → SVG {svg_kb:.1f}KB")
-    except Exception as e:
-        results["fail"] += 1
-        results["errors"].append(f"convert {name}: {e}")
+    stats = {label: {"raw": [], "gz": []} for label in PRESETS}
+    png_raw, png_gz = [], []
 
-print(f"\nDone: {results['ok']} ok, {results['fail']} failed")
-if results["errors"]:
-    print("Errors:")
-    for e in results["errors"][:10]:
-        print(" ", e)
+    for i, png in enumerate(sample):
+        png_raw.append(png.stat().st_size)
+        png_gz.append(gzip_size(png))
 
-# Size summary
-pngs = list(OUT_DIR.glob("*.png"))
-svgs = list(OUT_DIR.glob("*.svg"))
-if pngs and svgs:
-    avg_png = sum(f.stat().st_size for f in pngs) / len(pngs) / 1024
-    avg_svg = sum(f.stat().st_size for f in svgs) / len(svgs) / 1024
-    print(f"\nAverage PNG size: {avg_png:.1f} KB")
-    print(f"Average SVG size: {avg_svg:.1f} KB")
-    print(f"Size ratio: {avg_svg/avg_png:.1f}x")
-    total_svg_147k_gb = avg_svg * 147_000 / 1024 / 1024
-    print(f"\nProjected total for 147k SVGs: {total_svg_147k_gb:.1f} GB")
+        for label, params in PRESETS.items():
+            svg = OUT_DIR / f"{png.stem}_{label}.svg"
+            convert(png, svg, params)
+            stats[label]["raw"].append(svg.stat().st_size)
+            stats[label]["gz"].append(gzip_size(svg))
+
+        if (i + 1) % 50 == 0:
+            print(f"  {i+1}/{len(sample)} done...")
+
+    n = len(sample)
+    print(f"\n{'Format':<18} {'Avg raw':>10} {'Avg gz':>10} {'Proj 147k gz':>14}")
+    print("-" * 56)
+    avg_png_raw = sum(png_raw) / n
+    avg_png_gz  = sum(png_gz) / n
+    proj_png    = avg_png_gz * 147_000 / 1024**3
+    print(f"{'PNG':<18} {avg_png_raw/1024:>9.1f}KB {avg_png_gz/1024:>9.1f}KB {proj_png:>13.2f}GB")
+
+    for label, s in stats.items():
+        avg_raw = sum(s["raw"]) / n
+        avg_gz  = sum(s["gz"]) / n
+        proj    = avg_gz * 147_000 / 1024**3
+        print(f"{'SVG ' + label:<18} {avg_raw/1024:>9.1f}KB {avg_gz/1024:>9.1f}KB {proj:>13.2f}GB")
+
+    print(f"\nSVGs written to {OUT_DIR}/ — open a few to check quality.")
+
+if __name__ == "__main__":
+    main()
