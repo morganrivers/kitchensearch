@@ -170,8 +170,12 @@ def search_combined(query, model, img_emb, txt_emb, pca_matrix, pca_mean,
 
     txt_scores = txt_emb @ q_pca
     img_scores = img_emb @ q_pca
-    combined   = txt_scores + 2.0 * img_scores
-    top_idx    = combined.argsort()[::-1]
+
+    k = 60
+    txt_ranks = txt_scores.argsort()[::-1].argsort()
+    img_ranks = img_scores.argsort()[::-1].argsort()
+    combined  = 1.0 / (k + txt_ranks) + 1.0 / (k + img_ranks)
+    top_idx   = combined.argsort()[::-1]
     return [(float(combined[i]), nomic_alts[i], nomic_urls[i]) for i in top_idx]
 
 

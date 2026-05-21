@@ -6,10 +6,10 @@ Results appear one-by-one as thumbnails download. Borderless, half-screen, cente
 Bind in i3 config:
   bindsym $mod+shift+e exec --no-startup-id python3 ~/.local/bin/emoji-picker-tk.py
 """
-import sys, re, json, hashlib, webbrowser 
+import sys, re, json, hashlib, webbrowser, time
 from PIL import Image
 from picker_utils import (
-    DATA_DIR, UI_ASSETS_DIR, CACHE_DIR, THUMB_DIR,
+    DATA_DIR, UI_ASSETS_DIR, CACHE_DIR, CONFIG_DIR, THUMB_DIR,
     SEARCH_INDEX, _REPO, _PYTHON,
     STORY_OUT, STORY_PY, STORY_BIN,
     DAEMON_LOG,
@@ -20,13 +20,16 @@ from picker_utils import (
     copy_image_to_clipboard,
     query_daemon,
     _trim_thumb_cache, _spawn_daemon, _daemon_alive,
+    get_buymeacoffee_url, get_banner_config, _next_tuesday_ts,
 )
-from picker_ui import TkPicker, pick_base_emoji    
+from picker_ui import (
+    TkPicker, pick_base_emoji,
+)
 
 
 # ── settings ──────────────────────────────────────────────────────────────────
 
-SETTINGS_FILE = CACHE_DIR / "picker-settings.json"
+SETTINGS_FILE = CONFIG_DIR / "picker-settings.json"
 
 _DEFAULT_SETTINGS = {
     "notify_on_copy":  True,
@@ -37,6 +40,7 @@ _DEFAULT_SETTINGS = {
     "show_story":     True,
     "floating":       True,
     "frameless":      False,
+    "dark_mode":      False,
 }
 
 
@@ -134,8 +138,9 @@ def _run_settings(picker, settings):
             _lbl("exit_on_select", "Exit app when emoji selected"),
             _lbl("floating",       "Start as floating window (takes effect on restart)"),
             _lbl("frameless",      "Start frameless & no title bar (takes effect on restart)"),
-            "buy me a coffee ☕",
         ]
+        if "hide_ads" in settings and not (time.time() < settings.get("snooze_until", 0)):
+            items.append(_lbl("hide_ads", "Don't show support banner"))
         choice = picker.pick_settings("Settings", items, initial_sel=sel_idx)
         if not choice:
             return
@@ -149,11 +154,9 @@ def _run_settings(picker, settings):
         elif "semantic"       in choice: settings["show_semantic"]  = not settings["show_semantic"]
         elif "combo"          in choice: settings["show_combo"]     = not settings["show_combo"]
         elif "emoji story"    in choice: settings["show_story"]     = not settings["show_story"]
-        elif "floating window" in choice: settings["floating"]      = not settings["floating"]
-        elif "no title bar"   in choice: settings["frameless"]      = not settings["frameless"]
-        elif "buy me a coffee" in choice:
-            webbrowser.open("https://buymeacoffee.com/morganrivers")
-            return
+        elif "floating window"        in choice: settings["floating"]  = not settings["floating"]
+        elif "no title bar"           in choice: settings["frameless"] = not settings["frameless"]
+        elif "support banner"         in choice: settings["hide_ads"]  = not settings["hide_ads"]
         save_settings(settings)
 
 
@@ -161,7 +164,16 @@ def main():
     _dbg("APP_START")
     settings = load_settings()
     _dbg("APP: TkPicker init start")
-    picker   = TkPicker(floating=settings["floating"], frameless=settings["frameless"])
+    def _on_dark_toggle(dark):
+        settings["dark_mode"] = dark
+        save_settings(settings)
+
+    picker = TkPicker(
+        floating=settings["floating"],
+        frameless=settings["frameless"],
+        dark=settings.get("dark_mode", False),
+        on_dark_toggle=_on_dark_toggle,
+    )
     _dbg("APP: TkPicker init done")
 
     try:
@@ -196,13 +208,33 @@ def main():
             _dbg(f"MENU_BUILD_DONE n={len(menu_entries)}")
 
             _dbg("MENU_SHOW_START")
+            snoozed = time.time() < settings.get("snooze_until", 0)
+            banner = None if settings.get("hide_ads") or snoozed else get_banner_config()
+            if banner is not None and "hide_ads" not in settings:
+                settings["hide_ads"] = False
+                save_settings(settings)
             mode = picker.pick_with_images("Use quick keyword search directly or select an option below.", menu_entries, _menu_on_url,
                                            thumb_size=48, preload=True,
                                            placeholder="type to keyword search...",
-                                           filter=False)
+                                           filter=False, banner=banner,
+                                           show_dark_btn=True)
             _dbg(f"MENU_SHOW_DONE mode={mode!r}")
             if not mode:
                 sys.exit(0)
+
+            if mode == TkPicker.BMC_BANNER_LABEL:
+                settings["hide_ads"] = True
+                save_settings(settings)
+                webbrowser.open(get_buymeacoffee_url())
+                continue
+            if mode == TkPicker.BMC_SNOOZE_LABEL:
+                settings["snooze_until"] = _next_tuesday_ts()
+                save_settings(settings)
+                continue
+            if mode == TkPicker.BMC_DISMISS_LABEL:
+                settings["hide_ads"] = True
+                save_settings(settings)
+                continue
 
             # ── settings ─────────────────────────────────────────────────
             if mode == "settings":
@@ -291,10 +323,9 @@ def main():
                 on_sel_combo = None if settings["exit_on_select"] else _copy_combo
                 offset = 0
                 while True:
-                    batch_rest = rest[offset:offset + BATCH_SIZE]
-                    shown_end  = offset + len(batch_rest)
+                    batch_rest = rest[0:offset + BATCH_SIZE]
                     if len(rest) > 0:
-                        similar_range = f"{offset+1}-{shown_end} of {len(rest)}"
+                        similar_range = f"1-{len(batch_rest)} of {len(rest)}"
                     else:
                         similar_range = "0"
                     if exact:
@@ -371,8 +402,8 @@ def main():
             # ── results ──────────────────────────────────────────────────
             offset = 0
             while True:
-                batch = results[offset:offset + BATCH_SIZE]
-                count = f"({offset+1}-{offset+len(batch)} of {len(results)})"
+                batch = results[0:offset + BATCH_SIZE]
+                count = f"(1-{len(batch)} of {len(results)})"
                 icon_entries = [(format_label(alt, url, text), url, ts)
                                 for ts, alt, url, text in batch]
                 if offset + BATCH_SIZE < len(results):
