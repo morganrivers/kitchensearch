@@ -23,8 +23,8 @@ OUT_DIR.mkdir(exist_ok=True)
 
 PRESETS = {
     "medium": dict(filter_speckle=8,  color_precision=4, layer_difference=32, length_threshold=6.0,  path_precision=2),
-    "low":    dict(filter_speckle=16, color_precision=3, layer_difference=48, length_threshold=10.0, path_precision=1),
-    "tiny":   dict(filter_speckle=32, color_precision=2, layer_difference=64, length_threshold=15.0, path_precision=1),
+    "low":    dict(filter_speckle=16, color_precision=4, layer_difference=48, length_threshold=10.0, path_precision=1),
+    "tiny":   dict(filter_speckle=32, color_precision=4, layer_difference=64, length_threshold=15.0, path_precision=1),
 }
 
 def convert(png_path: Path, svg_path: Path, params: dict):
