@@ -1,4 +1,5 @@
 import sys
+import os
 import re
 import math
 import threading
@@ -158,7 +159,8 @@ class TkPicker:
                                relief="flat", bd=6,
                                highlightthickness=2,
                                highlightbackground="#dddddd",
-                               highlightcolor=self.ACCENT)
+                               highlightcolor=self.ACCENT,
+                               insertofftime=0 if os.environ.get("KITCHENSEARCH_NO_BLINK") else 300)
         self._entry.pack(fill="x", pady=(4, 0))
 
         self._entry.bind("<Escape>",       self._cancel)
@@ -528,15 +530,26 @@ class TkPicker:
             self.root.deiconify()
             if self._frameless:
                 self.root.geometry(self._geometry)
+            if os.environ.get("KITCHENSEARCH_NO_GRAB"):
+                # Start the test-mode widget-dump server
+                try:
+                    import sys as _sys
+                    _repo = _sys.path[0] if _sys.path else "."
+                    _sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent / "tests"))
+                    from widget_dump import start_test_server
+                    start_test_server(self.root)
+                except Exception:
+                    pass
         def _activate():
             self.root.focus_force()
             if self._entry.winfo_ismapped():
                 self._entry.focus_set()
             try:
-                if self._frameless:
-                    self.root.grab_set_global()
-                else:
-                    self.root.grab_set()
+                if not os.environ.get("KITCHENSEARCH_NO_GRAB"):
+                    if self._frameless:
+                        self.root.grab_set_global()
+                    else:
+                        self.root.grab_set()
             except tk.TclError:
                 pass
         self.root.after(50, _activate)

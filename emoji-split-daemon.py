@@ -59,8 +59,8 @@ IMG_EMBEDDINGS = DATA_DIR / "nomic-image-pca128.npy"
 TXT_EMBEDDINGS = DATA_DIR / "nomic-text-pca128.npy"
 PCA_MATRIX     = DATA_DIR / "nomic-pca128-matrix.npy"
 PCA_MEAN       = DATA_DIR / "nomic-pca128-mean.npy"
-NOMIC_URLS     = UI_ASSETS_DIR / "nomic-urls.txt"
-NOMIC_ALTS     = UI_ASSETS_DIR / "nomic-alts.txt"
+NOMIC_URLS     = UI_ASSETS_DIR / "embedding-urls.txt"
+NOMIC_ALTS     = UI_ASSETS_DIR / "embedding-alts.txt"
 
 IDLE_TIMEOUT = 600
 
@@ -83,11 +83,11 @@ def load():
             print(f"Missing {f.name} - download data.tar.gz from releases.", flush=True)
             sys.exit(1)
 
-    if _nomic_text.is_cached():
-        _write_status("Loading nomic-embed-text model...", 5)
-    else:
-        _nomic_text.download(status_cb=_write_status, pct_start=5, pct_end=40)
-        _write_status("Loading nomic-embed-text model...", 40)
+    # if _nomic_text.is_cached():
+    _write_status("Loading nomic-embed-text model...", 5)
+    # else:
+    # _nomic_text.download(status_cb=_write_status, pct_start=5, pct_end=40)
+    # _write_status("Loading nomic-embed-text model...", 40)
     model = _nomic_text.load()
 
     _write_status("Warming up model...", 42)
@@ -117,8 +117,9 @@ def load():
     txt_emb     = np.load(TXT_EMBEDDINGS).astype(np.float32)
     pca_matrix  = np.load(PCA_MATRIX).astype(np.float32)
     pca_mean    = np.load(PCA_MEAN).astype(np.float32)
-    nomic_urls  = NOMIC_URLS.read_text().splitlines()
-    nomic_alts  = NOMIC_ALTS.read_text().splitlines()
+    n = img_emb.shape[0]
+    nomic_urls  = NOMIC_URLS.read_text().splitlines()[:n]
+    nomic_alts  = NOMIC_ALTS.read_text().splitlines()[:n]
 
     _write_status("Ready", 100)
     print(f"Ready - {len(base_codes)} base emojis, {len(combo_map):,} combos, "

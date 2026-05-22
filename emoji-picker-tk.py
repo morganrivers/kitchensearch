@@ -376,9 +376,12 @@ def main():
                 if not query:
                     continue
                 results = query_daemon(query)
-                if not results or results == "loading":
+                if results is None:
                     picker.message(
                         f"Search daemon failed to start.\nSee {DAEMON_LOG} for details.")
+                    continue
+                if results == "loading":
+                    picker.message("Search daemon is still loading. Please try again in a moment.")
                     continue
                 alt_to_text = {alt: text for _, alt, text in entries}
                 results = [(rank, alt, url, alt_to_text.get(alt, ""))

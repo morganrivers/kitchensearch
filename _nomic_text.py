@@ -29,19 +29,19 @@ DOC_PREFIX   = "search_document: "
 QUERY_PREFIX = "search_query: "
 
 
-def _blobs_dir() -> Path:
-    root = Path(os.getenv("HF_HOME", Path.home() / ".cache" / "huggingface")) / "hub"
-    return root / f"models--{HF_REPO.replace('/', '--')}" / "blobs"
+# def _blobs_dir() -> Path:
+#     root = Path(os.getenv("HF_HOME", Path.home() / ".cache" / "huggingface")) / "hub"
+#     return root / f"models--{HF_REPO.replace('/', '--')}" / "blobs"
 
 
-def _hf_cached_paths() -> tuple[Path, Path] | None:
-    try:
-        from huggingface_hub import hf_hub_download
-        onnx = Path(hf_hub_download(HF_REPO, ONNX_FILE, local_files_only=True))
-        tok  = Path(hf_hub_download(HF_REPO, "tokenizer.json", local_files_only=True)).parent
-        return onnx, tok
-    except Exception:
-        return None
+# def _hf_cached_paths() -> tuple[Path, Path] | None:
+#     try:
+#         from huggingface_hub import hf_hub_download
+#         onnx = Path(hf_hub_download(HF_REPO, ONNX_FILE, local_files_only=True))
+#         tok  = Path(hf_hub_download(HF_REPO, "tokenizer.json", local_files_only=True)).parent
+#         return onnx, tok
+#     except Exception:
+#         return None
 
 
 def _bundled_paths() -> tuple[Path, Path] | None:
@@ -51,41 +51,41 @@ def _bundled_paths() -> tuple[Path, Path] | None:
     return None
 
 
-def is_cached() -> bool:
-    return _hf_cached_paths() is not None or _bundled_paths() is not None
+# def is_cached() -> bool:
+#     return _hf_cached_paths() is not None or _bundled_paths() is not None
 
 
-def download(status_cb: Callable[[str, float], None] | None = None,
-             pct_start: float = 0, pct_end: float = 100) -> None:
-    from huggingface_hub import hf_hub_download
-    stop  = threading.Event()
-    blobs = _blobs_dir()
+# def download(status_cb: Callable[[str, float], None] | None = None,
+#              pct_start: float = 0, pct_end: float = 100) -> None:
+#     from huggingface_hub import hf_hub_download
+#     stop  = threading.Event()
+#     blobs = _blobs_dir()
 
-    if status_cb:
-        def _watch() -> None:
-            while not stop.wait(0.4):
-                try:
-                    n = sum(f.stat().st_size for f in blobs.iterdir() if f.is_file())
-                    frac = min(n / (SIZE_MB * 1_000_000), 0.99)
-                    status_cb(
-                        f"Downloading nomic-embed-text ({n/1e6:.0f} / {SIZE_MB} MB)",
-                        pct_start + (pct_end - pct_start) * frac,
-                    )
-                except Exception:
-                    pass
-        status_cb("Downloading nomic-embed-text model...", pct_start)
-        threading.Thread(target=_watch, daemon=True).start()
+#     if status_cb:
+#         def _watch() -> None:
+#             while not stop.wait(0.4):
+#                 try:
+#                     n = sum(f.stat().st_size for f in blobs.iterdir() if f.is_file())
+#                     frac = min(n / (SIZE_MB * 1_000_000), 0.99)
+#                     status_cb(
+#                         f"Downloading nomic-embed-text ({n/1e6:.0f} / {SIZE_MB} MB)",
+#                         pct_start + (pct_end - pct_start) * frac,
+#                     )
+#                 except Exception:
+#                     pass
+#         status_cb("Downloading nomic-embed-text model...", pct_start)
+#         threading.Thread(target=_watch, daemon=True).start()
 
-    for fname in TOK_FILES + [ONNX_FILE]:
-        hf_hub_download(HF_REPO, fname)
-    stop.set()
+#     for fname in TOK_FILES + [ONNX_FILE]:
+#         hf_hub_download(HF_REPO, fname)
+#     stop.set()
 
 
 def load() -> "NomicText":
-    paths = _hf_cached_paths() or _bundled_paths()
+    paths = _bundled_paths()
     if paths is None:
         raise FileNotFoundError(
-            f"nomic-embed-text model not found in HF cache or bundled at {BUNDLED_DIR}. "
+            f"nomic-embed-text model not found bundled at {BUNDLED_DIR}. "
             "Call download() first."
         )
     onnx_path, tok_dir = paths

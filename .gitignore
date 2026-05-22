@@ -11,3 +11,5 @@ data/cache/
 data/ui_assets/
 data/fonts/
 data/models/
+tests/runs/
+tests/_test_config/

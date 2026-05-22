@@ -135,39 +135,45 @@ def _notify(msg):
         print(msg, file=sys.stderr)
 
 
-_xlib_clipboard_state = None
-
 def _copy_image_xlib(png_data):
-    """Own the X11 CLIPBOARD selection and serve PNG bytes to any requestor."""
-    global _xlib_clipboard_state
+    """Own the X11 CLIPBOARD selection, served from a detached grandchild process."""
     import select as _select
     from Xlib import display as _Xdisplay, X as _X, Xatom as _Xatom
     from Xlib.protocol import event as _Xevent
 
-    disp   = _Xdisplay.Display()
-    screen = disp.screen()
-    win    = screen.root.create_window(0, 0, 1, 1, 0, screen.root_depth)
+    # Double-fork so the grandchild is fully detached (reparented to init).
+    # The parent returns immediately; the grandchild serves clipboard requests
+    # until another app takes ownership (SelectionClear).
+    pid = os.fork()
+    if pid != 0:
+        os.waitpid(pid, 0)
+        return
 
-    CLIPBOARD = disp.intern_atom("CLIPBOARD")
-    TARGETS   = disp.intern_atom("TARGETS")
-    PNG       = disp.intern_atom("image/png")
+    # --- intermediate child ---
+    try:
+        pid2 = os.fork()
+        if pid2 != 0:
+            os._exit(0)
 
-    win.set_selection_owner(CLIPBOARD, _X.CurrentTime)
-    disp.flush()
-    if disp.get_selection_owner(CLIPBOARD) != win:
-        disp.close()
-        raise RuntimeError("could not acquire CLIPBOARD ownership")
+        # --- grandchild: own and serve the clipboard ---
+        disp   = _Xdisplay.Display()
+        screen = disp.screen()
+        win    = screen.root.create_window(0, 0, 1, 1, 0, screen.root_depth)
 
-    state = {"data": png_data, "running": True}
-    if _xlib_clipboard_state:
-        _xlib_clipboard_state["running"] = False
-    _xlib_clipboard_state = state
+        CLIPBOARD = disp.intern_atom("CLIPBOARD")
+        TARGETS   = disp.intern_atom("TARGETS")
+        PNG       = disp.intern_atom("image/png")
 
-    def _loop():
-        while state["running"]:
+        win.set_selection_owner(CLIPBOARD, _X.CurrentTime)
+        disp.flush()
+        if disp.get_selection_owner(CLIPBOARD) != win:
+            os._exit(1)
+
+        while True:
             r, _, _ = _select.select([disp.fileno()], [], [], 0.5)
             if not r:
                 continue
+            done = False
             while disp.pending_events():
                 ev = disp.next_event()
                 if ev.type == _X.SelectionRequest:
@@ -176,7 +182,7 @@ def _copy_image_xlib(png_data):
                         ev.requestor.change_property(prop, _Xatom.ATOM, 32,
                                                      [TARGETS, PNG])
                     elif ev.target == PNG:
-                        ev.requestor.change_property(prop, PNG, 8, state["data"])
+                        ev.requestor.change_property(prop, PNG, 8, png_data)
                     else:
                         prop = _X.NONE
                     notify = _Xevent.SelectionNotify(
@@ -185,10 +191,14 @@ def _copy_image_xlib(png_data):
                     ev.requestor.send_event(notify)
                     disp.flush()
                 elif ev.type == _X.SelectionClear:
-                    state["running"] = False
+                    done = True
+            if done:
+                break
         disp.close()
-
-    threading.Thread(target=_loop, daemon=True).start()
+    except Exception:
+        pass
+    finally:
+        os._exit(0)
 
 
 def copy_image_to_clipboard(path):
@@ -359,6 +369,8 @@ def query_daemon(query, limit=MAX_RESULTS):
         results = json.loads(conn.recv_bytes().decode())
         if isinstance(results, list):
             return [(r["rank"], r["alt"], r["url"], "") for r in results]
+        if isinstance(results, dict) and "error" in results:
+            raise RuntimeError(results["error"])
     except Exception:
         return "loading" if _daemon_alive() else None
     finally:
