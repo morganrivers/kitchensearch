@@ -250,12 +250,9 @@ def _cleanup_incomplete_data():
     """Remove any partially extracted npy files so the next download starts clean."""
     if _has_semantic_models():
         return
-    for f in ("base-emoji-nomic.npy", "nomic-image-pca256.npy",
-               "nomic-text-pca256.npy", "nomic-pca256-matrix.npy",
-               "nomic-pca256-mean.npy"):
+    for f in ("base-emoji-minilm.npy", "minilm-pca340.npy",
+               "minilm-pca340-matrix.npy", "minilm-pca340-mean.npy"):
         (DATA_DIR / f).unlink(missing_ok=True)
-    for f in ("nomic-urls.txt", "nomic-alts.txt"):
-        (UI_ASSETS_DIR / f).unlink(missing_ok=True)
 
 
 def _process_exists(pid: int) -> bool:
@@ -307,6 +304,18 @@ def _daemon_alive():
     if not _process_exists(pid):
         DAEMON_PID.unlink(missing_ok=True)
         return False
+    # Zombie detection: process is alive, claimed Ready, but socket is gone.
+    # Only kill if the status file says the daemon finished loading — during
+    # normal startup the socket doesn't exist yet (created after load).
+    if not IS_NAMED_PIPE and not Path(IPC_ADDRESS).exists():
+        try:
+            status = json.loads(DAEMON_STATUS.read_text())
+            if status.get("pct", 0) >= 100:
+                os.kill(pid, signal.SIGTERM)
+                DAEMON_PID.unlink(missing_ok=True)
+                return False
+        except Exception:
+            pass
     return True
 
 
@@ -647,17 +656,10 @@ def render_emoji_pil(char, size=20):
         return None
 
 def _has_semantic_models():
-    return (
-        all((DATA_DIR / f).exists() for f in (
-            "base-emoji-nomic.npy",
-            "nomic-image-pca256.npy",
-            "nomic-text-pca256.npy",
-            "nomic-pca256-matrix.npy",
-            "nomic-pca256-mean.npy",
-        )) and
-        all((UI_ASSETS_DIR / f).exists() for f in (
-            "nomic-urls.txt",
-            "nomic-alts.txt",
-        ))
-    )
+    return all((DATA_DIR / f).exists() for f in (
+        "base-emoji-minilm.npy",
+        "minilm-pca340.npy",
+        "minilm-pca340-matrix.npy",
+        "minilm-pca340-mean.npy",
+    ))
 

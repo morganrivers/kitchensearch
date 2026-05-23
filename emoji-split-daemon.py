@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """
-Split-query search daemon using jinaai/jina-clip-v1 (text encoder only at runtime).
-Combo images and their keyword texts are pre-embedded in the same 768-dim space
-and compressed to 128 dims via shared PCA.  Both are scored against each query
-and fused with RRF so results reflect both visual and textual similarity.
+Split-query search daemon using sentence-transformers/all-MiniLM-L6-v2 (text only).
 
   1 word  - scores base emojis, returns squared combo (emoji-emoji) first
   2 words - cross-ranks all combos by combined base-emoji similarity
-  3+ words - image RRF + text RRF combined search only
+  3+ words - text similarity search only
 
 Protocol: newline-terminated JSON each direction.
   Request:  {"query": "...", "limit": 5000}
@@ -26,7 +23,7 @@ from multiprocessing.connection import Listener
 from pathlib import Path
 
 import numpy as np
-import _nomic_text
+import _minilm_text
 
 from platformdirs import user_cache_dir
 
@@ -37,30 +34,24 @@ CACHE_DIR     = Path(user_cache_dir("kitchensearch"))
 
 
 def _ipc_address() -> str:
-    """Cross-platform IPC endpoint: Unix socket on POSIX, named pipe on Windows.
-
-    Named pipes are global to the machine, so namespace by username to avoid
-    collisions on shared systems.
-    """
     if sys.platform == "win32":
         return r"\\.\pipe\kitchensearch-" + getpass.getuser()
     return str(CACHE_DIR / "split-daemon.sock")
 
 
-IPC_ADDRESS = _ipc_address()
+IPC_ADDRESS   = _ipc_address()
 IS_NAMED_PIPE = IPC_ADDRESS.startswith(r"\\.\pipe")
 STATUS_PATH   = CACHE_DIR / "split-daemon-loading.json"
 SEARCH_INDEX  = UI_ASSETS_DIR / "search-index.tsv"
 
-BASE_CODES     = UI_ASSETS_DIR / "base-emoji-codes.txt"
-BASE_NAMES     = UI_ASSETS_DIR / "base-emoji-names.txt"
-BASE_NOMIC     = DATA_DIR / "base-emoji-nomic.npy"
-IMG_EMBEDDINGS = DATA_DIR / "nomic-image-pca256.npy"
-TXT_EMBEDDINGS = DATA_DIR / "nomic-text-pca256.npy"
-PCA_MATRIX     = DATA_DIR / "nomic-pca256-matrix.npy"
-PCA_MEAN       = DATA_DIR / "nomic-pca256-mean.npy"
-NOMIC_URLS     = UI_ASSETS_DIR / "embedding-urls.txt"
-NOMIC_ALTS     = UI_ASSETS_DIR / "embedding-alts.txt"
+BASE_CODES    = UI_ASSETS_DIR / "base-emoji-codes.txt"
+BASE_NAMES    = UI_ASSETS_DIR / "base-emoji-names.txt"
+BASE_MINILM   = DATA_DIR / "base-emoji-minilm.npy"
+TXT_EMBEDDINGS = DATA_DIR / "minilm-pca340.npy"
+PCA_MATRIX    = DATA_DIR / "minilm-pca340-matrix.npy"
+PCA_MEAN      = DATA_DIR / "minilm-pca340-mean.npy"
+COMBO_URLS    = UI_ASSETS_DIR / "embedding-urls.txt"
+COMBO_ALTS    = UI_ASSETS_DIR / "embedding-alts.txt"
 
 IDLE_TIMEOUT = 600
 
@@ -75,28 +66,24 @@ def _write_status(step, pct):
 
 
 def load():
-    required = [BASE_CODES, BASE_NAMES, BASE_NOMIC,
-                IMG_EMBEDDINGS, TXT_EMBEDDINGS, PCA_MATRIX, PCA_MEAN,
-                NOMIC_URLS, NOMIC_ALTS]
+    required = [BASE_CODES, BASE_NAMES, BASE_MINILM,
+                TXT_EMBEDDINGS, PCA_MATRIX, PCA_MEAN,
+                COMBO_URLS, COMBO_ALTS]
     for f in required:
         if not f.exists():
             print(f"Missing {f.name} - download data.tar.gz from releases.", flush=True)
             sys.exit(1)
 
-    # if _nomic_text.is_cached():
-    _write_status("Loading nomic-embed-text model...", 5)
-    # else:
-    # _nomic_text.download(status_cb=_write_status, pct_start=5, pct_end=40)
-    # _write_status("Loading nomic-embed-text model...", 40)
-    model = _nomic_text.load()
+    _write_status("Loading MiniLM model...", 5)
+    model = _minilm_text.load()
 
     _write_status("Warming up model...", 42)
     model.embed(["warmup"])
 
     _write_status("Loading base emoji data...", 50)
-    base_codes  = BASE_CODES.read_text().splitlines()
-    base_nomic  = np.load(BASE_NOMIC).astype(np.float32)
-    code_to_idx = {c: i for i, c in enumerate(base_codes)}
+    base_codes   = BASE_CODES.read_text().splitlines()
+    base_minilm  = np.load(BASE_MINILM).astype(np.float32)
+    code_to_idx  = {c: i for i, c in enumerate(base_codes)}
 
     _write_status("Loading search index...", 58)
     combo_map = {}
@@ -113,30 +100,29 @@ def load():
             combo_map[(c1, c2)] = (url, alt)
 
     _write_status("Loading embeddings...", 70)
-    img_emb     = np.load(IMG_EMBEDDINGS).astype(np.float32)
-    txt_emb     = np.load(TXT_EMBEDDINGS).astype(np.float32)
-    pca_matrix  = np.load(PCA_MATRIX).astype(np.float32)
-    pca_mean    = np.load(PCA_MEAN).astype(np.float32)
-    n = img_emb.shape[0]
-    nomic_urls  = NOMIC_URLS.read_text().splitlines()[:n]
-    nomic_alts  = NOMIC_ALTS.read_text().splitlines()[:n]
+    txt_emb    = np.load(TXT_EMBEDDINGS).astype(np.float32)
+    pca_matrix = np.load(PCA_MATRIX).astype(np.float32)
+    pca_mean   = np.load(PCA_MEAN).astype(np.float32)
+    n = txt_emb.shape[0]
+    combo_urls = COMBO_URLS.read_text().splitlines()[:n]
+    combo_alts = COMBO_ALTS.read_text().splitlines()[:n]
 
     _write_status("Ready", 100)
     print(f"Ready - {len(base_codes)} base emojis, {len(combo_map):,} combos, "
-          f"{len(nomic_urls):,} embedded.", flush=True)
+          f"{len(combo_urls):,} embedded.", flush=True)
 
-    return (model, base_nomic, code_to_idx, combo_map,
-            img_emb, txt_emb, pca_matrix, pca_mean,
-            nomic_alts, nomic_urls)
-
-
-def rank_base(query_word, model, base_nomic):
-    q = model.embed([query_word], query=True)[0]
-    return (base_nomic @ q).argsort()[::-1].argsort()
+    return (model, base_minilm, code_to_idx, combo_map,
+            txt_emb, pca_matrix, pca_mean,
+            combo_alts, combo_urls)
 
 
-def search_one(word, model, base_nomic, code_to_idx, combo_map):
-    ranks = rank_base(word, model, base_nomic)
+def rank_base(query_word, model, base_minilm):
+    q = model.embed([query_word])[0]
+    return (base_minilm @ q).argsort()[::-1].argsort()
+
+
+def search_one(word, model, base_minilm, code_to_idx, combo_map):
+    ranks = rank_base(word, model, base_minilm)
     idx_to_code = {v: k for k, v in code_to_idx.items()}
     best_code = idx_to_code.get(int(ranks.argmin()))
     if best_code and (best_code, best_code) in combo_map:
@@ -145,9 +131,9 @@ def search_one(word, model, base_nomic, code_to_idx, combo_map):
     return []
 
 
-def search_two(word1, word2, model, base_nomic, code_to_idx, combo_map):
-    ranks_w1 = rank_base(word1, model, base_nomic)
-    ranks_w2 = rank_base(word2, model, base_nomic)
+def search_two(word1, word2, model, base_minilm, code_to_idx, combo_map):
+    ranks_w1 = rank_base(word1, model, base_minilm)
+    ranks_w2 = rank_base(word2, model, base_minilm)
     scored = []
     for (c1, c2), (url, alt) in combo_map.items():
         i = code_to_idx.get(c1)
@@ -163,28 +149,20 @@ def search_two(word1, word2, model, base_nomic, code_to_idx, combo_map):
     return scored
 
 
-def search_combined(query, model, img_emb, txt_emb, pca_matrix, pca_mean,
-                    nomic_alts, nomic_urls):
-    q = model.embed([query], query=True)[0]
+def search_combined(query, model, txt_emb, pca_matrix, pca_mean, combo_alts, combo_urls):
+    q = model.embed([query])[0]
     q_pca = (q - pca_mean) @ pca_matrix
     q_pca /= max(np.linalg.norm(q_pca), 1e-8)
-
-    txt_scores = txt_emb @ q_pca
-    img_scores = img_emb @ q_pca
-
-    k = 60
-    txt_ranks = txt_scores.argsort()[::-1].argsort()
-    img_ranks = img_scores.argsort()[::-1].argsort()
-    combined  = 1.0 / (k + txt_ranks) + 1.0 / (k + img_ranks)
-    top_idx   = combined.argsort()[::-1]
-    return [(float(combined[i]), nomic_alts[i], nomic_urls[i]) for i in top_idx]
+    scores  = txt_emb @ q_pca
+    top_idx = scores.argsort()[::-1]
+    return [(float(scores[i]), combo_alts[i], combo_urls[i]) for i in top_idx]
 
 
 _last_activity = [0.0]
 
 
-def handle(conn, model, base_nomic, code_to_idx, combo_map,
-           img_emb, txt_emb, pca_matrix, pca_mean, nomic_alts, nomic_urls):
+def handle(conn, model, base_minilm, code_to_idx, combo_map,
+           txt_emb, pca_matrix, pca_mean, combo_alts, combo_urls):
     try:
         req   = json.loads(conn.recv_bytes().decode())
         query = req["query"]
@@ -193,13 +171,16 @@ def handle(conn, model, base_nomic, code_to_idx, combo_map,
 
         decomposed = []
         if len(words) == 1:
-            decomposed = search_one(words[0], model, base_nomic, code_to_idx, combo_map)
+            decomposed = search_one(words[0], model, base_minilm, code_to_idx, combo_map)
         elif len(words) == 2:
-            decomposed = search_two(words[0], words[1], model, base_nomic,
-                                    code_to_idx, combo_map)
+            # Pin only the single best cross-combo; let text search rank the rest.
+            top = search_two(words[0], words[1], model, base_minilm,
+                             code_to_idx, combo_map)
+            if top:
+                decomposed = [top[0]]
 
-        fallback = search_combined(query, model, img_emb, txt_emb,
-                                   pca_matrix, pca_mean, nomic_alts, nomic_urls)
+        fallback = search_combined(query, model, txt_emb, pca_matrix, pca_mean,
+                                   combo_alts, combo_urls)
 
         seen   = {url for _, _, url in decomposed}
         merged = decomposed + [(r, a, u) for r, a, u in fallback if u not in seen]
@@ -228,11 +209,22 @@ def main():
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     STATUS_PATH.unlink(missing_ok=True)
     if not IS_NAMED_PIPE:
-        Path(IPC_ADDRESS).unlink(missing_ok=True)
+        sock_path = Path(IPC_ADDRESS)
+        if sock_path.exists():
+            try:
+                from multiprocessing.connection import Client as _Client
+                _c = _Client(IPC_ADDRESS)
+                _c.close()
+                # Another healthy daemon is already listening — don't clobber it.
+                print("Daemon already running. Exiting.", flush=True)
+                sys.exit(0)
+            except (ConnectionRefusedError, OSError):
+                # Stale socket file from a crashed daemon — safe to remove.
+                sock_path.unlink(missing_ok=True)
 
-    (model, base_nomic, code_to_idx, combo_map,
-     img_emb, txt_emb, pca_matrix, pca_mean,
-     nomic_alts, nomic_urls) = load()
+    (model, base_minilm, code_to_idx, combo_map,
+     txt_emb, pca_matrix, pca_mean,
+     combo_alts, combo_urls) = load()
 
     listener = Listener(IPC_ADDRESS)
 
@@ -251,9 +243,9 @@ def main():
             _last_activity[0] = time.monotonic()
             threading.Thread(
                 target=handle,
-                args=(conn, model, base_nomic, code_to_idx, combo_map,
-                      img_emb, txt_emb, pca_matrix, pca_mean,
-                      nomic_alts, nomic_urls),
+                args=(conn, model, base_minilm, code_to_idx, combo_map,
+                      txt_emb, pca_matrix, pca_mean,
+                      combo_alts, combo_urls),
                 daemon=True,
             ).start()
     finally:

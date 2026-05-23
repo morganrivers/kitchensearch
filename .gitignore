@@ -12,4 +12,6 @@ data/ui_assets/
 data/fonts/
 data/models/
 tests/runs/
+tests/baseline_runs/
+tests/baseline_unapproved/
 tests/_test_config/
