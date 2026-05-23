@@ -9,13 +9,22 @@ micromamba run -n py311 python -m nuitka \
   --standalone \
   --enable-plugin=numpy \
   --include-package=platformdirs \
-  --include-package=onnxruntime \
+  --include-package=onnxruntime.capi \
   --include-package=tokenizers \
   --nofollow-import-to=pytest \
   --nofollow-import-to=torch \
   --nofollow-import-to=matplotlib \
   --nofollow-import-to=setuptools \
-  --include-data-dir="$REPO_DIR/data/models=data/models" \
+  --nofollow-import-to=transformers \
+  --nofollow-import-to=huggingface_hub \
+  --nofollow-import-to=faiss \
+  --nofollow-import-to=numba \
+  --nofollow-import-to=onnxruntime.backend \
+  --nofollow-import-to=onnxruntime.datasets \
+  --nofollow-import-to=onnxruntime.quantization \
+  --nofollow-import-to=onnxruntime.tools \
+  --nofollow-import-to=onnxruntime.transformers \
+  --include-data-dir="$REPO_DIR/data/models/all-MiniLM-L6-v2-onnx=data/models/all-MiniLM-L6-v2-onnx" \
   --include-data-dir="$REPO_DIR/data/embeddings=data/embeddings" \
   --output-dir="$REPO_DIR/nuitka-build" \
   emoji-split-daemon.py
