@@ -6,7 +6,7 @@ Results appear one-by-one as thumbnails download. Borderless, half-screen, cente
 Bind in i3 config:
   bindsym $mod+shift+e exec --no-startup-id python3 ~/.local/bin/emoji-picker-tk.py
 """
-import sys, re, json, hashlib, webbrowser, time
+import os, sys, re, json, hashlib, webbrowser, time
 from PIL import Image
 from picker_utils import (
     DATA_DIR, UI_ASSETS_DIR, CACHE_DIR, CONFIG_DIR, THUMB_DIR,
@@ -209,7 +209,8 @@ def main():
 
             _dbg("MENU_SHOW_START")
             snoozed = time.time() < settings.get("snooze_until", 0)
-            banner = None if settings.get("hide_ads") or snoozed else get_banner_config()
+            force_banner = os.environ.get("KITCHENSEARCH_SHOW_BANNER") == "1"
+            banner = None if (settings.get("hide_ads") or snoozed) and not force_banner else get_banner_config()
             if banner is not None and "hide_ads" not in settings:
                 settings["hide_ads"] = False
                 save_settings(settings)

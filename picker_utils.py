@@ -250,9 +250,9 @@ def _cleanup_incomplete_data():
     """Remove any partially extracted npy files so the next download starts clean."""
     if _has_semantic_models():
         return
-    for f in ("base-emoji-nomic.npy", "nomic-image-pca128.npy",
-               "nomic-text-pca128.npy", "nomic-pca128-matrix.npy",
-               "nomic-pca128-mean.npy"):
+    for f in ("base-emoji-nomic.npy", "nomic-image-pca256.npy",
+               "nomic-text-pca256.npy", "nomic-pca256-matrix.npy",
+               "nomic-pca256-mean.npy"):
         (DATA_DIR / f).unlink(missing_ok=True)
     for f in ("nomic-urls.txt", "nomic-alts.txt"):
         (UI_ASSETS_DIR / f).unlink(missing_ok=True)
@@ -568,7 +568,7 @@ def should_show_banner():
 
 
 def get_banner_config():
-    if not should_show_banner():
+    if not should_show_banner() and os.environ.get("KITCHENSEARCH_SHOW_BANNER") != "1":
         return None
     copy_v = "indie" if _ab_bucket() >= 3 else "simple"
     return {
@@ -650,10 +650,10 @@ def _has_semantic_models():
     return (
         all((DATA_DIR / f).exists() for f in (
             "base-emoji-nomic.npy",
-            "nomic-image-pca128.npy",
-            "nomic-text-pca128.npy",
-            "nomic-pca128-matrix.npy",
-            "nomic-pca128-mean.npy",
+            "nomic-image-pca256.npy",
+            "nomic-text-pca256.npy",
+            "nomic-pca256-matrix.npy",
+            "nomic-pca256-mean.npy",
         )) and
         all((UI_ASSETS_DIR / f).exists() for f in (
             "nomic-urls.txt",
