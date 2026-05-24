@@ -786,69 +786,73 @@
                     }
                   }
                 },
-                "!ctkscrollbar": {
-                  "class": "Frame",
+                "!nicescrollbar": {
+                  "class": "Canvas",
                   "mapped": false,
                   "x": 0,
                   "y": 0,
                   "w": 1,
                   "h": 1,
-                  "children": {
-                    "!ctkcanvas": {
-                      "class": "Canvas",
-                      "mapped": false,
-                      "x": 0,
-                      "y": 0,
-                      "w": 1,
-                      "h": 1,
-                      "bg": "#e0e0e0",
-                      "relief": "flat",
-                      "state": "normal",
-                      "canvas_items": 11,
-                      "canvas_sample": [
-                        {
-                          "type": "rectangle",
-                          "coords": null
-                        },
-                        {
-                          "type": "text",
-                          "coords": null
-                        },
-                        {
-                          "type": "text",
-                          "coords": null
-                        },
-                        {
-                          "type": "text",
-                          "coords": null
-                        },
-                        {
-                          "type": "text",
-                          "coords": null
-                        },
-                        {
-                          "type": "text",
-                          "coords": null
-                        },
-                        {
-                          "type": "text",
-                          "coords": null
-                        },
-                        {
-                          "type": "text",
-                          "coords": null
-                        },
-                        {
-                          "type": "text",
-                          "coords": null
-                        },
-                        {
-                          "type": "rectangle",
-                          "coords": null
-                        }
+                  "bg": "#e0e0e0",
+                  "relief": "flat",
+                  "state": "normal",
+                  "canvas_items": 6,
+                  "canvas_sample": [
+                    {
+                      "type": "arc",
+                      "coords": [
+                        2.0,
+                        2.0,
+                        2.0,
+                        2.0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "coords": [
+                        12.0,
+                        2.0,
+                        12.0,
+                        2.0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "coords": [
+                        2.0,
+                        -1.0,
+                        2.0,
+                        -1.0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "coords": [
+                        12.0,
+                        -1.0,
+                        12.0,
+                        -1.0
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "coords": [
+                        2.0,
+                        -1.0,
+                        12.0,
+                        2.0
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "coords": [
+                        2.0,
+                        -1.0,
+                        12.0,
+                        2.0
                       ]
                     }
-                  }
+                  ]
                 }
               }
             },

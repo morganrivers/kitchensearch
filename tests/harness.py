@@ -43,19 +43,36 @@ _DEFAULT_TEST_SETTINGS = {
 }
 
 
-def _make_test_settings(companion: Path | None = None):
-    """Merge defaults + per-test companion JSON + env overrides, write to test config dir."""
+def _make_test_settings(companion: Path | None = None, forced_settings: dict | None = None):
+    """Merge defaults + per-test companion JSON + env overrides; write picker-settings.json.
+
+    If forced_settings is provided it is used as-is (skips defaults + companion merge).
+    Returns (settings_dict, extra_env_dict) where extra_env_dict contains only the
+    test-specific env vars (not infrastructure vars like NO_GRAB).
+    """
     _TEST_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    settings = dict(_DEFAULT_TEST_SETTINGS)
+    extra_env: dict[str, str] = {}
 
-    if companion and companion.exists():
-        overrides = json.loads(companion.read_text())
-        settings.update(overrides)
+    if forced_settings is not None:
+        settings = dict(forced_settings)
+    else:
+        settings = dict(_DEFAULT_TEST_SETTINGS)
+        if companion and companion.exists():
+            overrides = json.loads(companion.read_text())
+            settings.update({k: v for k, v in overrides.items() if not k.startswith("_")})
+            if overrides.get("_cache_dir"):
+                extra_env["XDG_CACHE_HOME"] = str(overrides["_cache_dir"])
+            if overrides.get("_show_banner"):
+                extra_env["KITCHENSEARCH_SHOW_BANNER"] = "1"
 
-    if os.environ.get("KITCHENSEARCH_SHOW_BANNER") == "1":
-        settings["hide_ads"] = False
+        if os.environ.get("KITCHENSEARCH_SHOW_BANNER") == "1":
+            settings["hide_ads"] = False
+            extra_env["KITCHENSEARCH_SHOW_BANNER"] = "1"
+        if os.environ.get("KITCHENSEARCH_CACHE_DIR"):
+            extra_env["XDG_CACHE_HOME"] = os.environ["KITCHENSEARCH_CACHE_DIR"]
 
     (_TEST_CONFIG_DIR / "picker-settings.json").write_text(json.dumps(settings, indent=2))
+    return settings, extra_env
 
 
 class TestHarness:
@@ -63,33 +80,44 @@ class TestHarness:
     STARTUP_TIMEOUT = 12.0
     STARTUP_SETTLE = 1.5
 
-    def __init__(self, run_dir: str | Path, settings_path: Path | None = None):
+    def __init__(self, run_dir: str | Path, settings_path: Path | None = None,
+                 saved_context: dict | None = None):
         self.run_dir = Path(run_dir)
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self._settings_path = settings_path
+        self._saved_context = saved_context
         self._proc = None
         self._wid = None
         self._shots: list[tuple[str, Path]] = []
         self._widget_server_ready = False
+        self.effective_settings: dict = {}
+        self.effective_env: dict = {}
+        subprocess.run(
+            ["xclip", "-selection", "clipboard"],
+            input=b"test started",
+            check=False,
+        )
         self._clipboard_baseline: bytes | None = self._read_clipboard_raw()
 
     # ── lifecycle ─────────────────────────────────────────────────────────────
 
     def launch(self):
-        _make_test_settings(self._settings_path)
+        if self._saved_context is not None:
+            # Use the frozen settings + env from the baseline — ignore companion JSON and host env
+            settings, _ = _make_test_settings(forced_settings=self._saved_context.get("settings"))
+            extra_env = dict(self._saved_context.get("env", {}))
+        else:
+            settings, extra_env = _make_test_settings(self._settings_path)
+
+        self.effective_settings = settings
+        self.effective_env = extra_env
+
         env = os.environ.copy()
         env["XDG_CONFIG_HOME"] = str(_TEST_CONFIG_DIR.parent)
         env["KITCHENSEARCH_NO_GRAB"] = "1"
         env["KITCHENSEARCH_NO_DAEMON"] = "1"
         env["KITCHENSEARCH_NO_BLINK"] = "1"
-        # Pin the cache/thumbs dir for reproducibility (AB testing)
-        # Priority: env var > companion JSON "_cache_dir" key
-        cache_dir = os.environ.get("KITCHENSEARCH_CACHE_DIR")
-        if not cache_dir and self._settings_path and self._settings_path.exists():
-            companion = json.loads(self._settings_path.read_text())
-            cache_dir = companion.get("_cache_dir")
-        if cache_dir:
-            env["XDG_CACHE_HOME"] = cache_dir
+        env.update(extra_env)
 
         cmd = [sys.executable, str(_REPO / "emoji-picker-tk.py")]
         self._proc = subprocess.Popen(cmd, env=env, cwd=str(_REPO))
@@ -99,8 +127,13 @@ class TestHarness:
             time.sleep(0.25)
             wid = self._find_window()
             if wid:
-                self._wid = wid
+                # Re-verify after settle: guard against latching onto a dying window
+                # from the previous test before our new process opens its own.
                 time.sleep(self.STARTUP_SETTLE)
+                fresh = self._find_window()
+                if not fresh:
+                    continue
+                self._wid = fresh
                 # Probe widget-dump server
                 from widget_dump import SOCK_PATH
                 for _ in range(10):
@@ -146,7 +179,8 @@ class TestHarness:
     def _window_geometry(self) -> tuple[int, int, int, int]:
         """Return (x, y, width, height) of the window."""
         out = subprocess.check_output(
-            ["xdotool", "getwindowgeometry", self._wid]
+            ["xdotool", "getwindowgeometry", self._wid],
+            stderr=subprocess.DEVNULL,
         ).decode()
         for line in out.splitlines():
             if "Position:" in line:
@@ -160,13 +194,16 @@ class TestHarness:
     # ── actions ───────────────────────────────────────────────────────────────
 
     def _capture(self, path: Path):
+        x, y, w, h = self._window_geometry()
+        crop = f"{w}x{h}+{x}+{y}"
         subprocess.run(
-            ["import", "-window", self._wid, str(path)],
+            ["import", "-window", "root", "-crop", crop, "+repage", str(path)],
             check=True, stderr=subprocess.DEVNULL,
             timeout=5,
         )
 
-    def _capture_stable(self, path: Path, stable_for: float = 0.3, timeout: float = 6.0):
+    def _capture_stable(self, path: Path, stable_for: float = 0.3, timeout: float = 6.0,
+                        min_wait: float = 0.5):
         """Capture once the window has stopped changing for stable_for seconds."""
         from PIL import Image
         import numpy as np
@@ -178,18 +215,22 @@ class TestHarness:
         t0           = time.monotonic()
         iters        = 0
 
+        _gone = (subprocess.TimeoutExpired, subprocess.CalledProcessError)
         window_gone = False
         try:
             self._capture(tmp_a)
-        except subprocess.TimeoutExpired:
+        except _gone:
             window_gone = True
+
+        if not window_gone and min_wait > 0:
+            time.sleep(min_wait)
 
         if not window_gone:
             while time.monotonic() < deadline:
                 time.sleep(0.1)
                 try:
                     self._capture(tmp_b)
-                except subprocess.TimeoutExpired:
+                except _gone:
                     window_gone = True
                     break
                 a = np.asarray(Image.open(tmp_a))
@@ -216,10 +257,17 @@ class TestHarness:
         for f in (tmp_a, tmp_b):
             f.unlink(missing_ok=True)
 
-    def screenshot(self, name: str) -> Path:
-        """Capture a stable (settled) window screenshot + clipboard + widget dump."""
+    def screenshot(self, name: str, stable: bool = True) -> Path:
+        """Capture window screenshot + clipboard + widget dump.
+
+        stable=False skips the settle-wait; use it when a transient overlay
+        (e.g. a right-click menu) must be visible in the shot.
+        """
         path = self.run_dir / f"{name}.png"
-        self._capture_stable(path)
+        if stable:
+            self._capture_stable(path)
+        else:
+            self._capture(path)
         self._shots.append((name, path))
 
         # Clipboard snapshot
@@ -295,6 +343,21 @@ class TestHarness:
         )
         time.sleep(0.05)
         subprocess.run(["xdotool", "click", str(button)], check=True)
+
+    def mousedown(self, x: int, y: int, button: int = 1):
+        """Press (but do not release) a mouse button — use before screenshot to capture menus."""
+        subprocess.run(
+            ["xdotool", "mousemove", "--window", self._wid, "--sync", str(x), str(y)],
+            check=True,
+        )
+        time.sleep(0.05)
+        subprocess.run(["xdotool", "mousedown", str(button)], check=True)
+        if button == 3:
+            time.sleep(0.35)   # give Tkinter's event loop time to post the popup
+
+    def mouseup(self, x: int, y: int, button: int = 1):
+        """Release a previously pressed mouse button."""
+        subprocess.run(["xdotool", "mouseup", str(button)], check=True)
 
     def focus(self):
         subprocess.run(

@@ -23,6 +23,7 @@ from datetime import datetime
 from pathlib import Path
 
 from pynput import keyboard as kb, mouse as ms
+from Xlib import display as _Xdisplay
 
 _TESTS_DIR  = Path(__file__).parent
 _REPO       = _TESTS_DIR.parent
@@ -49,15 +50,18 @@ def _find_window(title="Kitchen Search"):
         return None
 
 
-def _window_pos(wid):
-    """Return (x, y) top-left of window in screen coords."""
+def _window_geometry(wid):
+    """Return (x, y, w, h) of window in screen coords."""
     out = subprocess.check_output(["xdotool", "getwindowgeometry", wid]).decode()
+    x = y = w = h = 0
     for line in out.splitlines():
         if "Position:" in line:
             coords = line.split(":")[1].strip().split(" ")[0]
             x, y = map(int, coords.split(","))
-            return x, y
-    return 0, 0
+        if "Geometry:" in line:
+            dims = line.split(":")[1].strip()
+            w, h = map(int, dims.split("x"))
+    return x, y, w, h
 
 
 def _next_test_number():
@@ -101,7 +105,10 @@ class Recorder:
 
     def __init__(self, wid: str):
         self.wid       = wid
-        self.wx, self.wy = _window_pos(wid)
+        self._wid_int  = int(wid)
+        self.wx, self.wy, self.ww, self.wh = _window_geometry(wid)
+        self._xdisplay = _Xdisplay.Display()
+        self._xwin     = self._xdisplay.create_resource_object('window', self._wid_int)
         self.events: list[dict] = []     # raw event log
         self._held_mods: set   = set()
         self._char_buf: str    = ""      # accumulate typed chars
@@ -131,8 +138,9 @@ class Recorder:
         self._shot_counter += 1
         name = f"{self._shot_counter:02d}_{label}"
         path = f"/tmp/ks_record_{name}.png"
+        crop = f"{self.ww}x{self.wh}+{self.wx}+{self.wy}"
         subprocess.run(
-            ["import", "-window", self.wid, path],
+            ["import", "-window", "root", "-crop", crop, "+repage", path],
             stderr=subprocess.DEVNULL
         )
         self.events.append({"type": "screenshot", "name": name})
@@ -183,16 +191,37 @@ class Recorder:
         if key not in _MODIFIERS and key not in _SPECIAL:
             self._queue_screenshot()
 
+    def _window_relative_pos(self):
+        """Return pointer position relative to the app window via XQueryPointer."""
+        try:
+            result = self._xwin.query_pointer()
+            return result.win_x, result.win_y
+        except Exception:
+            return None, None
+
     def on_click(self, x, y, button, pressed):
+        rx, ry = self._window_relative_pos()
+        if rx is None:
+            rx, ry = int(x) - self.wx, int(y) - self.wy  # fallback
+        btn = 1 if button == ms.Button.left else (3 if button == ms.Button.right else 2)
+
         if not pressed:
+            if btn == 3:
+                self._wait_since_last()
+                self.events.append({"type": "mouseup", "x": rx, "y": ry, "button": btn})
             return
+
         self._flush_chars()
         self._wait_since_last()
-        # Coordinates relative to window
-        rx, ry = x - self.wx, y - self.wy
-        btn = 1 if button == ms.Button.left else (3 if button == ms.Button.right else 2)
-        self.events.append({"type": "click", "x": rx, "y": ry, "button": btn})
-        self._queue_screenshot()
+        if btn == 3:
+            # Right-click: take screenshot synchronously so it lands in events
+            # between mousedown and mouseup (async queuing would place it after mouseup).
+            self.events.append({"type": "mousedown", "x": rx, "y": ry, "button": btn})
+            time.sleep(self.SCREENSHOT_DELAY)
+            self._take_screenshot(self._next_label())
+        else:
+            self.events.append({"type": "click", "x": rx, "y": ry, "button": btn})
+            self._queue_screenshot()
 
     # ── main loop ─────────────────────────────────────────────────────────────
 
@@ -240,11 +269,23 @@ class Recorder:
 # ── code generator ────────────────────────────────────────────────────────────
 
 def _generate_script(name: str, events: list[dict]) -> str:
+    # Track which screenshot events fall inside a button-3 mousedown/mouseup span
+    in_b3 = False
+    unstable_shots: set[int] = set()
+    for i, ev in enumerate(events):
+        if ev["type"] == "mousedown" and ev.get("button") == 3:
+            in_b3 = True
+        elif ev["type"] == "mouseup" and ev.get("button") == 3:
+            in_b3 = False
+        elif ev["type"] == "screenshot" and in_b3:
+            unstable_shots.add(i)
+
     lines = [f'"""\nRecorded test: {name}\n"""\n\n\ndef run(h):']
-    for ev in events:
+    for i, ev in enumerate(events):
         t = ev["type"]
         if t == "screenshot":
-            lines.append(f'    h.screenshot("{ev["name"]}")')
+            stable_kwarg = "" if i not in unstable_shots else ", stable=False"
+            lines.append(f'    h.screenshot("{ev["name"]}"{stable_kwarg})')
         elif t == "type":
             text = ev["text"].replace("\\", "\\\\").replace('"', '\\"')
             lines.append(f'    h.type("{text}")')
@@ -252,6 +293,10 @@ def _generate_script(name: str, events: list[dict]) -> str:
             lines.append(f'    h.key("{ev["key"]}")')
         elif t == "click":
             lines.append(f'    h.click({ev["x"]}, {ev["y"]}, button={ev["button"]})')
+        elif t == "mousedown":
+            lines.append(f'    h.mousedown({ev["x"]}, {ev["y"]}, button={ev["button"]})')
+        elif t == "mouseup":
+            lines.append(f'    h.mouseup({ev["x"]}, {ev["y"]}, button={ev["button"]})')
         elif t == "wait":
             lines.append(f'    h.wait({ev["secs"]})')
     return "\n".join(lines) + "\n"
@@ -318,6 +363,7 @@ def main():
     recorded_settings = dict(_DEFAULT_TEST_SETTINGS)
     if os.environ.get("KITCHENSEARCH_SHOW_BANNER") == "1":
         recorded_settings["hide_ads"] = False
+        recorded_settings["_show_banner"] = True
     if os.environ.get("KITCHENSEARCH_CACHE_DIR"):
         recorded_settings["_cache_dir"] = os.environ["KITCHENSEARCH_CACHE_DIR"]
     companion_path = _SCRIPTS / f"{full_name}.json"
@@ -336,11 +382,11 @@ def main():
     )
 
     # Find and print the GIF path
-    runs = sorted((_TESTS_DIR / "runs").glob(f"*/{full_name}/recording.gif"))
-    if runs:
-        gif = runs[-1]
+    gif = _TESTS_DIR / "baseline_unapproved" / full_name / "recording.gif"
+    if gif.exists():
         print(f"\n  GIF → {gif}")
         print(f"\n  View with:  firefox {gif}")
+        print(f"\n  Approve with:  python tests/approve.py {full_name}")
     else:
         print("  (no GIF found — re-run may have failed)")
 

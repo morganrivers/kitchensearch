@@ -6,29 +6,37 @@ End-to-end tests for Kitchen Search. Each test script drives the app via keyboar
 
 ## Quick start
 
-```bash
-# First time — capture the baseline
-./run.sh --update-baseline
-
-# After any code change — compare against baseline
-./run.sh
-
-# Headless / CI — exits non-zero if anything changed, no UI
-./run.sh --no-viewer
-```
+# Record a new test:
+micromamba run -n py311 python tests/record.py my_new_feature                                                        
+  → writes scripts/test_03_my_new_feature.py                                                 
+  → runs --update-baseline --test test_03_my_new_feature                                     
+  → saves to baseline_unapproved/test_03_my_new_feature/                                     
+  → prints GIF path + "Approve with: micromamba run -n py311 python tests/approve.py test_03_my_new_feature"         
+                                                                                             
+# Re-baseline existing tests (by prefix):                                                    
+micromamba run -n py311 python tests/run_tests.py --update-baseline --test test_01                                   
+  → saves to baseline_unapproved/test_01_main_menu/ (clears old unapproved first)            
+  → writes meta.json with {"recorded_at": "2026-05-22 12:34:56"}                             
+                                                                                             
+# Review then approve:                                                                       
+micromamba run -n py311 python tests/approve.py test_03_my_new_feature   # specific                                  
+micromamba run -n py311 python tests/approve.py                          # all pending                             
+                                                                                             
+# Normal test run (compares against baseline_approved):
+micromamba run -n py311 python tests/run_tests.py                                                                    
 
 ---
 
 ## Recording a new test
 
 ```bash
-./.venv/bin/python3 tests/record.py <test_name>
+micromamba run -n py311 python tests/record.py <test_name>
 ```
 
 Example:
 
 ```bash
-./.venv/bin/python3 tests/record.py keyword_search
+micromamba run -n py311 python tests/record.py keyword_search
 ```
 
 1. The app opens on your screen.
@@ -96,7 +104,7 @@ Each changed screenshot shows three panels side by side: **Baseline · Current �
 To open the viewer manually for a specific run:
 
 ```bash
-./.venv/bin/python3 tests/viewer.py tests/runs/<timestamp>/test_01_main_menu
+micromamba run -n py311 python tests/viewer.py tests/runs/<timestamp>/test_01_main_menu
 ```
 
 ---
@@ -112,7 +120,7 @@ To accept all current screenshots as the new baseline:
 To accept only one test:
 
 ```bash
-./.venv/bin/python3 tests/run_tests.py --update-baseline --test test_02_keyword_search
+micromamba run -n py311 python tests/run_tests.py --update-baseline --test test_02_keyword_search
 ```
 
 ---
@@ -128,12 +136,20 @@ tests/
   compare.py         — pixel diff + widget geometry diff
   viewer.py          — tkinter diff viewer
   widget_dump.py     — widget tree serialiser (server in-app, client in harness)
-  baseline/
-    test_01_*/       — baseline PNGs + JSON widget dumps (commit these)
-  runs/
+  baseline_approved/
+    test_01_*/       — approved baseline PNGs + JSON widget dumps (tracked)
+  baseline_unapproved/
+    test_01_*/       — pending review, not yet approved (gitignored)
+  test_run/
     <timestamp>/     — output of each run (gitignored)
   scripts/
-    test_01_*.py     — test scripts (commit these)
+    test_NN_*.py     — test scripts (tracked)
+  semantic_tests/
+    semantic_quality.py  — search quality benchmark (8 conceptual queries)
+    results/         — timestamped JSON benchmark results (gitignored)
+  approve.py         — interactive approve/reject for unapproved baselines
+  viewer.py          — tkinter diff viewer (baseline · current · diff panels)
 ```
 
-Commit `tests/baseline/` and `tests/scripts/`. The `tests/runs/` directory is transient — add it to `.gitignore`.
+Tracked: `tests/baseline_approved/`, `tests/scripts/`, `tests/semantic_tests/semantic_quality.py`.
+Gitignored: `tests/test_run/`, `tests/baseline_unapproved/`, `tests/semantic_tests/results/`.

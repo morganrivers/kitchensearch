@@ -102,8 +102,7 @@ def compare_runs(
 
     results: dict[str, dict] = {}
 
-    # Only compare top-level screenshots (not _clipboard.png files)
-    for run_shot in sorted(f for f in run_dir.glob("*.png") if "_clipboard" not in f.stem):
+    for run_shot in sorted(f for f in run_dir.glob("*.png")):
         name          = run_shot.stem
         baseline_shot = baseline_dir / run_shot.name
 

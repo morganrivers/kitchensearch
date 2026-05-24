@@ -195,14 +195,24 @@ class DiffViewer(tk.Tk):
         self._next()
 
 
+def _latest_baseline_dir(tests_dir: Path, test_name: str) -> Path | None:
+    runs_dir = tests_dir / "baseline_runs"
+    runs = sorted(runs_dir.glob("*/")) if runs_dir.exists() else []
+    return (runs[-1] / test_name) if runs else None
+
+
 def main(run_dir: Path):
     results_file = run_dir / "results.json"
     if not results_file.exists():
         print(f"No results.json found in {run_dir}")
         sys.exit(1)
 
+    tests_dir    = run_dir.parent.parent
     results      = json.loads(results_file.read_text())
-    baseline_dir = run_dir.parent.parent / "baseline"
+    baseline_dir = _latest_baseline_dir(tests_dir, run_dir.name)
+    if not baseline_dir:
+        print("No baseline_runs found.")
+        sys.exit(1)
 
     app = DiffViewer(run_dir, results, baseline_dir)
     app.mainloop()

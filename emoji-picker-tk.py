@@ -137,8 +137,9 @@ def _run_settings(picker, settings):
             _lbl("show_story",     "Show emoji story on front menu"),
             _lbl("exit_on_select", "Exit app when emoji selected"),
             _lbl("floating",       "Start as floating window (takes effect on restart)"),
-            _lbl("frameless",      "Start frameless & no title bar (takes effect on restart)"),
         ]
+        if not sys.platform == "win32":
+            items.append(_lbl("frameless", "Start frameless & no title bar (takes effect on restart)"))
         if "hide_ads" in settings and not (time.time() < settings.get("snooze_until", 0)):
             items.append(_lbl("hide_ads", "Don't show support banner"))
         choice = picker.pick_settings("Settings", items, initial_sel=sel_idx)
@@ -170,7 +171,7 @@ def main():
 
     picker = TkPicker(
         floating=settings["floating"],
-        frameless=settings["frameless"],
+        frameless=settings["frameless"] and not sys.platform == "win32",
         dark=settings.get("dark_mode", False),
         on_dark_toggle=_on_dark_toggle,
     )

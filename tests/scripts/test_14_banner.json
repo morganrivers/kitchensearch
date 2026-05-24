@@ -1,0 +1,13 @@
+{
+  "notify_on_copy": false,
+  "exit_on_select": true,
+  "show_keyword": true,
+  "show_semantic": true,
+  "show_combo": true,
+  "show_story": true,
+  "floating": true,
+  "frameless": false,
+  "dark_mode": false,
+  "hide_ads": false,
+  "_show_banner": true
+}

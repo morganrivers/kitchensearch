@@ -14,4 +14,7 @@ data/models/
 tests/runs/
 tests/baseline_runs/
 tests/baseline_unapproved/
+tests/baseline/
+tests/test_run/
 tests/_test_config/
+tests/semantic_tests/results/
