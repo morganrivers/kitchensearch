@@ -46,6 +46,7 @@ RANK_TESTS = [
     ("life in the slow lane",                "motorway-snail"),
     ("i do love chocolate chips",            "goat-cookie"),
     ("fantastic boat trip",                  "comet-canoe"),
+    ("love in paris",                        "croissant-rose"),
 ]
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -75,9 +76,9 @@ def load_minilm():
     model.embed(["warmup"])
     rows = [l.rstrip("\n").split("\t", 2) for l in SEARCH_INDEX.read_text().splitlines()]
     alts = [r[1] for r in rows if len(r) == 3]
-    emb  = np.load(SEM_PCA).astype(np.float32)
-    mat  = np.load(SEM_PCA_MAT).astype(np.float32)
-    mean = np.load(SEM_PCA_MEAN).astype(np.float32)
+    emb  = np.load(SEM_PCA)
+    mat  = np.load(SEM_PCA_MAT)
+    mean = np.load(SEM_PCA_MEAN)
     n = min(len(alts), len(emb))
     return model, emb[:n], mat, mean, alts[:n]
 

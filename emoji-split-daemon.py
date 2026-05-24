@@ -82,7 +82,7 @@ def load():
 
     _write_status("Loading base emoji data...", 50)
     base_codes   = BASE_CODES.read_text().splitlines()
-    base_minilm  = np.load(BASE_MINILM).astype(np.float32)
+    base_minilm  = np.load(BASE_MINILM)
     code_to_idx  = {c: i for i, c in enumerate(base_codes)}
 
     _write_status("Loading search index...", 58)
@@ -100,9 +100,9 @@ def load():
             combo_map[(c1, c2)] = (url, alt)
 
     _write_status("Loading embeddings...", 70)
-    txt_emb    = np.load(TXT_EMBEDDINGS).astype(np.float32)
-    pca_matrix = np.load(PCA_MATRIX).astype(np.float32)
-    pca_mean   = np.load(PCA_MEAN).astype(np.float32)
+    txt_emb    = np.load(TXT_EMBEDDINGS)
+    pca_matrix = np.load(PCA_MATRIX)
+    pca_mean   = np.load(PCA_MEAN)
     n = txt_emb.shape[0]
     combo_urls = COMBO_URLS.read_text().splitlines()[:n]
     combo_alts = COMBO_ALTS.read_text().splitlines()[:n]
