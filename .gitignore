@@ -10,7 +10,8 @@ dataold/
 data/cache/
 data/ui_assets/
 data/fonts/
-data/models/
+data/models/*.bin
+data/models/*.pt
 tests/runs/
 tests/baseline_runs/
 tests/baseline_unapproved/
