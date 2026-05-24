@@ -64,6 +64,8 @@ def _make_test_settings(companion: Path | None = None, forced_settings: dict | N
                 extra_env["XDG_CACHE_HOME"] = str(overrides["_cache_dir"])
             if overrides.get("_show_banner"):
                 extra_env["KITCHENSEARCH_SHOW_BANNER"] = "1"
+            if overrides.get("_ab_mtime_ms") is not None:
+                extra_env["KITCHENSEARCH_AB_MTIME_MS"] = str(overrides["_ab_mtime_ms"])
 
         if os.environ.get("KITCHENSEARCH_SHOW_BANNER") == "1":
             settings["hide_ads"] = False

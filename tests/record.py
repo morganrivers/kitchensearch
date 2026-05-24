@@ -23,7 +23,6 @@ from datetime import datetime
 from pathlib import Path
 
 from pynput import keyboard as kb, mouse as ms
-from Xlib import display as _Xdisplay
 
 _TESTS_DIR  = Path(__file__).parent
 _REPO       = _TESTS_DIR.parent
@@ -105,10 +104,7 @@ class Recorder:
 
     def __init__(self, wid: str):
         self.wid       = wid
-        self._wid_int  = int(wid)
         self.wx, self.wy, self.ww, self.wh = _window_geometry(wid)
-        self._xdisplay = _Xdisplay.Display()
-        self._xwin     = self._xdisplay.create_resource_object('window', self._wid_int)
         self.events: list[dict] = []     # raw event log
         self._held_mods: set   = set()
         self._char_buf: str    = ""      # accumulate typed chars
@@ -191,18 +187,16 @@ class Recorder:
         if key not in _MODIFIERS and key not in _SPECIAL:
             self._queue_screenshot()
 
-    def _window_relative_pos(self):
-        """Return pointer position relative to the app window via XQueryPointer."""
-        try:
-            result = self._xwin.query_pointer()
-            return result.win_x, result.win_y
-        except Exception:
-            return None, None
-
     def on_click(self, x, y, button, pressed):
-        rx, ry = self._window_relative_pos()
-        if rx is None:
-            rx, ry = int(x) - self.wx, int(y) - self.wy  # fallback
+        # Use pynput absolute coords minus window origin — consistent with how
+        # xdotool getwindowgeometry reports the content-area position, which is
+        # what xdotool mousemove --window uses during replay.
+        rx, ry = int(x) - self.wx, int(y) - self.wy
+
+        # Ignore clicks that land outside the app window
+        if not (0 <= rx < self.ww and 0 <= ry < self.wh):
+            return
+
         btn = 1 if button == ms.Button.left else (3 if button == ms.Button.right else 2)
 
         if not pressed:

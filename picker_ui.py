@@ -1425,7 +1425,7 @@ class TkPicker:
     def _append_bmc_banner(self, banner):
         outer = tk.Frame(self._inner, bg=self.BMC_BORDER_COLOR,
                          bd=0, highlightthickness=0)
-        outer.pack(side="bottom", fill="x", padx=4, pady=(8, 4))
+        outer.pack(side="top", fill="x", padx=4, pady=(8, 4))
 
         row = tk.Frame(outer, bg=self.BG, cursor="hand2",
                        bd=0, highlightthickness=0)

@@ -5,8 +5,8 @@ Semantic search quality benchmark.
 Tests the current MiniLM pipeline against hand-crafted queries.
 
 Usage:
-  python3 tests/semantic_tests/semantic_quality.py           # run and print
-  python3 tests/semantic_tests/semantic_quality.py --save    # save results to results/
+  python3 tests/semantic_tests/semantic_quality.py             # run, print, and save
+  python3 tests/semantic_tests/semantic_quality.py --no-save  # run and print only
 """
 
 import sys
@@ -104,13 +104,30 @@ def run_model(name, embed_fn, emb, alts):
     return mean
 
 
+def quantize(emb, mode):
+    if mode == "int8":
+        scale = np.abs(emb).max(axis=1, keepdims=True).clip(1e-8)
+        return (emb / scale * 127).clip(-127, 127).astype(np.int8)
+    if mode == "binary":
+        return np.sign(emb).astype(np.float16)
+    if mode == "float16":
+        return emb.astype(np.float16)  # no-op sanity check — results must be identical
+    return emb
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--save", action="store_true",
-                        help="save results to tests/semantic_tests/results/")
+    parser.add_argument("--no-save", action="store_true",
+                        help="skip saving results to tests/semantic_tests/results/")
+    parser.add_argument("--quantize", choices=["int8", "binary", "float16"],
+                        help="quantize corpus embeddings in-memory before scoring")
     args = parser.parse_args()
 
     sem_model, sem_emb, sem_mat, sem_mean, sem_alts = load_minilm()
+    if args.quantize:
+        sem_emb = quantize(sem_emb, args.quantize)
+        print(f"Quantized corpus to {args.quantize} "
+              f"({sem_emb.nbytes/1024/1024:.1f} MB, dtype={sem_emb.dtype})")
     models = [("MiniLM (current)",
                lambda q, m=sem_model, mat=sem_mat, mean=sem_mean:
                    embed_query_minilm(m, q, mat, mean),
@@ -146,7 +163,7 @@ def main():
         print(f"  {mean:8.1f}  {name}")
     print()
 
-    if args.save:
+    if not args.no_save:
         results_dir = Path(__file__).parent / "results"
         results_dir.mkdir(exist_ok=True)
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

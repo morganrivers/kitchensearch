@@ -49,9 +49,9 @@ echo "  Before: $before_h"
 echo "  After:  $after_h"
 echo "  Saved:  ~${saved}M"
 
-# echo ""
-# echo "=== Tarball ==="
-# cd "$REPO_DIR/nuitka-build"
-# tar -czf "$REPO_DIR/emoji-kitchen-stripped-linux-x86_64.tar.gz" emoji-kitchen-stripped/
-# sz=$(du -sh "$REPO_DIR/emoji-kitchen-stripped-linux-x86_64.tar.gz" | cut -f1)
-# echo "  emoji-kitchen-stripped-linux-x86_64.tar.gz: $sz"
+echo ""
+echo "=== Tarball ==="
+cd "$REPO_DIR/nuitka-build"
+tar -czf "$REPO_DIR/emoji-kitchen-stripped-linux-x86_64.tar.gz" emoji-kitchen-stripped/
+sz=$(du -sh "$REPO_DIR/emoji-kitchen-stripped-linux-x86_64.tar.gz" | cut -f1)
+echo "  emoji-kitchen-stripped-linux-x86_64.tar.gz: $sz"

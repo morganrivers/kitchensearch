@@ -543,6 +543,12 @@ def _next_tuesday_ts():
 
 def _ab_mtime_ms():
     """Return THUMB_DIR mtime as integer milliseconds, or None if not yet created."""
+    override = os.environ.get("KITCHENSEARCH_AB_MTIME_MS")
+    if override:
+        try:
+            return int(override)
+        except ValueError:
+            pass
     try:
         return int(THUMB_DIR.stat().st_mtime * 1000)
     except OSError:

@@ -15,6 +15,9 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 
+sys.path.insert(0, str(Path(__file__).parent))
+from compare import compare_runs
+
 # ── layout constants ──────────────────────────────────────────────────────────
 THUMB_W = 340
 THUMB_H = 340
@@ -43,6 +46,7 @@ class DiffViewer(tk.Tk):
             self._show(0)
         else:
             self._lbl_title.configure(text="All screenshots match baseline — nothing to review.")
+            self._refresh_list()
 
     # ── UI construction ───────────────────────────────────────────────────────
 
@@ -62,13 +66,41 @@ class DiffViewer(tk.Tk):
         )
         self._lbl_counter.pack(side="right")
 
-        # Three image panels
-        panels = tk.Frame(self, bg="#1e1e1e")
-        panels.pack(fill="both", expand=True, padx=PAD)
+        # Main area: image panels + sidebar
+        main = tk.Frame(self, bg="#1e1e1e")
+        main.pack(fill="both", expand=True, padx=PAD)
+
+        # Three image panels (left)
+        panels = tk.Frame(main, bg="#1e1e1e")
+        panels.pack(side="left", fill="both", expand=True)
 
         self._canvas_b, self._lbl_b = self._make_panel(panels, "Baseline")
         self._canvas_c, self._lbl_c = self._make_panel(panels, "Current")
         self._canvas_d, self._lbl_d = self._make_panel(panels, "Diff  (red = changed)")
+
+        # Sidebar: per-test status list (right)
+        sidebar = tk.Frame(main, bg="#1e1e1e", width=200)
+        sidebar.pack(side="right", fill="y", padx=(PAD * 2, 0))
+        sidebar.pack_propagate(False)
+
+        tk.Label(sidebar, text="Tests", font=("Helvetica", 10, "bold"),
+                 bg="#1e1e1e", fg="#777777").pack(anchor="w", pady=(4, 4))
+
+        list_wrap = tk.Frame(sidebar, bg="#252525")
+        list_wrap.pack(fill="both", expand=True)
+
+        sb = tk.Scrollbar(list_wrap, orient="vertical")
+        self._listbox = tk.Listbox(
+            list_wrap, yscrollcommand=sb.set,
+            bg="#252525", fg="#aaaaaa",
+            selectbackground="#252525", selectforeground="#ffffff",
+            font=("Courier", 10), relief="flat", borderwidth=0,
+            activestyle="none", highlightthickness=0,
+        )
+        sb.config(command=self._listbox.yview)
+        sb.pack(side="right", fill="y")
+        self._listbox.pack(side="left", fill="both", expand=True)
+        self._listbox.bind("<<ListboxSelect>>", self._on_list_select)
 
         # Pixel-diff label
         self._lbl_pct = tk.Label(
@@ -135,18 +167,38 @@ class DiffViewer(tk.Tk):
         self._lbl_counter.configure(
             text=f"{self.idx + 1} / {len(self.names)}"
         )
-        self._lbl_pct.configure(text=f"{r['pct']:.1f}% pixels changed  [{r['status']}]")
+        clipboard_diff = r.get("clipboard_diff")
+        pct_text = f"{r['pct']:.1f}% pixels changed  [{r['status']}]"
+        if clipboard_diff:
+            pct_text += f"  |  {clipboard_diff}"
+        self._lbl_pct.configure(text=pct_text)
 
         self._load_panel(self._canvas_b, r.get("baseline"))
         self._load_panel(self._canvas_c, r.get("run"))
-        self._load_panel(self._canvas_d, r.get("diff"))
+        if r.get("diff"):
+            self._lbl_d.configure(text="Diff  (red = changed)")
+            self._load_panel(self._canvas_d, r["diff"])
+        elif clipboard_diff:
+            self._lbl_d.configure(text="Clipboard diff")
+            self._show_text_panel(self._canvas_d, clipboard_diff)
+        else:
+            self._lbl_d.configure(text="Diff  (red = changed)")
+            self._load_panel(self._canvas_d, None)
 
-        decision = self.decisions.get(name, "")
-        dec_str  = f"  → {decision}" if decision else ""
+        n_ok     = sum(1 for d in self.decisions.values() if d == "ok")
+        n_broken = sum(1 for d in self.decisions.values() if d == "broken")
+        n_left   = len(self.names) - len(self.decisions)
         self._lbl_summary.configure(
-            text=f"  {sum(1 for d in self.decisions.values() if d == 'ok')} approved  "
-                 f"{sum(1 for d in self.decisions.values() if d == 'broken')} broken  "
-                 f"{len(self.names) - len(self.decisions)} remaining{dec_str}"
+            text=f"  {n_ok} approved  {n_broken} broken  {n_left} remaining"
+        )
+        self._refresh_list()
+
+    def _show_text_panel(self, canvas: tk.Canvas, text: str):
+        canvas.delete("all")
+        canvas.create_text(
+            THUMB_W // 2, THUMB_H // 2, text=text,
+            fill="#ffcc44", font=("Helvetica", 11),
+            width=THUMB_W - 20, justify="center",
         )
 
     def _load_panel(self, canvas: tk.Canvas, path: str | None):
@@ -164,6 +216,27 @@ class DiffViewer(tk.Tk):
         x = (THUMB_W - img.width)  // 2
         y = (THUMB_H - img.height) // 2
         canvas.create_image(x, y, anchor="nw", image=photo)
+
+    def _refresh_list(self):
+        self._listbox.delete(0, "end")
+        for i, name in enumerate(self.names):
+            dec = self.decisions.get(name, "")
+            if dec == "ok":
+                icon, fg, bg = "✓", "#88dd88", "#1e2e1e"
+            elif dec == "broken":
+                icon, fg, bg = "✗", "#dd8888", "#2e1e1e"
+            else:
+                icon, fg, bg = "·", "#aaaaaa", "#252525"
+            if i == self.idx:
+                bg = "#2e2e4a"
+            self._listbox.insert("end", f" {icon} {name}")
+            self._listbox.itemconfigure(i, fg=fg, bg=bg)
+        self._listbox.see(self.idx)
+
+    def _on_list_select(self, event):
+        sel = self._listbox.curselection()
+        if sel and sel[0] != self.idx:
+            self._show(sel[0])
 
     def _prev(self):
         self._show(self.idx - 1)
@@ -196,6 +269,9 @@ class DiffViewer(tk.Tk):
 
 
 def _latest_baseline_dir(tests_dir: Path, test_name: str) -> Path | None:
+    approved = tests_dir / "baseline_approved" / test_name
+    if approved.exists():
+        return approved
     runs_dir = tests_dir / "baseline_runs"
     runs = sorted(runs_dir.glob("*/")) if runs_dir.exists() else []
     return (runs[-1] / test_name) if runs else None
@@ -208,11 +284,16 @@ def main(run_dir: Path):
         sys.exit(1)
 
     tests_dir    = run_dir.parent.parent
-    results      = json.loads(results_file.read_text())
     baseline_dir = _latest_baseline_dir(tests_dir, run_dir.name)
     if not baseline_dir:
-        print("No baseline_runs found.")
+        print("No baseline found in baseline_approved/ or baseline_runs/.")
         sys.exit(1)
+
+    # Re-compare against the current baseline so previously approved items
+    # don't show up again.
+    diff_dir = run_dir.parent / "_diffs" / run_dir.name
+    results  = compare_runs(baseline_dir, run_dir, diff_dir)
+    results_file.write_text(json.dumps(results, indent=2))
 
     app = DiffViewer(run_dir, results, baseline_dir)
     app.mainloop()
