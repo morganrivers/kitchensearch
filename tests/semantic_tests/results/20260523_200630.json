@@ -1,0 +1,47 @@
+{
+  "recorded_at": "20260523_200630",
+  "corpus_size": 147004,
+  "mean_rank": 1.75,
+  "queries": [
+    {
+      "query": "a house rising out of the mountains",
+      "target": "sunrise_over_mountains-house",
+      "rank": 1,
+      "top3": [
+        "sunrise_over_mountains-house",
+        "sunrise_over_mountains-derelict_house_building",
+        "sunrise_over_mountains-newspaper"
+      ]
+    },
+    {
+      "query": "dancing cow",
+      "target": "ballet_shoes-cow",
+      "rank": 3,
+      "top3": [
+        "cow-balloon",
+        "clapper-cow",
+        "ballet_shoes-cow"
+      ]
+    },
+    {
+      "query": "laptop hurricane",
+      "target": "tornado-computer",
+      "rank": 2,
+      "top3": [
+        "computer-cyclone",
+        "tornado-computer",
+        "computer-volcano"
+      ]
+    },
+    {
+      "query": "raining coffee",
+      "target": "rain_cloud-coffee",
+      "rank": 1,
+      "top3": [
+        "rain_cloud-coffee",
+        "umbrella-coffee",
+        "cloud-coffee"
+      ]
+    }
+  ]
+}

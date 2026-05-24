@@ -11,7 +11,95 @@ import subprocess
 import webbrowser
 import tkinter as tk
 from tkinter import ttk
-import customtkinter as ctk
+
+class NiceScrollbar(tk.Canvas):
+    """Rounded, theme-aware scrollbar — drop-in for CTkScrollbar."""
+
+    def __init__(self, master, command=None, width=14,
+                 fg_color="#e0e0e0", button_color="#888888",
+                 button_hover_color="#555555", corner_radius=6,
+                 orientation="vertical", **kw):
+        super().__init__(master, width=width, bg=fg_color,
+                         highlightthickness=0, bd=0, **kw)
+        self._cmd      = command
+        self._track    = fg_color
+        self._btn      = button_color
+        self._hover    = button_hover_color
+        self._radius   = corner_radius
+        self._bar_w    = width
+        self._first    = 0.0
+        self._last     = 1.0
+        self._hovering = False
+        self._dragging = False
+        self._drag_y   = 0
+        self._drag_first = 0.0
+
+        self.bind("<Configure>",      self._draw)
+        self.bind("<ButtonPress-1>",  self._on_press)
+        self.bind("<B1-Motion>",      self._on_drag)
+        self.bind("<ButtonRelease-1>",self._on_release)
+        self.bind("<Enter>",          lambda _: self._set_hover(True))
+        self.bind("<Leave>",          lambda _: self._set_hover(False))
+
+    def configure(self, **kw):
+        if "fg_color"           in kw: self._track = kw.pop("fg_color");            super().configure(bg=self._track)
+        if "button_color"       in kw: self._btn   = kw.pop("button_color")
+        if "button_hover_color" in kw: self._hover = kw.pop("button_hover_color")
+        if "command"            in kw: self._cmd   = kw.pop("command")
+        if kw: super().configure(**kw)
+        self._draw()
+
+    def set(self, first, last):
+        self._first, self._last = float(first), float(last)
+        self._draw()
+
+    def _thumb(self):
+        h = max(self.winfo_height(), 1)
+        y0, y1 = int(self._first * h), int(self._last * h)
+        if y1 - y0 < 20:
+            mid = (y0 + y1) // 2
+            y0, y1 = max(0, mid - 10), min(h, mid + 10)
+        return y0, y1
+
+    def _draw(self, *_):
+        self.delete("all")
+        y0, y1 = self._thumb()
+        w  = self._bar_w
+        r  = min(self._radius, (y1 - y0) // 2, w // 2)
+        c  = self._hover if self._hovering else self._btn
+        x0, x1 = 2, w - 2
+        self.create_arc(x0,      y0+2,    x0+2*r, y0+2+2*r, start=90,  extent=90,  fill=c, outline=c)
+        self.create_arc(x1-2*r,  y0+2,    x1,     y0+2+2*r, start=0,   extent=90,  fill=c, outline=c)
+        self.create_arc(x0,      y1-2-2*r,x0+2*r, y1-2,     start=180, extent=90,  fill=c, outline=c)
+        self.create_arc(x1-2*r,  y1-2-2*r,x1,     y1-2,     start=270, extent=90,  fill=c, outline=c)
+        self.create_rectangle(x0+r, y0+2, x1-r, y1-2, fill=c, outline=c)
+        self.create_rectangle(x0,   y0+2+r, x1, y1-2-r, fill=c, outline=c)
+
+    def _set_hover(self, v):
+        self._hovering = v
+        self._draw()
+
+    def _on_press(self, e):
+        y0, y1 = self._thumb()
+        if y0 <= e.y <= y1:
+            self._dragging   = True
+            self._drag_y     = e.y
+            self._drag_first = self._first
+        elif self._cmd:
+            self._cmd("scroll", -1 if e.y < y0 else 1, "pages")
+
+    def _on_drag(self, e):
+        if not self._dragging or not self._cmd:
+            return
+        h = max(self.winfo_height(), 1)
+        delta    = (e.y - self._drag_y) / h
+        new_first = max(0.0, min(1.0 - (self._last - self._first),
+                                 self._drag_first + delta))
+        self._cmd("moveto", new_first)
+
+    def _on_release(self, e):
+        self._dragging = False
+
 from PIL import Image, ImageDraw, ImageFont as _ImageFont, ImageTk
 from picker_utils import (
     _dbg,
@@ -204,13 +292,13 @@ class TkPicker:
         list_outer.pack(fill="both", expand=True, padx=2)
 
         self._canvas = tk.Canvas(list_outer, bg=self.BG, highlightthickness=0, bd=0)
-        self._sb = ctk.CTkScrollbar(list_outer, orientation="vertical",
-                                    command=self._canvas.yview,
-                                    fg_color="#e0e0e0",
-                                    button_color="#888888",
-                                    button_hover_color="#555555",
-                                    corner_radius=6,
-                                    width=14)
+        self._sb = NiceScrollbar(list_outer, orientation="vertical",
+                                 command=self._canvas.yview,
+                                 fg_color="#e0e0e0",
+                                 button_color="#888888",
+                                 button_hover_color="#555555",
+                                 corner_radius=6,
+                                 width=14)
         self._canvas.configure(yscrollcommand=self._on_yscroll)
         self._canvas.pack(side="left", fill="both", expand=True)
 
