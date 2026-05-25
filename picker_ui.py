@@ -216,6 +216,9 @@ class TkPicker:
         self._virt_photo_cache  = {}   # (char, size) -> PhotoImage, lives for session
         self._all_image_children = []  # ("h", frame) | ("d", frame, rd) in insertion order
         self._ph_active = False
+        self._pending_toast  = None
+        self._toast_widget   = None
+        self._toast_after_id = None
         self._build()
 
     def _build(self):
@@ -629,6 +632,25 @@ class TkPicker:
                 except Exception:
                     pass
         def _activate():
+            self.root.lift()
+            if sys.platform == "win32":
+                try:
+                    import ctypes
+                    hwnd   = int(self.root.wm_frame(), 16)
+                    fg     = ctypes.windll.user32.GetForegroundWindow()
+                    fg_tid = ctypes.windll.user32.GetWindowThreadProcessId(fg, None)
+                    my_tid = ctypes.windll.kernel32.GetCurrentThreadId()
+                    # Attach to the foreground thread's input queue so Windows
+                    # allows us to call SetForegroundWindow.
+                    if fg_tid and fg_tid != my_tid:
+                        ctypes.windll.user32.AttachThreadInput(my_tid, fg_tid, True)
+                        ctypes.windll.user32.BringWindowToTop(hwnd)
+                        ctypes.windll.user32.SetForegroundWindow(hwnd)
+                        ctypes.windll.user32.AttachThreadInput(my_tid, fg_tid, False)
+                    else:
+                        ctypes.windll.user32.SetForegroundWindow(hwnd)
+                except Exception:
+                    pass
             self.root.focus_force()
             if self._entry.winfo_ismapped():
                 self._entry.focus_set()
@@ -641,6 +663,9 @@ class TkPicker:
             except tk.TclError:
                 pass
         self.root.after(50, _activate)
+        if self._pending_toast:
+            _msg, self._pending_toast = self._pending_toast, None
+            self.root.after(400, lambda m=_msg: self._show_toast(m))
         self.root.mainloop()
         try:
             self.root.grab_release()
@@ -773,13 +798,21 @@ class TkPicker:
             if val:
                 self._result = val
                 self.result_typed = True
+                self.root.quit()
             elif self._sel >= 0 and self._rows:
-                self._result = self._rows[self._sel]["label"]
-                self.result_typed = False
+                label = self._rows[self._sel]["label"]
+                if self._on_select is not None and label != LOAD_MORE:
+                    # non-exit mode: same as clicking the row
+                    self._on_select(label)
+                    self._mark_copied(self._sel)
+                else:
+                    self._result = label
+                    self.result_typed = False
+                    self.root.quit()
             else:
                 self._result = None
                 self.result_typed = False
-            self.root.quit()
+                self.root.quit()
         elif self._mode == "showimage":
             self._result = "copy"
             self.root.quit()
@@ -868,11 +901,74 @@ class TkPicker:
         if "on_select" in rd:
             rd["on_select"](selected)
 
+    def queue_toast(self, message):
+        self._pending_toast = message
+
+    def _show_toast(self, message):
+        self._dismiss_toast()
+        lbl = tk.Label(
+            self._inner,
+            text=message,
+            bg="#1a5c1a", fg="#ffffff",
+            font=("Helvetica", 10, "bold"),
+            anchor="center", pady=7,
+        )
+        lbl.pack(fill="x", padx=8, pady=(6, 4))
+        self._toast_widget   = lbl
+        self._toast_after_id = self.root.after(3000, self._dismiss_toast)
+
+    def _dismiss_toast(self):
+        if self._toast_after_id:
+            try:
+                self.root.after_cancel(self._toast_after_id)
+            except Exception:
+                pass
+            self._toast_after_id = None
+        if self._toast_widget:
+            try:
+                self._toast_widget.destroy()
+            except Exception:
+                pass
+            self._toast_widget = None
+
+    @staticmethod
+    def _resize_txt(t):
+        t.update_idletasks()
+        dlines = t.count("1.0", "end", "displaylines")
+        if dlines:
+            new_h = max(1, dlines[0])
+            if int(t.cget("height")) != new_h:
+                t.configure(height=new_h)
+
+    def _mark_copied(self, idx):
+        for rd in self._rows:
+            if rd.get("_copied") and rd.get("txt"):
+                try:
+                    t = rd["txt"]
+                    t.delete("copied_mark", "end")
+                    rd["_copied"] = False
+                    self._resize_txt(t)
+                except Exception:
+                    pass
+        if 0 <= idx < len(self._rows):
+            rd = self._rows[idx]
+            t = rd.get("txt")
+            if t:
+                try:
+                    t.mark_set("copied_mark", "end-1c")
+                    t.mark_gravity("copied_mark", "left")
+                    t.insert("copied_mark", "  Copied", "copied_tag")
+                    rd["_copied"] = True
+                    self._resize_txt(t)
+                except Exception:
+                    pass
+
     def _click_row(self, idx):
         self._select(idx, scroll=False)
         label = self._rows[idx]["label"]
         if self._mode == "imagelist" and self._on_select is not None and label != LOAD_MORE:
             self._on_select(label)
+            self._mark_copied(idx)
         else:
             self._result = label
             self.root.quit()
@@ -910,6 +1006,7 @@ class TkPicker:
         if not self._entry.winfo_ismapped():
             self._entry.pack(fill="x", pady=(4, 0))
         self._dm_btn.place_forget()
+        self._dismiss_toast()
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -983,7 +1080,7 @@ class TkPicker:
                 self.root.after(1500, self.root.quit)
                 return
             try:
-                data = json.loads(DAEMON_STATUS.read_text())
+                data = json.loads(DAEMON_STATUS.read_text(encoding="utf-8"))
                 self._prog_var.set(float(data.get("pct", 0)))
                 desc_var.set(data.get("step", "Starting..."))
             except Exception:
@@ -1616,12 +1713,16 @@ class TkPicker:
                           relief="flat", bd=0,
                           highlightthickness=0,
                           spacing1=1, spacing3=1,
-                          cursor="hand2")
-            txt.tag_configure("alt_bold",  font=font_main,    foreground=self.FG)
-            txt.tag_configure("kw_normal", font=font_kw,      foreground=self.FG_DIM)
-            txt.tag_configure("kw_bold",   font=font_kw_bold, foreground=self.FG)
-            txt.bind("<Key>",     lambda e: "break")
+                          cursor="hand2",
+                          insertwidth=0)
+            txt.tag_configure("alt_bold",   font=font_main,    foreground=self.FG)
+            txt.tag_configure("kw_normal",  font=font_kw,      foreground=self.FG_DIM)
+            txt.tag_configure("kw_bold",    font=font_kw_bold, foreground=self.FG)
+            txt.tag_configure("copied_tag", font=("Helvetica", 10, "bold"),
+                               foreground="#1a7f1a")
+            txt.bind("<Key>",      lambda e: "break")
             txt.bind("<Button-2>", lambda e: "break")
+            txt.bind("<FocusIn>",  lambda e: self._entry.focus_set())
             txt.pack(side="left", fill="x", expand=True, padx=(0, 8), pady=0)
 
             def _auto_height(e, t=txt):
@@ -1687,7 +1788,8 @@ class TkPicker:
 
             all_widgets = [row, img_lbl, txt]
             rd = {"frame": row, "label": label,
-                  "row_bg": rbg, "all_widgets": all_widgets}
+                  "row_bg": rbg, "all_widgets": all_widgets,
+                  "txt": txt, "_copied": False}
             self._rows.append(rd)
             self._all_image_children.append(("d", row, rd))
             for w in all_widgets:
@@ -1953,7 +2055,7 @@ class TkPicker:
                 self.root.after(1500, self.root.quit)
                 return
             try:
-                data = json.loads(DAEMON_STATUS.read_text())
+                data = json.loads(DAEMON_STATUS.read_text(encoding="utf-8"))
                 pct  = float(data.get("pct", 0))
                 step = data.get("step", "Starting...")
                 self._prog_var.set(pct)
@@ -2004,7 +2106,7 @@ class TkPicker:
             captured = []
             try:
                 log_path.parent.mkdir(parents=True, exist_ok=True)
-                logf = open(log_path, "w")
+                logf = open(log_path, "w", encoding="utf-8")
                 logf.write("$ " + " ".join(cmd) + "\n")
                 proc = subprocess.Popen(
                     cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -2090,11 +2192,17 @@ class TkPicker:
         img_label.pack(pady=(10, 6))
         img_label.bind("<Button-1>", self._on_return)
 
-        tk.Label(self._inner,
+        hint_label = tk.Label(self._inner,
                  text="Enter to copy  |  Esc to cancel",
                  bg=self.BG, fg=self.FG_DIM,
                  font=("Helvetica", 10), anchor="center"
-                 ).pack()
+                 )
+        hint_label.pack()
+
+        for _w in (img_label, hint_label):
+            _w.bind("<MouseWheel>", self._on_scroll)
+            _w.bind("<Button-4>",   self._on_scroll)
+            _w.bind("<Button-5>",   self._on_scroll)
 
         self.root.update_idletasks()
         return self._run()

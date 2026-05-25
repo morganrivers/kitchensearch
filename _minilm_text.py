@@ -58,7 +58,7 @@ class MiniLMText:
 
         cfg_path = tok_dir / "tokenizer_config.json"
         if cfg_path.exists():
-            with open(cfg_path) as f:
+            with open(cfg_path, encoding="utf-8") as f:
                 cfg = json.load(f)
             max_len = min(cfg.get("model_max_length") or cfg.get("max_length", 512), 512)
             pad_id  = cfg.get("pad_token_id", 0)

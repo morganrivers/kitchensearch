@@ -293,7 +293,7 @@ def main(run_dir: Path):
     # don't show up again.
     diff_dir = run_dir.parent / "_diffs" / run_dir.name
     results  = compare_runs(baseline_dir, run_dir, diff_dir)
-    results_file.write_text(json.dumps(results, indent=2))
+    results_file.write_text(json.dumps(results, indent=2), encoding="utf-8")
 
     app = DiffViewer(run_dir, results, baseline_dir)
     app.mainloop()

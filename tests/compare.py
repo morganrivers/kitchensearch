@@ -53,8 +53,8 @@ def _compare_widget_dumps(baseline_json: Path, current_json: Path) -> list[str]:
     if not baseline_json.exists() or not current_json.exists():
         return []
     try:
-        b = json.loads(baseline_json.read_text())
-        c = json.loads(current_json.read_text())
+        b = json.loads(baseline_json.read_text(encoding="utf-8"))
+        c = json.loads(current_json.read_text(encoding="utf-8"))
         return diff_dumps(b, c)
     except Exception:
         return []
@@ -148,7 +148,7 @@ def compare_runs(
     for name, r in results.items():
         wdiff = r.get("widget_diff")
         if wdiff:
-            (diff_dir / f"{name}_widget.diff").write_text("\n".join(wdiff))
+            (diff_dir / f"{name}_widget.diff").write_text("\n".join(wdiff), encoding="utf-8")
 
     # Shots in baseline but missing from run
     if baseline_dir.exists():

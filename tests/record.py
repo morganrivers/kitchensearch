@@ -349,7 +349,7 @@ def main():
 
     # Write test script
     script = _generate_script(raw_name, recorder.events)
-    out_path.write_text(script)
+    out_path.write_text(script, encoding="utf-8")
     print(f"\n  Wrote {out_path}")
 
     # Write companion settings JSON (captures the settings used during recording)
@@ -361,7 +361,7 @@ def main():
     if os.environ.get("KITCHENSEARCH_CACHE_DIR"):
         recorded_settings["_cache_dir"] = os.environ["KITCHENSEARCH_CACHE_DIR"]
     companion_path = _SCRIPTS / f"{full_name}.json"
-    companion_path.write_text(json.dumps(recorded_settings, indent=2))
+    companion_path.write_text(json.dumps(recorded_settings, indent=2), encoding="utf-8")
     print(f"  Wrote {companion_path}")
 
     # Re-run the new test to verify + produce GIF

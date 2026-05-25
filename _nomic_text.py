@@ -97,7 +97,7 @@ class NomicText:
         import onnxruntime as ort
         from tokenizers import Tokenizer
 
-        with open(tok_dir / "tokenizer_config.json") as f:
+        with open(tok_dir / "tokenizer_config.json", encoding="utf-8") as f:
             cfg = json.load(f)
         max_len = min(cfg.get("model_max_length") or cfg.get("max_length", 512), 8192)
         pad_id  = cfg.get("pad_token_id", 0)

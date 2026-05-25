@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Kitchen Search
+Comment=Emoji kitchen picker
+Exec=__INSTALL_DIR__/.venv/bin/python __INSTALL_DIR__/emoji-picker-tk.py
+Icon=__INSTALL_DIR__/banner.png
+Terminal=false
+Categories=Utility;
+Keywords=emoji;search;picker;
+StartupNotify=false

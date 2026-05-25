@@ -62,9 +62,18 @@ DIVIDER     = (210, 210, 210)
 
 def find_font(size):
     for path in [
+        # Linux
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
         "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        # Windows
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/verdanab.ttf",
+        "C:/Windows/Fonts/calibrib.ttf",
+        # macOS
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "/Library/Fonts/Arial Bold.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
     ]:
         if Path(path).exists():
             return ImageFont.truetype(path, size)

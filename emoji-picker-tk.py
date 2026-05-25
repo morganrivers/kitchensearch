@@ -33,20 +33,21 @@ SETTINGS_FILE = CONFIG_DIR / "picker-settings.json"
 
 _DEFAULT_SETTINGS = {
     "notify_on_copy":  True,
-    "exit_on_select": True,
-    "show_keyword":   True,
-    "show_semantic":  True,
-    "show_combo":     True,
-    "show_story":     True,
-    "floating":       True,
-    "frameless":      False,
-    "dark_mode":      False,
+    "exit_on_select":  True,
+    "semantic_first":  True,
+    "show_keyword":    True,
+    "show_semantic":   True,
+    "show_combo":      True,
+    "show_story":      True,
+    "floating":        True,
+    "frameless":       False,
+    "dark_mode":       False,
 }
 
 
 def load_settings():
     try:
-        data = json.loads(SETTINGS_FILE.read_text())
+        data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
         return {**_DEFAULT_SETTINGS, **data}
     except Exception:
         return dict(_DEFAULT_SETTINGS)
@@ -55,7 +56,7 @@ def load_settings():
 def save_settings(s):
     try:
         SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        SETTINGS_FILE.write_text(json.dumps(s, indent=2))
+        SETTINGS_FILE.write_text(json.dumps(s, indent=2), encoding="utf-8")
     except Exception:
         pass
 
@@ -131,12 +132,13 @@ def _run_settings(picker, settings):
             return f"{'[x]' if settings[key] else '[ ]'} {text}"
         items = [
             _lbl("notify_on_copy",  "Show notification when copied"),
-            _lbl("show_keyword",   "Show keyword search on front menu"),
-            _lbl("show_semantic",  "Show semantic search on front menu"),
-            _lbl("show_combo",     "Show combo search on front menu"),
-            _lbl("show_story",     "Show emoji story on front menu"),
-            _lbl("exit_on_select", "Exit app when emoji selected"),
-            _lbl("floating",       "Start as floating window (takes effect on restart)"),
+            _lbl("semantic_first",  "Semantic search as default (first in menu)"),
+            _lbl("show_keyword",    "Show keyword search on front menu"),
+            _lbl("show_semantic",   "Show semantic search on front menu"),
+            _lbl("show_combo",      "Show combo search on front menu"),
+            _lbl("show_story",      "Show emoji story on front menu"),
+            _lbl("exit_on_select",  "Exit app when emoji selected"),
+            _lbl("floating",        "Start as floating window (takes effect on restart)"),
         ]
         if not sys.platform == "win32":
             items.append(_lbl("frameless", "Start frameless & no title bar (takes effect on restart)"))
@@ -149,15 +151,16 @@ def _run_settings(picker, settings):
             sel_idx = items.index(choice)
         except ValueError:
             sel_idx = 0
-        if "notification when copied" in choice: settings["notify_on_copy"]  = not settings["notify_on_copy"]
-        elif "Exit app when emoji selected"   in choice: settings["exit_on_select"] = not settings["exit_on_select"]
-        elif "keyword search" in choice: settings["show_keyword"]   = not settings["show_keyword"]
-        elif "semantic"       in choice: settings["show_semantic"]  = not settings["show_semantic"]
-        elif "combo"          in choice: settings["show_combo"]     = not settings["show_combo"]
-        elif "emoji story"    in choice: settings["show_story"]     = not settings["show_story"]
-        elif "floating window"        in choice: settings["floating"]  = not settings["floating"]
-        elif "no title bar"           in choice: settings["frameless"] = not settings["frameless"]
-        elif "support banner"         in choice: settings["hide_ads"]  = not settings["hide_ads"]
+        if "notification when copied"    in choice: settings["notify_on_copy"]  = not settings["notify_on_copy"]
+        elif "Semantic search as default" in choice: settings["semantic_first"]  = not settings["semantic_first"]
+        elif "Exit app when emoji selected" in choice: settings["exit_on_select"] = not settings["exit_on_select"]
+        elif "keyword search"  in choice: settings["show_keyword"]  = not settings["show_keyword"]
+        elif "semantic"        in choice: settings["show_semantic"] = not settings["show_semantic"]
+        elif "combo"           in choice: settings["show_combo"]    = not settings["show_combo"]
+        elif "emoji story"     in choice: settings["show_story"]    = not settings["show_story"]
+        elif "floating window" in choice: settings["floating"]      = not settings["floating"]
+        elif "no title bar"    in choice: settings["frameless"]     = not settings["frameless"]
+        elif "support banner"  in choice: settings["hide_ads"]      = not settings["hide_ads"]
         save_settings(settings)
 
 
@@ -192,12 +195,20 @@ def main():
             # build menu entries with combo thumbnail icons
             _dbg("MENU_BUILD_START")
             menu_entries = []
-            if settings["show_keyword"]:
-                menu_entries.append(("keyword search",
-                                     _find_combo_url_or_emoji(entries, "tornado", "mag_right")))
-            if settings["show_semantic"]:
-                menu_entries.append((sem_label + ("" if has_sem else _nd),
-                                     _find_combo_url_or_emoji(entries, "sunrise_over_mountains", "mag_right")))
+            sem_entry = (sem_label + ("" if has_sem else _nd),
+                         _find_combo_url_or_emoji(entries, "sunrise_over_mountains", "mag_right"))
+            kw_entry  = ("keyword search",
+                         _find_combo_url_or_emoji(entries, "tornado", "mag_right"))
+            if settings.get("semantic_first", True):
+                first, second = sem_entry, kw_entry
+                show_first, show_second = settings["show_semantic"], settings["show_keyword"]
+            else:
+                first, second = kw_entry, sem_entry
+                show_first, show_second = settings["show_keyword"], settings["show_semantic"]
+            if show_first:
+                menu_entries.append(first)
+            if show_second:
+                menu_entries.append(second)
             if settings["show_combo"]:
                 menu_entries.append(("combo",
                                      _find_combo_url_or_emoji(entries, "fire", "slot_machine")))
@@ -217,7 +228,7 @@ def main():
                 save_settings(settings)
             mode = picker.pick_with_images("Use quick keyword search directly or select an option below.", menu_entries, _menu_on_url,
                                            thumb_size=48, preload=True,
-                                           placeholder="type to keyword search...",
+                                           placeholder="type to semantic search..." if settings.get("semantic_first", True) else "type to keyword search...",
                                            filter=False, banner=banner,
                                            show_dark_btn=True)
             _dbg(f"MENU_SHOW_DONE mode={mode!r}")
@@ -243,17 +254,33 @@ def main():
                 _run_settings(picker, settings)
                 continue
 
-            # ── typed text → keyword search ───────────────────────────────
+            # ── typed text → default search ───────────────────────────────
             mode_names = {e[0] for e in menu_entries}
             if picker.result_typed or mode not in mode_names:
-                query   = mode
-                results = search(entries, query)
-                if not results:
-                    picker.message(f"No results for '{query}'")
-                    continue
-                patterns    = [re.compile(r'\b' + re.escape(w) + r'\b')
-                                for w in query.lower().split()]
-                query_label = f"'{query}'"
+                query = mode
+                if settings.get("semantic_first", True) and has_sem:
+                    if not _daemon_alive():
+                        _spawn_daemon()
+                    results = query_daemon(query)
+                    if results is None:
+                        picker.message(f"Search daemon failed to start.\nSee {DAEMON_LOG} for details.")
+                        continue
+                    if results == "loading":
+                        picker.message("Search daemon is still loading. Please try again in a moment.")
+                        continue
+                    alt_to_text = {alt: text for _, alt, text in entries}
+                    results = [(rank, alt, url, alt_to_text.get(alt, ""))
+                               for rank, alt, url, _ in results]
+                    patterns    = []
+                    query_label = f"'{query}' (semantic)"
+                else:
+                    results = search(entries, query)
+                    if not results:
+                        picker.message(f"No results for '{query}'")
+                        continue
+                    patterns    = [re.compile(r'\b' + re.escape(w) + r'\b')
+                                    for w in query.lower().split()]
+                    query_label = f"'{query}'"
                 mode = "_results"
 
             # ── story ────────────────────────────────────────────────────
@@ -273,6 +300,9 @@ def main():
                     copy_image_to_clipboard(str(STORY_OUT))
                     if settings["notify_on_copy"]:
                         _notify("Story copied to clipboard")
+                    if settings["exit_on_select"]:
+                        break
+                    picker.queue_toast("story copied")
                 continue
 
             # ── combo ────────────────────────────────────────────────────

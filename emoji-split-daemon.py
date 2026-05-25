@@ -59,7 +59,7 @@ IDLE_TIMEOUT = 600
 def _write_status(step, pct):
     try:
         tmp = STATUS_PATH.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"step": step, "pct": round(float(pct), 1)}))
+        tmp.write_text(json.dumps({"step": step, "pct": round(float(pct), 1)}), encoding="utf-8")
         tmp.replace(STATUS_PATH)
     except Exception:
         pass
@@ -81,13 +81,13 @@ def load():
     model.embed(["warmup"])
 
     _write_status("Loading base emoji data...", 50)
-    base_codes   = BASE_CODES.read_text().splitlines()
+    base_codes   = BASE_CODES.read_text(encoding="utf-8").splitlines()
     base_minilm  = np.load(BASE_MINILM)
     code_to_idx  = {c: i for i, c in enumerate(base_codes)}
 
     _write_status("Loading search index...", 58)
     combo_map = {}
-    with open(SEARCH_INDEX) as f:
+    with open(SEARCH_INDEX, encoding="utf-8") as f:
         for line in f:
             parts = line.rstrip("\n").split("\t", 2)
             if len(parts) < 2:
@@ -104,8 +104,8 @@ def load():
     pca_matrix = np.load(PCA_MATRIX)
     pca_mean   = np.load(PCA_MEAN)
     n = txt_emb.shape[0]
-    combo_urls = COMBO_URLS.read_text().splitlines()[:n]
-    combo_alts = COMBO_ALTS.read_text().splitlines()[:n]
+    combo_urls = COMBO_URLS.read_text(encoding="utf-8").splitlines()[:n]
+    combo_alts = COMBO_ALTS.read_text(encoding="utf-8").splitlines()[:n]
 
     _write_status("Ready", 100)
     print(f"Ready - {len(base_codes)} base emojis, {len(combo_map):,} combos, "

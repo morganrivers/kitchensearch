@@ -60,7 +60,7 @@ def run_test(script_path: Path, run_dir: Path, baseline_dir: Path | None = None)
     if baseline_dir is not None:
         context_path = baseline_dir / "test_context.json"
         if context_path.exists():
-            saved_context = json.loads(context_path.read_text())
+            saved_context = json.loads(context_path.read_text(encoding="utf-8"))
 
     harness = TestHarness(
         run_dir=test_dir,
@@ -136,10 +136,10 @@ def main():
                 if test_dir.exists():
                     ts_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     (test_dir / "meta.json").write_text(
-                        json.dumps({"recorded_at": ts_iso}, indent=2)
+                        json.dumps({"recorded_at": ts_iso}, indent=2), encoding="utf-8"
                     )
                     (test_dir / "test_context.json").write_text(
-                        json.dumps({"settings": effective_settings, "env": effective_env}, indent=2)
+                        json.dumps({"settings": effective_settings, "env": effective_env}, indent=2), encoding="utf-8"
                     )
             else:
                 run_test(script, run_dir, baseline_dir=_BASELINE_APPROVED / script.stem)
@@ -167,7 +167,7 @@ def main():
         results = compare_runs(test_base_dir, test_run_dir, test_diff_dir)
         all_results[test_name] = results
 
-        (test_run_dir / "results.json").write_text(json.dumps(results, indent=2))
+        (test_run_dir / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
 
     # ── print summary ─────────────────────────────────────────────────────────
     total_changed = 0

@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw, ImageFont as _ImageFont
 _DBG_ENABLED  = "--logging" in sys.argv
 _DBG_LOG_PATH = Path("/tmp/emojipicker-debug.log")
 if _DBG_ENABLED:
-    _DBG_LOG_PATH.write_text("")  # truncate on each launch
+    _DBG_LOG_PATH.write_text("", encoding="utf-8")  # truncate on each launch
 _dbg_lock = threading.Lock()
 
 def _dbg(msg, include_tb=False):
@@ -28,7 +28,7 @@ def _dbg(msg, include_tb=False):
         tb_lines = traceback.format_stack(limit=8)
         lines.append("  STACK: " + " | ".join(l.strip() for l in tb_lines[:-1]))
     with _dbg_lock:
-        with open(_DBG_LOG_PATH, "a") as f:
+        with open(_DBG_LOG_PATH, "a", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
 
 
@@ -284,7 +284,7 @@ def _kill_daemon():
     if not DAEMON_PID.exists():
         return
     try:
-        pid = int(DAEMON_PID.read_text().strip())
+        pid = int(DAEMON_PID.read_text(encoding="utf-8").strip())
         os.kill(pid, signal.SIGTERM)
     except (ValueError, OSError, ProcessLookupError):
         pass
@@ -297,7 +297,7 @@ def _daemon_alive():
     if not DAEMON_PID.exists():
         return False
     try:
-        pid = int(DAEMON_PID.read_text().strip())
+        pid = int(DAEMON_PID.read_text(encoding="utf-8").strip())
     except (ValueError, OSError):
         DAEMON_PID.unlink(missing_ok=True)
         return False
@@ -309,7 +309,7 @@ def _daemon_alive():
     # normal startup the socket doesn't exist yet (created after load).
     if not IS_NAMED_PIPE and not Path(IPC_ADDRESS).exists():
         try:
-            status = json.loads(DAEMON_STATUS.read_text())
+            status = json.loads(DAEMON_STATUS.read_text(encoding="utf-8"))
             if status.get("pct", 0) >= 100:
                 os.kill(pid, signal.SIGTERM)
                 DAEMON_PID.unlink(missing_ok=True)
@@ -326,12 +326,12 @@ def _spawn_daemon():
     kwargs = {"stdout": log, "stderr": subprocess.STDOUT}
     if sys.platform == "win32":
         kwargs["creationflags"] = (
-            subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
         )
     else:
         kwargs["start_new_session"] = True
     proc = subprocess.Popen(cmd, **kwargs)
-    DAEMON_PID.write_text(str(proc.pid))
+    DAEMON_PID.write_text(str(proc.pid), encoding="utf-8")
     return proc
 
 
@@ -389,7 +389,7 @@ def query_daemon(query, limit=MAX_RESULTS):
 
 def load_index():
     entries = []
-    with open(SEARCH_INDEX) as f:
+    with open(SEARCH_INDEX, encoding="utf-8") as f:
         for line in f:
             parts = line.rstrip("\n").split("\t", 2)
             if len(parts) == 3:

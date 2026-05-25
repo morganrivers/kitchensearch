@@ -5,5 +5,4 @@ platformdirs
 onnxruntime
 tokenizers
 screeninfo
-python-xlib; sys_platform == "linux"
-
+nuitka

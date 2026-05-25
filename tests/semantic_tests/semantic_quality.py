@@ -74,7 +74,7 @@ def load_minilm():
     print("Loading MiniLM ONNX model...", flush=True)
     model = _minilm_text.load()
     model.embed(["warmup"])
-    rows = [l.rstrip("\n").split("\t", 2) for l in SEARCH_INDEX.read_text().splitlines()]
+    rows = [l.rstrip("\n").split("\t", 2) for l in SEARCH_INDEX.read_text(encoding="utf-8").splitlines()]
     alts = [r[1] for r in rows if len(r) == 3]
     emb  = np.load(SEM_PCA)
     mat  = np.load(SEM_PCA_MAT)
@@ -174,7 +174,7 @@ def main():
             "mean_rank": summary[0][1],
             "queries": per_query,
         }
-        out.write_text(json.dumps(payload, indent=2))
+        out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"Saved → {out}")
 
 

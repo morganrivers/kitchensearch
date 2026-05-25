@@ -58,7 +58,7 @@ def _make_test_settings(companion: Path | None = None, forced_settings: dict | N
     else:
         settings = dict(_DEFAULT_TEST_SETTINGS)
         if companion and companion.exists():
-            overrides = json.loads(companion.read_text())
+            overrides = json.loads(companion.read_text(encoding="utf-8"))
             settings.update({k: v for k, v in overrides.items() if not k.startswith("_")})
             if overrides.get("_cache_dir"):
                 extra_env["XDG_CACHE_HOME"] = str(overrides["_cache_dir"])
@@ -73,7 +73,7 @@ def _make_test_settings(companion: Path | None = None, forced_settings: dict | N
         if os.environ.get("KITCHENSEARCH_CACHE_DIR"):
             extra_env["XDG_CACHE_HOME"] = os.environ["KITCHENSEARCH_CACHE_DIR"]
 
-    (_TEST_CONFIG_DIR / "picker-settings.json").write_text(json.dumps(settings, indent=2))
+    (_TEST_CONFIG_DIR / "picker-settings.json").write_text(json.dumps(settings, indent=2), encoding="utf-8")
     return settings, extra_env
 
 
@@ -279,7 +279,7 @@ class TestHarness:
         if self._widget_server_ready:
             try:
                 dump = fetch_dump()
-                (self.run_dir / f"{name}.json").write_text(json.dumps(dump, indent=2))
+                (self.run_dir / f"{name}.json").write_text(json.dumps(dump, indent=2), encoding="utf-8")
             except Exception as exc:
                 print(f"  [warn] widget dump failed for {name}: {exc}")
 
