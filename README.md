@@ -6,7 +6,7 @@ A collection of Python tools for searching [Emoji Kitchen](https://emojikitchen.
 
 Emojikitchen has approximately 147,000 images. Many of them are *delightful*.
 
-I found the existing Emoji Kitchen options missing essential features like a proper image search, or lacking features like quickly combining specific emojis. I use this app all the time when messaging friends on my desktop. It's convenient to set a keyboard shortcut to launch it like `alt+shift+i`, search or browse for fun emojis, and copy them into your messaging app of choice.
+I found the existing Emoji Kitchen options missing essential features like a proper image search, or lacking features like quickly combining specific emojis. I use this app all the time when messaging friends on my desktop. It's convenient to set a keyboard shortcut to launch it like `Alt+Shift+K`, search or browse for fun emojis, and copy them into your messaging app of choice.
 ## Easy install (tested on Ubuntu, MacOS, Windows)
 ## Linux/MacOS
 Manual install:
@@ -55,15 +55,60 @@ Thumbnail images are cached as you browse (~10 KB each) in `~/.local/share/kitch
 curl -sSL https://github.com/morganrivers/kitchensearch/releases/latest/download/install.sh | bash -s uninstall
 ```
 
-## Keybindings
+## Setting a Keyboard Shortcut
 
-Bind your picker in i3 or sway:
+Launching the picker with a hotkey makes it instant to use from any app.
+
+<details>
+<summary><b>Windows</b></summary>
+
+The installer sets `Alt+Shift+K` as the global hotkey automatically. A background daemon listens for it and opens the picker.
+
+To change the hotkey: open the **Settings menu within the app** (or right-click the system tray icon → Settings), pick a new key combo, and save.
+
+</details>
+
+<details>
+<summary><b>Linux — i3 / Sway</b></summary>
+
+Add to your config (`~/.config/i3/config` or `~/.config/sway/config`), replacing the path with wherever you extracted the release:
 
 ```
-bindsym $mod+shift+e exec --no-startup-id emoji-picker
+bindsym alt+shift+k exec --no-startup-id ~/kitchensearch/kitchensearch
 ```
 
-See **[docs/README.md](docs/README.md)** for clipboard setup, keybinding options, and the full tool reference.
+</details>
+
+<details>
+<summary><b>Linux — GNOME</b></summary>
+
+1. Open **Settings → Keyboard → View and Customize Shortcuts → Custom Shortcuts**
+2. Click **+**, set the name to `Kitchen Search`, and the command to the full path of the extracted binary (e.g. `/home/yourname/kitchensearch/kitchensearch`)
+3. Assign your preferred key combo (e.g. `Alt+Shift+K`)
+
+</details>
+
+<details>
+<summary><b>Linux — KDE Plasma</b></summary>
+
+1. Open **System Settings → Shortcuts → Custom Shortcuts**
+2. Click **Edit → New → Global Shortcut → Command/URL**
+3. Set the command to the full path of the extracted binary (e.g. `/home/yourname/kitchensearch/kitchensearch`) and assign `Alt+Shift+K` as the trigger
+
+</details>
+
+<details>
+<summary><b>macOS</b></summary>
+
+macOS doesn't natively support per-app global hotkeys for arbitrary commands, but any of these tools work:
+
+- **[Raycast](https://www.raycast.com/)** — create a Script Command pointing to `kitchensearch` and assign a hotkey
+- **[Karabiner-Elements](https://karabiner-elements.pqrs.org/)** — map a key combo to run a shell command
+- **[Automator](https://support.apple.com/guide/automator/welcome/mac)** — create a Quick Action that runs `kitchensearch`, then bind it in **System Settings → Keyboard → Shortcuts → Services**
+
+</details>
+
+See **[docs/README.md](docs/README.md)** for clipboard setup and the full tool reference.
 
 ---
 

@@ -79,8 +79,6 @@ Filename: "{app}\emoji-picker-tk.exe"; \
 
 
 [Code]
-var
-  HotkeyPage: TInputQueryWizardPage;
 
 function InitializeSetup(): Boolean;
 begin
@@ -108,55 +106,42 @@ begin
   Result := '';
 end;
 
-procedure InitializeWizard;
+procedure CurPageChanged(CurPageID: Integer);
 begin
-  HotkeyPage := CreateInputQueryPage(
-    wpSelectTasks,
-    'Keyboard Shortcut',
-    'Choose a global hotkey to open Kitchen Search.',
-    'Type a combination using Ctrl, Alt, and/or Shift with a letter or function key.' + #13#10 +
-    'Examples: Ctrl+Alt+K    Ctrl+Shift+F2    Alt+Shift+S' + #13#10 +
-    'You can change this later from the Kitchen Search Settings menu.'
-  );
-  HotkeyPage.Add('Hotkey:', False);
-  HotkeyPage.Values[0] := 'Ctrl+Alt+K';
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-var
-  V: String;
-begin
-  Result := True;
-  if CurPageID = HotkeyPage.ID then
-  begin
-    V := Trim(HotkeyPage.Values[0]);
-    if V = '' then
-    begin
-      MsgBox('Please enter a hotkey, e.g. Ctrl+Alt+K', mbError, MB_OK);
-      Result := False;
-    end;
-  end;
+  if CurPageID = wpFinished then
+    WizardForm.FinishedLabel.Caption :=
+      WizardForm.FinishedLabel.Caption + #13#10#13#10 +
+      'The global hotkey to open Kitchen Search is Alt+Shift+K.' + #13#10 +
+      'This can be changed in the Kitchen Search Settings.';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  ConfigDir, ConfigFile, Hotkey: String;
+  ConfigDir, ConfigFile: String;
 begin
   if CurStep = ssPostInstall then
   begin
-    Hotkey := Trim(HotkeyPage.Values[0]);
-    if Hotkey = '' then Hotkey := 'Ctrl+Alt+K';
     ConfigDir := ExpandConstant('{localappdata}\kitchensearch');
     ForceDirectories(ConfigDir);
     ConfigFile := ConfigDir + '\picker-settings.json';
-    SaveStringToFile(ConfigFile, '{"hotkey": "' + Hotkey + '"}', False);
+    SaveStringToFile(ConfigFile, '{"hotkey": "Alt+Shift+K"}', False);
   end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   DataDir: String;
+  ResultCode: Integer;
 begin
+  if CurUninstallStep = usAppMutexCheck then
+  begin
+    Exec('taskkill.exe', '/F /IM kitchensearch-daemon.exe', '', SW_HIDE,
+         ewWaitUntilTerminated, ResultCode);
+    Exec('taskkill.exe', '/F /IM emoji-split-daemon.exe', '', SW_HIDE,
+         ewWaitUntilTerminated, ResultCode);
+    Exec('taskkill.exe', '/F /IM emoji-picker-tk.exe', '', SW_HIDE,
+         ewWaitUntilTerminated, ResultCode);
+  end;
   if CurUninstallStep = usPostUninstall then
   begin
     DataDir := ExpandConstant('{localappdata}\kitchensearch');
