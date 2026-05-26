@@ -36,10 +36,12 @@ python -m nuitka \
   --nofollow-import-to=onnxruntime.transformers \
   --nofollow-import-to=PIL.ImageQt \
   --nofollow-import-to=PIL.ImageWin \
+  --windows-console-mode=disable \
 --include-data-dir="$REPO_DIR/data/models/all-MiniLM-L6-v2-onnx=data/models/all-MiniLM-L6-v2-onnx" \
   --include-data-dir="$REPO_DIR/data/embeddings=data/embeddings" \
   --include-data-dir="$REPO_DIR/data/fonts=data/fonts" \
   --include-data-file="$REPO_DIR/data/app_assets.tar.gz=data/app_assets.tar.gz" \
+  --include-data-file="$REPO_DIR/data/ui_assets/tray-icon.png=data/ui_assets/tray-icon.png" \
   --output-dir="$REPO_DIR/nuitka-build"
 echo "=== build done ==="
 

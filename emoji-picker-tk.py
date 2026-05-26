@@ -125,6 +125,16 @@ def _find_combo_url_or_emoji(entries, name1, name2):
 
 # ── main ──────────────────────────────────────────────────────────────────────
 
+def _open_hotkey_settings():
+    import subprocess
+    daemon_exe = _REPO / "kitchensearch-daemon.exe"
+    daemon_py  = _REPO / "kitchensearch-daemon.py"
+    if daemon_exe.exists():
+        subprocess.run([str(daemon_exe), "--settings"])
+    elif daemon_py.exists():
+        subprocess.run([_PYTHON, str(daemon_py), "--settings"])
+
+
 def _run_settings(picker, settings):
     sel_idx = 0
     while True:
@@ -142,6 +152,9 @@ def _run_settings(picker, settings):
         ]
         if not sys.platform == "win32":
             items.append(_lbl("frameless", "Start frameless & no title bar (takes effect on restart)"))
+        if sys.platform == "win32":
+            hotkey = settings.get("hotkey", "Ctrl+Alt+K")
+            items.append(f"Keyboard shortcut: {hotkey}  (click to change)")
         if "hide_ads" in settings and not (time.time() < settings.get("snooze_until", 0)):
             items.append(_lbl("hide_ads", "Don't show support banner"))
         choice = picker.pick_settings("Settings", items, initial_sel=sel_idx)
@@ -161,11 +174,40 @@ def _run_settings(picker, settings):
         elif "floating window" in choice: settings["floating"]      = not settings["floating"]
         elif "no title bar"    in choice: settings["frameless"]     = not settings["frameless"]
         elif "support banner"  in choice: settings["hide_ads"]      = not settings["hide_ads"]
+        elif sys.platform == "win32" and "Keyboard shortcut:" in choice:
+            _open_hotkey_settings()
+            try:
+                updated = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+                settings["hotkey"] = updated.get("hotkey", settings.get("hotkey", "Ctrl+Alt+K"))
+            except Exception:
+                pass
+            continue
         save_settings(settings)
+
+
+def _hotkey_daemon_alive():
+    import ctypes
+    h = ctypes.windll.kernel32.OpenMutexW(0x00100000, False, "Global\\KitchenSearchDaemon")
+    if h:
+        ctypes.windll.kernel32.CloseHandle(h)
+        return True
+    return False
 
 
 def main():
     _dbg("APP_START")
+    if sys.platform == "win32":
+        if not _daemon_alive():
+            _spawn_daemon()
+        if not _hotkey_daemon_alive():
+            import subprocess as _sp
+            _flags = _sp.CREATE_NO_WINDOW | _sp.CREATE_NEW_PROCESS_GROUP
+            _hotkey_exe = _REPO / "kitchensearch-daemon.exe"
+            _hotkey_py  = _REPO / "kitchensearch-daemon.py"
+            if _hotkey_exe.exists():
+                _sp.Popen([str(_hotkey_exe)], creationflags=_flags)
+            elif _hotkey_py.exists():
+                _sp.Popen([_PYTHON, str(_hotkey_py)], creationflags=_flags)
     settings = load_settings()
     _dbg("APP: TkPicker init start")
     def _on_dark_toggle(dark):

@@ -17,7 +17,7 @@ AppId={{6F3A2B1C-9D4E-4F87-B532-1A2C3D4E5F60}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Kitchen Search
-AppPublisherURL=https://github.com/your-repo/kitchensearch
+AppPublisherURL=https://github.com/morganrivers/kitchensearch
 DefaultDirName={localappdata}\KitchenSearch
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -28,6 +28,7 @@ OutputBaseFilename=KitchenSearch-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+CloseApplications=no
 UninstallDisplayIcon={app}\emoji-picker-tk.exe
 
 [Languages]
@@ -35,10 +36,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; \
-  Description: "Create a &desktop shortcut"; \
-  Flags: unchecked
+  Description: "Create a &desktop shortcut"
 Name: "startup"; \
-  Description: "Start with Windows and listen for &Ctrl+Alt+K"
+  Description: "Start hotkey listener automatically with Windows"
 
 [Files]
 Source: "{#BuildDir}\*"; \
@@ -46,9 +46,10 @@ Source: "{#BuildDir}\*"; \
   Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#AppName}";           Filename: "{app}\emoji-picker-tk.exe"
-Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
-Name: "{userdesktop}\{#AppName}";     Filename: "{app}\emoji-picker-tk.exe"; Tasks: desktopicon
+Name: "{group}\{#AppName}";                Filename: "{app}\emoji-picker-tk.exe"
+Name: "{group}\{#AppName} Settings";       Filename: "{app}\kitchensearch-daemon.exe"; Parameters: "--settings"
+Name: "{group}\Uninstall {#AppName}";      Filename: "{uninstallexe}"
+Name: "{userdesktop}\{#AppName}";          Filename: "{app}\emoji-picker-tk.exe"; Tasks: desktopicon
 
 [Registry]
 ; Write startup entry when the checkbox is ticked; remove it on uninstall.
@@ -68,18 +69,90 @@ Filename: "{app}\kitchensearch-daemon.exe"; \
   RunOnceId: "RemoveStartupEntry"
 
 [Run]
-; If startup was chosen, launch the daemon immediately so the hotkey works
-; without needing to reboot.
+; Start the hotkey daemon unconditionally after install.
 Filename: "{app}\kitchensearch-daemon.exe"; \
-  Tasks: startup; \
-  Flags: nowait postinstall skipifsilent runhidden
-
-; Offer to open the app once installation finishes.
+  Flags: nowait runhidden
+; Optionally launch the picker (user-visible checkbox on finish page).
 Filename: "{app}\emoji-picker-tk.exe"; \
   Flags: nowait postinstall skipifsilent; \
   Description: "Launch {#AppName} now"
 
+
 [Code]
+var
+  HotkeyPage: TInputQueryWizardPage;
+
+function InitializeSetup(): Boolean;
+begin
+  if CheckForMutexes('Global\KitchenSearchDaemon') then
+  begin
+    MsgBox(
+      'Kitchen Search is currently running.' + #13#10 +
+      'Please right-click the tray icon and choose "Quit", then run the installer again.',
+      mbError, MB_OK
+    );
+    Result := False;
+    Exit;
+  end;
+  Result := True;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Exec('taskkill.exe', '/F /IM kitchensearch-daemon.exe', '', SW_HIDE,
+       ewWaitUntilTerminated, ResultCode);
+  Exec('taskkill.exe', '/F /IM emoji-picker-tk.exe', '', SW_HIDE,
+       ewWaitUntilTerminated, ResultCode);
+  Result := '';
+end;
+
+procedure InitializeWizard;
+begin
+  HotkeyPage := CreateInputQueryPage(
+    wpSelectTasks,
+    'Keyboard Shortcut',
+    'Choose a global hotkey to open Kitchen Search.',
+    'Type a combination using Ctrl, Alt, and/or Shift with a letter or function key.' + #13#10 +
+    'Examples: Ctrl+Alt+K    Ctrl+Shift+F2    Alt+Shift+S' + #13#10 +
+    'You can change this later from the Kitchen Search Settings menu.'
+  );
+  HotkeyPage.Add('Hotkey:', False);
+  HotkeyPage.Values[0] := 'Ctrl+Alt+K';
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  V: String;
+begin
+  Result := True;
+  if CurPageID = HotkeyPage.ID then
+  begin
+    V := Trim(HotkeyPage.Values[0]);
+    if V = '' then
+    begin
+      MsgBox('Please enter a hotkey, e.g. Ctrl+Alt+K', mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ConfigDir, ConfigFile, Hotkey: String;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    Hotkey := Trim(HotkeyPage.Values[0]);
+    if Hotkey = '' then Hotkey := 'Ctrl+Alt+K';
+    ConfigDir := ExpandConstant('{localappdata}\kitchensearch');
+    ForceDirectories(ConfigDir);
+    ConfigFile := ConfigDir + '\picker-settings.json';
+    SaveStringToFile(ConfigFile, '{"hotkey": "' + Hotkey + '"}', False);
+  end;
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   DataDir: String;

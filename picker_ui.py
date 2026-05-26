@@ -613,9 +613,6 @@ class TkPicker:
         return frameless or floating
 
     def _run(self):
-        # Defer focus/grab so the window is fully mapped before we grab input.
-        # With -type splash the WM handles focus; with overrideredirect we need
-        # focus_force + grab_set to capture keyboard events.
         if not self._shown:
             self._shown = True
             self.root.deiconify()
@@ -631,6 +628,10 @@ class TkPicker:
                     start_test_server(self.root)
                 except Exception:
                     pass
+            if sys.platform == "win32":
+                # Flush pending Win32 messages so the window is fully mapped
+                # before SetForegroundWindow / focus calls below.
+                self.root.update()
         def _activate():
             self.root.lift()
             if sys.platform == "win32":
@@ -652,8 +653,6 @@ class TkPicker:
                 except Exception:
                     pass
             self.root.focus_force()
-            if self._entry.winfo_ismapped():
-                self._entry.focus_set()
             try:
                 if not os.environ.get("KITCHENSEARCH_NO_GRAB"):
                     if self._frameless:
@@ -662,7 +661,9 @@ class TkPicker:
                         self.root.grab_set()
             except tk.TclError:
                 pass
-        self.root.after(50, _activate)
+            if self._entry.winfo_ismapped():
+                self._entry.focus_set()
+        _activate()
         if self._pending_toast:
             _msg, self._pending_toast = self._pending_toast, None
             self.root.after(400, lambda m=_msg: self._show_toast(m))

@@ -39,8 +39,12 @@ DATA_DIR      = _REPO / "data" / "embeddings"
 UI_ASSETS_DIR = _REPO / "data" / "ui_assets"
 CACHE_DIR     = Path(user_cache_dir("kitchensearch"))
 CONFIG_DIR    = Path(user_config_dir("kitchensearch"))
-_VENV_PY      = _REPO / ".venv" / "bin" / "python3"
-_PYTHON       = str(_VENV_PY) if _VENV_PY.exists() else sys.executable
+_VENV_PY = (
+    _REPO / ".venv" / "Scripts" / "python.exe"
+    if sys.platform == "win32"
+    else _REPO / ".venv" / "bin" / "python3"
+)
+_PYTHON = str(_VENV_PY) if _VENV_PY.exists() else sys.executable
 SEARCH_INDEX  = UI_ASSETS_DIR / "search-index.tsv"
 THUMB_DIR     = CACHE_DIR / "thumbs"
 WALLPAPER_PATH    = CACHE_DIR / "wallpaper.png"
@@ -59,7 +63,7 @@ IPC_ADDRESS    = _ipc_address()
 IS_NAMED_PIPE  = IPC_ADDRESS.startswith(r"\\.\pipe")
 DAEMON_STATUS  = CACHE_DIR / "split-daemon-loading.json"
 DAEMON_PY      = _REPO / "emoji-split-daemon.py"
-DAEMON_BIN     = _REPO / "emoji-split-daemon"
+DAEMON_BIN     = _REPO / ("emoji-split-daemon.exe" if sys.platform == "win32" else "emoji-split-daemon")
 DAEMON_PID     = CACHE_DIR / "split-daemon.pid"
 DAEMON_LOG     = CACHE_DIR / "split-daemon.log"
 
@@ -127,7 +131,8 @@ def _notify(msg):
             "$b.ShowBalloonTip(3000)"
         )
         subprocess.run(["powershell", "-c", ps],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       creationflags=subprocess.CREATE_NO_WINDOW)
     elif shutil.which("notify-send"):
         subprocess.run(["notify-send", "-t", "3000", "Emoji Kitchen", msg],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -215,15 +220,49 @@ def copy_image_to_clipboard(path):
         _notify("Clipboard failed (osascript error)")
         return
 
-    # Windows
+    # Windows — use Win32 API directly via ctypes to avoid PowerShell startup lag.
+    # CF_DIB (8) is the most compatible image format; paste into any Windows app.
     if sys.platform == "win32":
-        ps = (
-            "Add-Type -AssemblyName System.Windows.Forms;"
-            f"$img = [System.Drawing.Image]::FromFile('{path}');"
-            "[System.Windows.Forms.Clipboard]::SetImage($img)"
-        )
-        subprocess.run(["powershell", "-Command", ps],
-                       capture_output=True, check=True)
+        try:
+            import ctypes, ctypes.wintypes, io
+            img = Image.open(path).convert("RGB")
+            buf = io.BytesIO()
+            img.save(buf, "BMP")
+            dib = buf.getvalue()[14:]  # strip 14-byte BMP file header → DIB
+            k32 = ctypes.windll.kernel32
+            u32 = ctypes.windll.user32
+            # Must set restype=c_void_p for handle-returning functions on 64-bit;
+            # the default c_int truncates the upper 32 bits → NULL → access violation.
+            k32.GlobalAlloc.restype   = ctypes.c_void_p
+            k32.GlobalLock.restype    = ctypes.c_void_p
+            k32.GlobalLock.argtypes   = [ctypes.c_void_p]
+            k32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+            k32.GlobalFree.restype    = ctypes.c_void_p
+            k32.GlobalFree.argtypes   = [ctypes.c_void_p]
+            u32.SetClipboardData.restype  = ctypes.c_void_p
+            u32.SetClipboardData.argtypes = [ctypes.wintypes.UINT, ctypes.c_void_p]
+            h = k32.GlobalAlloc(0x0002, len(dib))  # GMEM_MOVEABLE
+            if not h:
+                raise OSError("GlobalAlloc failed")
+            p = k32.GlobalLock(h)
+            if not p:
+                k32.GlobalFree(h)
+                raise OSError("GlobalLock failed")
+            ctypes.memmove(p, dib, len(dib))
+            k32.GlobalUnlock(h)
+            if not u32.OpenClipboard(None):
+                k32.GlobalFree(h)
+                raise OSError("OpenClipboard failed")
+            try:
+                u32.EmptyClipboard()
+                if not u32.SetClipboardData(8, h):  # CF_DIB
+                    k32.GlobalFree(h)
+                    raise OSError("SetClipboardData failed")
+                # On success the clipboard owns h — do NOT free it
+            finally:
+                u32.CloseClipboard()
+        except Exception as e:
+            _notify(f"Clipboard copy failed: {e}")
         return
 
     # Linux: try python-xlib (pure Python, no external tools needed)
