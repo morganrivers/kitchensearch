@@ -24,7 +24,7 @@ DisableProgramGroupPage=yes
 ; No admin rights needed — installs to %LOCALAPPDATA%
 PrivilegesRequired=lowest
 OutputDir=.
-OutputBaseFilename=KitchenSearch-Setup
+OutputBaseFilename=kitchensearch-windows-x86_64
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern

@@ -22,15 +22,14 @@ tar -xzf kitchensearch-linux-x86_64.tar.gz
 cd kitchensearch
 ./kitchensearch # launch the app
 ```
-## Windows
+## Windows (10 or later)
 
-* Go to the [releases](https://github.com/morganrivers/kitchensearch/releases) page 
-* Download `kitchensearch-windows-x86_64.zip`
-* Extract the ZIP file
-* Run `kitchensearch.exe`
+* Go to the [releases](https://github.com/morganrivers/kitchensearch/releases) page
+* Download `kitchensearch-windows-x86_64.exe`
+* Run it and follow the installer
 ## Installing from source (tested on Ubuntu)
 
-- Linux with X11 or Wayland
+- Linux with X11 or Wayland (not sure which? run `echo $XDG_SESSION_TYPE`)
 - **Python 3.8+**
 - Tkinter (e.g. `sudo apt install python3-tk`)
 ```bash

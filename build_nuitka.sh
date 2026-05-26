@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 REPO_DIR=$(pwd)
+VERSION=$(git -C "$REPO_DIR" describe --tags --abbrev=0 2>/dev/null || echo "dev")
 
 if [ ! -d "$REPO_DIR/data/fonts" ]; then
   echo "=== Extracting app assets ==="
