@@ -19,3 +19,10 @@ tests/baseline/
 tests/test_run/
 tests/_test_config/
 tests/semantic_tests/results/
+
+# build artifacts and downloaded packages
+*.exe
+*.whl
+
+# SSH keys
+*id_ed25519*
