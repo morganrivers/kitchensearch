@@ -1,4 +1,4 @@
-import sys, os, re, json, hashlib, shutil, signal, subprocess
+import sys, os, re, json, hashlib, shutil, signal, subprocess, math
 import time, urllib.request, threading, random as _random, traceback, getpass
 from multiprocessing.connection import Client
 from pathlib import Path                                                                                                                                                                     
@@ -599,9 +599,37 @@ def _ab_bucket():
     return mt % 6 if mt is not None else 0
 
 
+_AB_XOR_KEY = 0x5A3C9F2B7  # 36-bit obfuscation key
+
+_AB_SETTINGS_KEYS = [
+    "notify_on_copy", "exit_on_select", "semantic_first",
+    "show_keyword", "show_semantic", "show_combo", "show_story",
+    "floating", "frameless", "dark_mode",
+]
+
+_AB_TS_EPOCH = 1704067200  # 2024-01-01 00:00:00 UTC
+
+
 def _ab_version():
-    mt = _ab_mtime_ms()
-    return f"{(mt & 0xFFFFFFF):07x}" if mt is not None else "0000000"
+    try:
+        s = json.loads((CONFIG_DIR / "picker-settings.json").read_text(encoding="utf-8"))
+    except Exception:
+        s = {}
+
+    settings_bits = sum(
+        (1 << i) for i, k in enumerate(_AB_SETTINGS_KEYS) if s.get(k, False)
+    )
+
+    copy_count = max(0, int(s.get("copy_count", 0)))
+    log_copies = min(15, int(math.log2(copy_count)) if copy_count > 0 else 0)  # 4 bits
+
+    ts_bucket = int((time.time() - _AB_TS_EPOCH) // 900) & 0x7FFFF  # 19 bits, 15-min res (~15 years)
+
+    ab = _ab_bucket() & 0x7
+
+    # [35:26]=settings  [25:22]=log_copies  [21:3]=ts_bucket  [2:0]=ab
+    payload = (settings_bits << 26) | (log_copies << 22) | (ts_bucket << 3) | ab
+    return f"{payload ^ _AB_XOR_KEY:09x}"
 
 
 def _ab_hours_elapsed():

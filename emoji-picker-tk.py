@@ -42,6 +42,7 @@ _DEFAULT_SETTINGS = {
     "floating":        True,
     "frameless":       False,
     "dark_mode":       False,
+    "copy_count":      0,
 }
 
 
@@ -340,6 +341,8 @@ def main():
                     str(STORY_OUT))
                 if action == "copy":
                     copy_image_to_clipboard(str(STORY_OUT))
+                    settings["copy_count"] = settings.get("copy_count", 0) + 1
+                    save_settings(settings)
                     if settings["notify_on_copy"]:
                         _notify("Story copied to clipboard")
                     if settings["exit_on_select"]:
@@ -390,6 +393,8 @@ def main():
                             path = get_thumb(url)
                             if path:
                                 copy_image_to_clipboard(path)
+                                settings["copy_count"] = settings.get("copy_count", 0) + 1
+                                save_settings(settings)
                                 if settings["notify_on_copy"]:
                                     _notify("Copied to clipboard")
                             break
@@ -494,6 +499,8 @@ def main():
                             path = get_thumb(url)
                             if path:
                                 copy_image_to_clipboard(path)
+                                settings["copy_count"] = settings.get("copy_count", 0) + 1
+                                save_settings(settings)
                                 if settings["notify_on_copy"]:
                                     _notify("Copied to clipboard")
                             break
