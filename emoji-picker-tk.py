@@ -269,7 +269,8 @@ def main():
             if banner is not None and "hide_ads" not in settings:
                 settings["hide_ads"] = False
                 save_settings(settings)
-            mode = picker.pick_with_images("Use quick keyword search directly or select an option below.", menu_entries, _menu_on_url,
+            _menu_prompt = "Use quick semantic search directly or select an option below." if settings.get("semantic_first", True) else "Use quick keyword search directly or select an option below."
+            mode = picker.pick_with_images(_menu_prompt, menu_entries, _menu_on_url,
                                            thumb_size=48, preload=True,
                                            placeholder="type to semantic search..." if settings.get("semantic_first", True) else "type to keyword search...",
                                            filter=False, banner=banner,
@@ -297,6 +298,31 @@ def main():
                 _run_settings(picker, settings)
                 continue
 
+            # ── search helpers ────────────────────────────────────────────
+            def _run_semantic(q):
+                raw = query_daemon(q)
+                if raw is None:
+                    picker.message(f"Search daemon failed to start.\nSee {DAEMON_LOG} for details.")
+                    return None
+                if raw == "loading":
+                    if not picker.show_model_loading_progress():
+                        return None
+                    raw = query_daemon(q)
+                    if raw is None:
+                        picker.message(f"Search daemon failed to start.\nSee {DAEMON_LOG} for details.")
+                        return None
+                _a2t = {alt: text for _, alt, text in entries}
+                return ([(rank, alt, url, _a2t.get(alt, "")) for rank, alt, url, _ in raw],
+                        [], f"'{q}' (semantic)")
+
+            def _run_keyword(q):
+                r = search(entries, q)
+                if not r:
+                    picker.message(f"No results for '{q}'")
+                    return None
+                pats = [re.compile(r'\b' + re.escape(w) + r'\b') for w in q.lower().split()]
+                return r, pats, f"'{q}'"
+
             # ── typed text → default search ───────────────────────────────
             mode_names = {e[0] for e in menu_entries}
             if picker.result_typed or mode not in mode_names:
@@ -304,26 +330,16 @@ def main():
                 if settings.get("semantic_first", True) and has_sem:
                     if not _daemon_alive():
                         _spawn_daemon()
-                    results = query_daemon(query)
-                    if results is None:
-                        picker.message(f"Search daemon failed to start.\nSee {DAEMON_LOG} for details.")
+                    out = _run_semantic(query)
+                    if out is None:
                         continue
-                    if results == "loading":
-                        picker.message("Search daemon is still loading. Please try again in a moment.")
-                        continue
-                    alt_to_text = {alt: text for _, alt, text in entries}
-                    results = [(rank, alt, url, alt_to_text.get(alt, ""))
-                               for rank, alt, url, _ in results]
-                    patterns    = []
-                    query_label = f"'{query}' (semantic)"
+                    is_semantic = True
                 else:
-                    results = search(entries, query)
-                    if not results:
-                        picker.message(f"No results for '{query}'")
+                    out = _run_keyword(query)
+                    if out is None:
                         continue
-                    patterns    = [re.compile(r'\b' + re.escape(w) + r'\b')
-                                    for w in query.lower().split()]
-                    query_label = f"'{query}'"
+                    is_semantic = False
+                results, patterns, query_label = out
                 mode = "_results"
 
             # ── story ────────────────────────────────────────────────────
@@ -454,32 +470,22 @@ def main():
                 query = picker.ask_with_loading_bar("emoji search (semantic):", placeholder='try e.g. "ski chicken" then press enter')
                 if not query:
                     continue
-                results = query_daemon(query)
-                if results is None:
-                    picker.message(
-                        f"Search daemon failed to start.\nSee {DAEMON_LOG} for details.")
+                out = _run_semantic(query)
+                if out is None:
                     continue
-                if results == "loading":
-                    picker.message("Search daemon is still loading. Please try again in a moment.")
-                    continue
-                alt_to_text = {alt: text for _, alt, text in entries}
-                results = [(rank, alt, url, alt_to_text.get(alt, ""))
-                           for rank, alt, url, _ in results]
-                patterns    = []
-                query_label = f"'{query}' (semantic)"
+                results, patterns, query_label = out
+                is_semantic = True
 
             # ── keyword ──────────────────────────────────────────────────
             else:
                 query = picker.ask("emoji search:", placeholder='try e.g. "ski chicken" then press enter')
                 if not query:
                     continue
-                results = search(entries, query)
-                if not results:
-                    picker.message(f"No results for '{query}'")
+                out = _run_keyword(query)
+                if out is None:
                     continue
-                patterns    = [re.compile(r'\b' + re.escape(w) + r'\b')
-                                for w in query.lower().split()]
-                query_label = f"'{query}'"
+                results, patterns, query_label = out
+                is_semantic = False
 
             # ── results ──────────────────────────────────────────────────
             offset = 0
@@ -515,13 +521,10 @@ def main():
                     continue
                 if picker.result_typed and result:
                     query = result
-                    results = search(entries, query)
-                    if not results:
-                        picker.message(f"No results for '{query}'")
+                    out = _run_semantic(query) if is_semantic else _run_keyword(query)
+                    if out is None:
                         break
-                    patterns = [re.compile(r'\b' + re.escape(w) + r'\b')
-                                for w in query.lower().split()]
-                    query_label = f"'{query}'"
+                    results, patterns, query_label = out
                     offset = 0
                     continue
                 if result and settings["exit_on_select"]:

@@ -487,7 +487,7 @@
                       "y": 2,
                       "w": 488,
                       "h": 22,
-                      "text": "Use quick keyword search directly or select an option below.",
+                      "text": "Use quick semantic search directly or select an option below.",
                       "bg": "#ffffff",
                       "fg": "#6633cc",
                       "font": "Helvetica 11 bold",

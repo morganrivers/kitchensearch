@@ -1,5 +1,6 @@
 import sys, os, re, json, hashlib, shutil, signal, subprocess, math
 import time, urllib.request, threading, random as _random, traceback, getpass
+from datetime import date, timedelta, datetime as _datetime
 from multiprocessing.connection import Client
 from pathlib import Path                                                                                                                                                                     
                                                                                                                                                                                              
@@ -372,6 +373,8 @@ def _daemon_alive():
 
 
 def _spawn_daemon():
+    if os.environ.get("KITCHENSEARCH_KILL_DAEMON") == "1":
+        _kill_daemon()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     log = open(DAEMON_LOG, "wb")
     cmd = [str(DAEMON_BIN)] if DAEMON_BIN.exists() else [_PYTHON, str(DAEMON_PY)]

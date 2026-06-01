@@ -267,11 +267,13 @@ class TkPicker:
             font=("Helvetica", 11),
             cursor="hand2",
             relief="flat", bd=0,
+            highlightthickness=1,
+            highlightbackground=self.BG,
+            highlightcolor=self.ACCENT,
         )
         self._research_cb.bind("<Tab>",       lambda e: self._focus_next())
         self._research_cb.bind("<Shift-Tab>", lambda e: self._focus_prev())
 
-        self._entry.bind("<Escape>",       self._cancel)
         self._entry.bind("<Return>",       self._on_return)
         self._entry.bind("<space>",        self._on_space_key)
         self._entry.bind("<Up>",           lambda e: (self._up(),            "break")[1])
@@ -344,10 +346,6 @@ class TkPicker:
             w.bind("<Prior>",         self._prev_page)
 
         self._canvas.bind("<ButtonPress-1>", lambda e: self._dismiss_popup(), add="+")
-        self._canvas.bind("<FocusIn>",  lambda e: self._canvas.configure(
-            highlightthickness=3, highlightbackground=self.ACCENT), add="+")
-        self._canvas.bind("<FocusOut>", lambda e: self._canvas.configure(
-            highlightthickness=0), add="+")
         root.bind("<FocusOut>", lambda e: self._dismiss_popup(), add="+")
 
         root.bind("<Escape>",       self._cancel)
@@ -388,7 +386,7 @@ class TkPicker:
         btn.bind("<Tab>",       lambda e: self._focus_next())
         btn.bind("<Shift-Tab>", lambda e: self._focus_prev())
         btn.bind("<FocusIn>",  lambda e: btn.configure(
-            highlightthickness=3, highlightbackground=self.ACCENT))
+            highlightthickness=3, highlightcolor=self.FG))
         btn.bind("<FocusOut>", lambda e: btn.configure(highlightthickness=0))
 
     def _dm_draw(self):
@@ -434,7 +432,7 @@ class TkPicker:
         btn.bind("<Tab>",       lambda e: self._focus_next())
         btn.bind("<Shift-Tab>", lambda e: self._focus_prev())
         btn.bind("<FocusIn>",  lambda e: btn.configure(
-            highlightthickness=3, highlightbackground=self.ACCENT))
+            highlightthickness=3, highlightcolor=self.FG))
         btn.bind("<FocusOut>", lambda e: btn.configure(highlightthickness=0))
 
     def _back_draw(self, hover=False):
@@ -502,6 +500,8 @@ class TkPicker:
             selectcolor=new_theme["ENTRY_BG"],
             activebackground=self.BG,
             activeforeground=self.FG,
+            highlightbackground=self.BG,
+            highlightcolor=self.ACCENT,
         )
 
         # TTK progressbar style
@@ -568,6 +568,8 @@ class TkPicker:
             self._title_canvas.winfo_height())
 
         self._dm_draw()
+        if self.root.focus_displayof() is self._dm_btn:
+            self._dm_btn.configure(highlightcolor=self.FG)
         self.root.tk.call('raise', self._dm_btn._w)
         self._back_draw()
         if self._back_btn.winfo_ismapped():
@@ -911,7 +913,7 @@ class TkPicker:
             self.root.quit()
         elif self._mode == "imagelist":
             val = self._real_text().strip()
-            if val and self._research_cb.winfo_ismapped() and self._research_var.get():
+            if val and self._sel < 0:
                 self._result = val
                 self.result_typed = True
                 self.root.quit()
@@ -1628,22 +1630,31 @@ class TkPicker:
         BLUE       = "#4a90d9"
         BLUE_HOVER = "#2270c0"
         PURPLE     = "#7744cc"
-        W, H, R, OW = 92, 28, 8, 2
+        W, H, R, OW = 104, 28, 8, 2
 
         cv = tk.Canvas(parent, width=W, height=H,
                        bg=row_bg, highlightthickness=0, bd=0, cursor="hand2")
 
+        from PIL import ImageTk as _ITK
+        _em_pil   = render_emoji_pil("💤", size=13)
+        _em_photo = _ITK.PhotoImage(_em_pil) if _em_pil else None
+        _EM_W     = _em_photo.width() if _em_photo else 0
+        GAP       = 3
+        TEXT_PX   = 42  # approx width of "snooze" at Helvetica 10 bold
+        _TOTAL    = _EM_W + GAP + TEXT_PX
+        _START    = (W - _TOTAL) // 2
+        _EM_X     = _START + _EM_W // 2
+        _TEXT_X   = _START + _EM_W + GAP
+
         def _draw(fill):
             cv.delete("all")
             x1, y1, x2, y2 = OW, OW, W - OW, H - OW
-            # Fill rounded rect
             cv.create_arc(x1,      y1,      x1+2*R, y1+2*R, start=90,  extent=90, fill=fill,   outline=fill,   style="pieslice")
             cv.create_arc(x2-2*R,  y1,      x2,     y1+2*R, start=0,   extent=90, fill=fill,   outline=fill,   style="pieslice")
             cv.create_arc(x1,      y2-2*R,  x1+2*R, y2,     start=180, extent=90, fill=fill,   outline=fill,   style="pieslice")
             cv.create_arc(x2-2*R,  y2-2*R,  x2,     y2,     start=270, extent=90, fill=fill,   outline=fill,   style="pieslice")
             cv.create_rectangle(x1+R, y1, x2-R, y2, fill=fill, outline=fill)
             cv.create_rectangle(x1, y1+R, x2, y2-R, fill=fill, outline=fill)
-            # Purple outline
             cv.create_arc(x1,      y1,      x1+2*R, y1+2*R, start=90,  extent=90, outline=PURPLE, width=OW, style="arc")
             cv.create_arc(x2-2*R,  y1,      x2,     y1+2*R, start=0,   extent=90, outline=PURPLE, width=OW, style="arc")
             cv.create_arc(x1,      y2-2*R,  x1+2*R, y2,     start=180, extent=90, outline=PURPLE, width=OW, style="arc")
@@ -1652,9 +1663,13 @@ class TkPicker:
             cv.create_line(x2,   y1+R, x2,   y2-R, fill=PURPLE, width=OW)
             cv.create_line(x1+R, y2, x2-R, y2, fill=PURPLE, width=OW)
             cv.create_line(x1,   y1+R, x1,   y2-R, fill=PURPLE, width=OW)
-            # White text (always white regardless of theme)
-            cv.create_text(W // 2, H // 2, text="💤 snooze",
-                           fill="#ffffff", font=("Helvetica", 10, "bold"))
+            if _em_photo:
+                cv.create_image(_EM_X, H // 2, image=_em_photo, anchor="center")
+                cv.create_text(_TEXT_X, H // 2, text="snooze",
+                               fill="#ffffff", font=("Helvetica", 10, "bold"), anchor="w")
+            else:
+                cv.create_text(W // 2, H // 2, text="💤 snooze",
+                               fill="#ffffff", font=("Helvetica", 10, "bold"))
 
         _draw(BLUE)
         cv.bind("<Enter>", lambda e: _draw(BLUE_HOVER))
@@ -1677,7 +1692,7 @@ class TkPicker:
             tk.Frame(stripe, bg=c, bd=0, highlightthickness=0).pack(
                 side="top", fill="both", expand=True)
 
-        dismiss = tk.Label(row, text="✕  no thanks",
+        dismiss = tk.Label(row, text="x  no thanks",
                            bg=self.BG, fg=self.FG_DIM, cursor="hand2",
                            font=("Helvetica", 9), padx=8)
         dismiss.pack(side="right", padx=(4, 8))
@@ -1804,6 +1819,7 @@ class TkPicker:
             if banner and not banner_appended[0] and next_rank[0] >= total_entries:
                 self._append_bmc_banner(banner)
                 banner_appended[0] = True
+                self._dm_btn.place_forget()
 
         def _append_header_row(text, color, image_path=None):
             hr = tk.Frame(self._inner, bg=self.BG, bd=0, highlightthickness=0)
@@ -2027,6 +2043,9 @@ class TkPicker:
                 if self._ph_active:
                     self._ph_active = False
                     self._show_ph(_current_ph())
+                if self._research_var.get() and self._sel >= 0:
+                    self._color_row(self._sel, selected=False)
+                    self._sel = -1
 
             self._toggle_trace_id = self._research_var.trace_add("write", _on_research_toggle)
 

@@ -12,8 +12,10 @@ Usage:
 """
 
 import os
+import signal
 import subprocess
 import sys
+import threading
 import time
 import json
 from pathlib import Path
@@ -95,6 +97,8 @@ class TestHarness:
         self.effective_settings: dict = {}
         self.effective_env: dict = {}
         self.stderr_output: str = ""
+        self._stderr_buf: list[bytes] = []
+        self._stderr_thread: threading.Thread | None = None
         subprocess.run(
             ["xclip", "-selection", "clipboard"],
             input=b"test started",
@@ -123,7 +127,12 @@ class TestHarness:
         env.update(extra_env)
 
         cmd = [sys.executable, str(_REPO / "emoji-picker-tk.py")]
-        self._proc = subprocess.Popen(cmd, env=env, cwd=str(_REPO), stderr=subprocess.PIPE)
+        self._stderr_buf = []
+        self._proc = subprocess.Popen(cmd, env=env, cwd=str(_REPO),
+                                      stderr=subprocess.PIPE,
+                                      start_new_session=True)
+        self._stderr_thread = threading.Thread(target=self._drain_stderr, daemon=True)
+        self._stderr_thread.start()
 
         deadline = time.monotonic() + self.STARTUP_TIMEOUT
         while time.monotonic() < deadline:
@@ -150,20 +159,49 @@ class TestHarness:
             f"Window '{self.WINDOW_TITLE}' did not appear within {self.STARTUP_TIMEOUT}s"
         )
 
+    def _drain_stderr(self):
+        try:
+            for line in self._proc.stderr:
+                self._stderr_buf.append(line)
+        except Exception:
+            pass
+
+    def _killpg(self, sig):
+        try:
+            os.killpg(os.getpgid(self._proc.pid), sig)
+        except (ProcessLookupError, OSError):
+            pass
+
     def close(self):
-        if self._proc and self._proc.poll() is None:
-            self._proc.terminate()
+        if self._proc:
+            if self._proc.poll() is None:
+                self._killpg(signal.SIGTERM)
+                try:
+                    self._proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+            self._killpg(signal.SIGKILL)
             try:
-                self._proc.wait(timeout=5)
+                self._proc.wait(timeout=2)
             except subprocess.TimeoutExpired:
-                self._proc.kill()
-        if self._proc and self._proc.stderr:
-            self.stderr_output = self._proc.stderr.read().decode(errors="replace")
+                pass
+        if self._stderr_thread:
+            self._stderr_thread.join(timeout=3)
+        self.stderr_output = b"".join(self._stderr_buf).decode(errors="replace")
         self._proc = None
         self._wid = None
+        time.sleep(0.3)
+        subprocess.run(
+            ["xdotool", "key", "--clearmodifiers", "Escape"],
+            stderr=subprocess.DEVNULL, check=False,
+        )
 
     def __enter__(self):
-        return self.launch()
+        try:
+            return self.launch()
+        except Exception:
+            self.close()
+            raise
 
     def __exit__(self, *_):
         self.close()

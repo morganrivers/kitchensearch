@@ -74,6 +74,9 @@ def run_test(script_path: Path, run_dir: Path, baseline_dir: Path | None = None)
             h.make_gif(gif_path)
             print(f"  GIF → {gif_path}")
     except Exception as exc:
+        stderr = harness.stderr_output.strip()
+        if stderr:
+            print(f"  STDERR in {script_path.stem}:\n{stderr}\n")
         print(f"  ERROR in {script_path.stem}: {exc}")
         raise
 
