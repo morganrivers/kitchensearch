@@ -2054,9 +2054,12 @@ class TkPicker:
                     return
                 q = self._entry_var.get().strip()
                 if not q:
-                    self._show_ph(_current_ph())
-                    if self._rows:
-                        self._select(0)
+                    if not self._research_var.get():
+                        self._do_image_filter()
+                    else:
+                        self._show_ph(_current_ph())
+                        if self._rows:
+                            self._select(0)
                     return
                 if self._filter_after_id:
                     self.root.after_cancel(self._filter_after_id)

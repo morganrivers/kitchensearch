@@ -12,6 +12,7 @@ Usage:
 """
 
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -19,6 +20,12 @@ import threading
 import time
 import json
 from pathlib import Path
+
+_CHROMIUM_NOISE = re.compile(
+    r"\[\d+:\d+:\d+/\d+\.\d+:(?:ERROR|WARNING):.*?\]"
+    r"|Created TensorFlow Lite XNNPACK delegate"
+    r"|Registration response error message: DEPRECATED_ENDPOINT"
+)
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -33,7 +40,8 @@ _SCRIPTS_DIR = Path(__file__).parent / "scripts"
 # Stable defaults for all tests — never touches the user's real settings
 _DEFAULT_TEST_SETTINGS = {
     "notify_on_copy": False,
-    "exit_on_select": True,
+    "exit_on_select": False,
+    "semantic_first": True,
     "show_keyword":   True,
     "show_semantic":  True,
     "show_combo":     True,
@@ -41,6 +49,7 @@ _DEFAULT_TEST_SETTINGS = {
     "floating":       True,
     "frameless":      False,
     "dark_mode":      False,
+    "copy_count":     130,
     "hide_ads":       True,   # banner hidden by default; set false in companion JSON or KITCHENSEARCH_SHOW_BANNER=1
 }
 
@@ -195,6 +204,11 @@ class TestHarness:
             ["xdotool", "key", "--clearmodifiers", "Escape"],
             stderr=subprocess.DEVNULL, check=False,
         )
+
+    @property
+    def meaningful_stderr(self) -> str:
+        lines = [l for l in self.stderr_output.splitlines() if not _CHROMIUM_NOISE.search(l)]
+        return "\n".join(lines).strip()
 
     def __enter__(self):
         try:

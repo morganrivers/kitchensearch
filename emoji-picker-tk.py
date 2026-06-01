@@ -143,9 +143,9 @@ def _run_settings(picker, settings):
             return f"{'[x]' if settings[key] else '[ ]'} {text}"
         items = [
             _lbl("notify_on_copy",  "Show notification when copied"),
-            _lbl("semantic_first",  "Semantic search as default (first in menu)"),
+            _lbl("semantic_first",  "Normal search as default (first in menu)"),
             _lbl("show_keyword",    "Show keyword search on front menu"),
-            _lbl("show_semantic",   "Show semantic search on front menu"),
+            _lbl("show_semantic",   "Show normal search on front menu"),
             _lbl("show_combo",      "Show combo search on front menu"),
             _lbl("show_story",      "Show emoji story on front menu"),
             _lbl("exit_on_select",  "Exit app when emoji selected"),
@@ -166,10 +166,10 @@ def _run_settings(picker, settings):
         except ValueError:
             sel_idx = 0
         if "notification when copied"    in choice: settings["notify_on_copy"]  = not settings["notify_on_copy"]
-        elif "Semantic search as default" in choice: settings["semantic_first"]  = not settings["semantic_first"]
+        elif "Normal search as default" in choice: settings["semantic_first"]  = not settings["semantic_first"]
         elif "Exit app when emoji selected" in choice: settings["exit_on_select"] = not settings["exit_on_select"]
         elif "keyword search"  in choice: settings["show_keyword"]  = not settings["show_keyword"]
-        elif "semantic"        in choice: settings["show_semantic"] = not settings["show_semantic"]
+        elif "normal"        in choice: settings["show_semantic"] = not settings["show_semantic"]
         elif "combo"           in choice: settings["show_combo"]    = not settings["show_combo"]
         elif "emoji story"     in choice: settings["show_story"]    = not settings["show_story"]
         elif "floating window" in choice: settings["floating"]      = not settings["floating"]
@@ -231,7 +231,7 @@ def main():
         while True:
             has_sem     = _has_semantic_models()
             has_data    = SEARCH_INDEX.exists()
-            sem_label   = "semantic search (better, slow)"
+            sem_label   = "normal search"
             story_label = "emoji story"
             _nd         = "  (not downloaded)"
 
@@ -269,10 +269,10 @@ def main():
             if banner is not None and "hide_ads" not in settings:
                 settings["hide_ads"] = False
                 save_settings(settings)
-            _menu_prompt = "Use quick semantic search directly or select an option below." if settings.get("semantic_first", True) else "Use quick keyword search directly or select an option below."
+            _menu_prompt = "Use the emojikitchen image search directly or select an option below." if settings.get("semantic_first", True) else "Use emojikitchen keyword search directly or select an option below."
             mode = picker.pick_with_images(_menu_prompt, menu_entries, _menu_on_url,
                                            thumb_size=48, preload=True,
-                                           placeholder="type to semantic search..." if settings.get("semantic_first", True) else "type to keyword search...",
+                                           placeholder="type to search..." if settings.get("semantic_first", True) else "type to keyword search...",
                                            filter=False, banner=banner,
                                            show_dark_btn=True)
             _dbg(f"MENU_SHOW_DONE mode={mode!r}")
@@ -313,7 +313,7 @@ def main():
                         return None
                 _a2t = {alt: text for _, alt, text in entries}
                 return ([(rank, alt, url, _a2t.get(alt, "")) for rank, alt, url, _ in raw],
-                        [], f"'{q}' (semantic)")
+                        [], f"'{q}' (normal)")
 
             def _run_keyword(q):
                 r = search(entries, q)
@@ -463,11 +463,11 @@ def main():
             # ── semantic ─────────────────────────────────────────────────
             elif mode.startswith(sem_label):
                 if not has_sem:
-                    picker.message("Semantic search data not available.")
+                    picker.message("Search data not available.")
                     continue
                 if not _daemon_alive():
                     _spawn_daemon()
-                query = picker.ask_with_loading_bar("emoji search (semantic):", placeholder='try e.g. "ski chicken" then press enter')
+                query = picker.ask_with_loading_bar("emoji search:", placeholder='try e.g. "ski chicken" then press enter')
                 if not query:
                     continue
                 out = _run_semantic(query)

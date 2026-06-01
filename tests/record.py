@@ -322,7 +322,7 @@ def main():
         env["XDG_CACHE_HOME"] = os.environ["KITCHENSEARCH_CACHE_DIR"]
 
     proc = subprocess.Popen(
-        [str(_REPO / ".venv" / "bin" / "python3"), str(_REPO / "emoji-picker-tk.py")],
+        [sys.executable, str(_REPO / "emoji-picker-tk.py")],
         env=env, cwd=str(_REPO),
     )
 
@@ -368,7 +368,7 @@ def main():
     print(f"\n  Re-running {full_name} to verify…\n")
     result = subprocess.run(
         ["xvfb-run", "-a",
-         str(_REPO / ".venv" / "bin" / "python3"),
+         sys.executable,
          str(_TESTS_DIR / "run_tests.py"),
          "--update-baseline",
          "--test", full_name],
