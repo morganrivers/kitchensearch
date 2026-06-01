@@ -154,6 +154,7 @@ class TkPicker:
     TITLE_H       = 52
     _VIRT_ROW_H   = 34
     _DM_SIZE      = 26
+    _BACK_W       = 58
 
     def _apply_theme(self, theme):
         self.BG         = theme["BG"]
@@ -204,7 +205,8 @@ class TkPicker:
         self._img_refs        = []
         self._prompt_img_refs = []
         self._options   = []
-        self._trace_id      = None
+        self._trace_id        = None
+        self._toggle_trace_id = None
         self._filter_after_id = None
         self._filter_mode = False
         self._on_select  = None
@@ -243,7 +245,9 @@ class TkPicker:
         self._prompt_frame.pack(fill="x")
 
         self._entry_var = tk.StringVar()
-        self._entry = tk.Entry(top, textvariable=self._entry_var,
+        self._entry_row = tk.Frame(top, bg=self.BG)
+        self._entry_row.pack(fill="x", pady=(4, 0))
+        self._entry = tk.Entry(self._entry_row, textvariable=self._entry_var,
                                bg=self.ENTRY_BG, fg=self.FG,
                                insertbackground=self.FG,
                                font=("Helvetica", 13),
@@ -252,7 +256,27 @@ class TkPicker:
                                highlightbackground="#dddddd",
                                highlightcolor=self.ACCENT,
                                insertofftime=0 if os.environ.get("KITCHENSEARCH_NO_BLINK") else 300)
-        self._entry.pack(fill="x", pady=(4, 0))
+        self._entry.pack(side="left", fill="x", expand=True)
+        self._research_var = tk.BooleanVar(value=True)
+        self._research_cb = tk.Checkbutton(
+            self._entry_row, text="re-search",
+            variable=self._research_var,
+            bg=self.BG, fg=self.FG,
+            selectcolor=self.ENTRY_BG,
+            activebackground=self.BG, activeforeground=self.FG,
+            font=("Helvetica", 11),
+            cursor="hand2",
+            relief="flat", bd=0,
+        )
+        self._search_btn = tk.Button(
+            self._entry_row, text="Search",
+            command=self._on_return,
+            bg=self.ACCENT, fg="white",
+            font=("Helvetica", 11),
+            relief="flat", bd=4,
+            cursor="hand2",
+            activebackground=self.ACCENT, activeforeground="white",
+        )
 
         self._entry.bind("<Escape>",       self._cancel)
         self._entry.bind("<Return>",       self._on_return)
@@ -340,6 +364,7 @@ class TkPicker:
         root.bind("<Prior>",        self._prev_page)
 
         self._make_dm_button()
+        self._make_back_btn()
 
     # ── dark mode button ──────────────────────────────────────────────────────
 
@@ -385,6 +410,36 @@ class TkPicker:
             btn.create_oval(c - r + 5, c - r - 2,
                             c + r + 5, c + r - 2,
                             fill=self.BG, outline="")
+
+    def _make_back_btn(self):
+        btn = tk.Canvas(self._content_frame,
+                        width=self._BACK_W, height=self._DM_SIZE,
+                        bg=self.BG, highlightthickness=0, bd=0,
+                        cursor="hand2", takefocus=True)
+        self._back_btn = btn
+        self._back_draw()
+        btn.bind("<Button-1>", lambda e: self._cancel())
+        btn.bind("<Return>",   lambda e: self._cancel())
+        btn.bind("<space>",    lambda e: self._cancel())
+        btn.bind("<Enter>",    lambda e: self._back_draw(hover=True))
+        btn.bind("<Leave>",    lambda e: self._back_draw(hover=False))
+        btn.bind("<FocusIn>",  lambda e: btn.configure(
+            highlightthickness=2, highlightbackground=self.ACCENT))
+        btn.bind("<FocusOut>", lambda e: btn.configure(highlightthickness=0))
+
+    def _back_draw(self, hover=False):
+        btn = self._back_btn
+        btn.delete("all")
+        btn.configure(bg=self.BG)
+        w, h = self._BACK_W, self._DM_SIZE
+        c = self.FG if hover else self.FG_DIM
+        btn.create_text(w // 2, h // 2, text="< back",
+                        fill=c, font=("Helvetica", 10), anchor="center")
+
+    def _show_back_btn(self):
+        y = (self.TITLE_H - self._DM_SIZE) // 2
+        self._back_btn.place(in_=self._content_frame, x=6, y=y)
+        self.root.tk.call('raise', self._back_btn._w)
 
     @staticmethod
     def _norm_color(color):
@@ -433,6 +488,11 @@ class TkPicker:
         )
         if self._ph_active:
             self._entry.config(fg=self._PH_COLOR)
+        self._research_cb.configure(
+            selectcolor=new_theme["ENTRY_BG"],
+            activebackground=self.BG,
+            activeforeground=self.FG,
+        )
 
         # TTK progressbar style
         style = ttk.Style()
@@ -499,6 +559,9 @@ class TkPicker:
 
         self._dm_draw()
         self.root.tk.call('raise', self._dm_btn._w)
+        self._back_draw()
+        if self._back_btn.winfo_ismapped():
+            self.root.tk.call('raise', self._back_btn._w)
 
         if self._on_dark_toggle:
             self._on_dark_toggle(self._dark)
@@ -983,6 +1046,10 @@ class TkPicker:
             try: self._entry_var.trace_remove("write", self._trace_id)
             except Exception: pass
             self._trace_id = None
+        if self._toggle_trace_id:
+            try: self._research_var.trace_remove("write", self._toggle_trace_id)
+            except Exception: pass
+            self._toggle_trace_id = None
         if self._filter_after_id:
             self.root.after_cancel(self._filter_after_id)
             self._filter_after_id = None
@@ -1004,21 +1071,29 @@ class TkPicker:
         self._entry_var.set("")
         self._prog_frame.pack_forget()
         self._progbar.configure(mode="determinate")
+        self._research_cb.pack_forget()
+        self._search_btn.pack_forget()
+        if not self._entry_row.winfo_ismapped():
+            self._entry_row.pack(fill="x", pady=(4, 0))
         if not self._entry.winfo_ismapped():
-            self._entry.pack(fill="x", pady=(4, 0))
+            self._entry.pack(side="left", fill="x", expand=True)
         self._dm_btn.place_forget()
         self._dismiss_toast()
+        self._back_btn.place_forget()
 
     # ── public API ────────────────────────────────────────────────────────────
 
-    def ask(self, prompt):
+    def ask(self, prompt, placeholder=None):
         """Plain text input. Returns typed text or None."""
         self._reset()
         self._mode = "input"
         self._set_prompt(prompt)
+        self._show_back_btn()
+        if placeholder is not None:
+            self._show_ph(placeholder)
         return self._run()
 
-    def ask_with_loading_bar(self, prompt):
+    def ask_with_loading_bar(self, prompt, placeholder=None):
         """
         Input prompt that also shows daemon loading progress below the entry.
         If the daemon finishes loading before the user submits, the bar is hidden.
@@ -1029,6 +1104,9 @@ class TkPicker:
         self._reset()
         self._mode = "input"
         self._set_prompt(prompt)
+        self._show_back_btn()
+        if placeholder is not None:
+            self._show_ph(placeholder)
 
         if _daemon_ready():
             return self._run()
@@ -1104,7 +1182,7 @@ class TkPicker:
                  bg=self.BG, fg=self.FG_DIM,
                  font=("Helvetica", 11, "bold"), anchor="w", padx=10, pady=20
                  ).pack(fill="x")
-        self._entry.pack_forget()
+        self._entry_row.pack_forget()
         return self._run()
 
     def pick(self, prompt, options, filter=True, initial_sel=0):
@@ -1114,6 +1192,7 @@ class TkPicker:
         self._options     = list(options)
         self._filter_mode = filter
         self._set_prompt(prompt)
+        self._show_back_btn()
         _dbg(f"PICK: _build_text_rows start n={len(self._options)}")
         self._build_text_rows(self._options)
         _dbg(f"PICK: _build_text_rows done n_rows={len(self._rows)}")
@@ -1172,6 +1251,16 @@ class TkPicker:
             self._select(0)
         if not q:
             self._show_ph()
+
+    def _do_research_return(self):
+        self._filter_after_id = None
+        if self._ph_active:
+            return
+        q = self._entry_var.get().strip()
+        if q:
+            self._result = q
+            self.result_typed = True
+            self.root.quit()
 
     def _click_image_row(self, rd):
         try:
@@ -1473,6 +1562,7 @@ class TkPicker:
         self._options     = list(options)
         self._filter_mode = False
         self._set_prompt(prompt)
+        self._show_back_btn()
         self._build_settings_rows(self._options)
         if self._rows:
             self._select(min(initial_sel, len(self._rows) - 1))
@@ -1638,12 +1728,14 @@ class TkPicker:
             self.root.quit()
         snooze.bind("<Button-1>", _on_snooze)
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, banner=None, show_dark_btn=False):
+    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, banner=None, show_dark_btn=False, show_research_cb=False):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
         if show_dark_btn:
             self._dm_btn.place(relx=1.0, rely=1.0, anchor="se", x=-6, y=-6)
             self.root.tk.call('raise', self._dm_btn._w)
+        else:
+            self._show_back_btn()
         gen = self._gen_id  # capture generation ID for stale-callback detection
         self._mode = "imagelist"
         self._on_select = on_select
@@ -1871,7 +1963,39 @@ class TkPicker:
             self._sb.pack_forget()
 
         _dbg(f"PICK_WITH_IMAGES: {'preloaded' if preload else 'all workers dispatched'} gen={gen}, calling _run")
-        if filter:
+        _ph_to_show = placeholder
+        if show_research_cb:
+            self._search_btn.pack(side="right", padx=(0, 4))
+            self._research_cb.pack(side="right", padx=(8, 0))
+            _ph_search = placeholder if placeholder is not None else "type query, press Enter to search"
+            _ph_filter = "start typing to filter"
+
+            def _current_ph():
+                return _ph_search if self._research_var.get() else _ph_filter
+
+            def _on_research_toggle(*_):
+                if self._ph_active:
+                    self._ph_active = False
+                    self._show_ph(_current_ph())
+
+            self._toggle_trace_id = self._research_var.trace_add("write", _on_research_toggle)
+
+            def _research_aware_cb(*_):
+                if self._ph_active:
+                    return
+                q = self._entry_var.get().strip()
+                if not q:
+                    self._show_ph(_current_ph())
+                    if self._rows:
+                        self._select(0)
+                    return
+                if self._filter_after_id:
+                    self.root.after_cancel(self._filter_after_id)
+                if not self._research_var.get():
+                    self._filter_after_id = self.root.after(300, self._do_image_filter)
+            self._trace_id = self._entry_var.trace_add("write", _research_aware_cb)
+            _ph_to_show = _current_ph()
+        elif filter:
             self._trace_id = self._entry_var.trace_add("write", self._filter_cb)
         else:
             def _no_filter_cb(*_):
@@ -1887,7 +2011,7 @@ class TkPicker:
                     if self._rows:
                         self._select(0)
             self._trace_id = self._entry_var.trace_add("write", _no_filter_cb)
-        self._show_ph(placeholder)
+        self._show_ph(_ph_to_show)
         result = self._run()
         _dbg(f"PICK_WITH_IMAGES: _run done gen={gen} result={result!r}")
         return result
@@ -1901,7 +2025,7 @@ class TkPicker:
         self._reset()
         self._mode = "download"
         self._set_prompt(title)
-        self._entry.pack_forget()
+        self._entry_row.pack_forget()
 
         self._prog_var.set(0)
         self._progbar.configure(maximum=100, mode="determinate")
@@ -1995,7 +2119,7 @@ class TkPicker:
         self._reset()
         self._mode = "loading"
         self._set_prompt("Loading search models...")
-        self._entry.pack_forget()
+        self._entry_row.pack_forget()
 
         self._prog_var.set(0)
         self._progbar.configure(maximum=100, mode="determinate")
@@ -2074,7 +2198,7 @@ class TkPicker:
         self._reset()
         self._mode = "story_progress"
         self._set_prompt("Generating emoji story...")
-        self._entry.pack_forget()
+        self._entry_row.pack_forget()
 
         self._prog_var.set(0)
         self._progbar.configure(maximum=100, mode="indeterminate")
@@ -2145,7 +2269,7 @@ class TkPicker:
         self._reset()
         self._mode = "spinner"
         self._set_prompt(title)
-        self._entry.pack_forget()
+        self._entry_row.pack_forget()
 
         self._progbar.configure(mode="indeterminate")
         self._prog_frame.pack(fill="x")
@@ -2177,7 +2301,7 @@ class TkPicker:
         self._reset()
         self._mode = "showimage"
         self._set_prompt(prompt)
-        self._entry.pack_forget()
+        self._entry_row.pack_forget()
 
         self.root.update_idletasks()
         avail_w = max(self.root.winfo_width() - 20, 100)

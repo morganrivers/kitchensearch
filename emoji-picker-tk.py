@@ -33,7 +33,7 @@ SETTINGS_FILE = CONFIG_DIR / "picker-settings.json"
 
 _DEFAULT_SETTINGS = {
     "notify_on_copy":  True,
-    "exit_on_select":  True,
+    "exit_on_select":  False,
     "semantic_first":  True,
     "show_keyword":    True,
     "show_semantic":   True,
@@ -253,7 +253,7 @@ def main():
             if show_second:
                 menu_entries.append(second)
             if settings["show_combo"]:
-                menu_entries.append(("combo",
+                menu_entries.append(("combine two emojis",
                                      _find_combo_url_or_emoji(entries, "fire", "slot_machine")))
             if settings["show_story"]:
                 menu_entries.append((story_label + ("" if has_data else _nd),
@@ -351,7 +351,7 @@ def main():
                 continue
 
             # ── combo ────────────────────────────────────────────────────
-            elif mode == "combo":
+            elif mode == "combine two emojis":
                 _dbg("COMBO_SELECTED")
                 _dbg("COMBO: pick_first_emoji start")
                 first = pick_base_emoji(base_index, "first emoji:", picker)
@@ -451,7 +451,7 @@ def main():
                     continue
                 if not _daemon_alive():
                     _spawn_daemon()
-                query = picker.ask_with_loading_bar("emoji search (semantic):")
+                query = picker.ask_with_loading_bar("emoji search (semantic):", placeholder='try e.g. "ski chicken" then press enter')
                 if not query:
                     continue
                 results = query_daemon(query)
@@ -470,7 +470,7 @@ def main():
 
             # ── keyword ──────────────────────────────────────────────────
             else:
-                query = picker.ask("emoji search:")
+                query = picker.ask("emoji search:", placeholder='try e.g. "ski chicken" then press enter')
                 if not query:
                     continue
                 results = search(entries, query)
@@ -508,10 +508,21 @@ def main():
                 on_sel = None if settings["exit_on_select"] else _copy_selected
                 result = picker.pick_with_images(
                     f"{query_label} {count}:", icon_entries, get_thumb,
-                    on_select=on_sel, patterns=patterns)
+                    on_select=on_sel, patterns=patterns, show_research_cb=True)
 
                 if result == LOAD_MORE:
                     offset += BATCH_SIZE
+                    continue
+                if picker.result_typed and result:
+                    query = result
+                    results = search(entries, query)
+                    if not results:
+                        picker.message(f"No results for '{query}'")
+                        break
+                    patterns = [re.compile(r'\b' + re.escape(w) + r'\b')
+                                for w in query.lower().split()]
+                    query_label = f"'{query}'"
+                    offset = 0
                     continue
                 if result and settings["exit_on_select"]:
                     _copy_selected(result)

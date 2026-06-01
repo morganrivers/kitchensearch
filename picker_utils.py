@@ -225,14 +225,8 @@ def copy_image_to_clipboard(path):
     if sys.platform == "win32":
         try:
             import ctypes, ctypes.wintypes, io
-            img = Image.open(path).convert("RGB")
-            buf = io.BytesIO()
-            img.save(buf, "BMP")
-            dib = buf.getvalue()[14:]  # strip 14-byte BMP file header → DIB
             k32 = ctypes.windll.kernel32
             u32 = ctypes.windll.user32
-            # Must set restype=c_void_p for handle-returning functions on 64-bit;
-            # the default c_int truncates the upper 32 bits → NULL → access violation.
             k32.GlobalAlloc.restype   = ctypes.c_void_p
             k32.GlobalLock.restype    = ctypes.c_void_p
             k32.GlobalLock.argtypes   = [ctypes.c_void_p]
@@ -241,24 +235,43 @@ def copy_image_to_clipboard(path):
             k32.GlobalFree.argtypes   = [ctypes.c_void_p]
             u32.SetClipboardData.restype  = ctypes.c_void_p
             u32.SetClipboardData.argtypes = [ctypes.wintypes.UINT, ctypes.c_void_p]
-            h = k32.GlobalAlloc(0x0002, len(dib))  # GMEM_MOVEABLE
-            if not h:
-                raise OSError("GlobalAlloc failed")
-            p = k32.GlobalLock(h)
-            if not p:
-                k32.GlobalFree(h)
-                raise OSError("GlobalLock failed")
-            ctypes.memmove(p, dib, len(dib))
-            k32.GlobalUnlock(h)
+
+            def _make_hglobal(data):
+                h = k32.GlobalAlloc(0x0002, len(data))  # GMEM_MOVEABLE
+                if not h:
+                    raise OSError("GlobalAlloc failed")
+                p = k32.GlobalLock(h)
+                if not p:
+                    k32.GlobalFree(h)
+                    raise OSError("GlobalLock failed")
+                ctypes.memmove(p, data, len(data))
+                k32.GlobalUnlock(h)
+                return h
+
+            img_rgba = Image.open(path).convert("RGBA")
+
+            dib_buf = io.BytesIO()
+            img_rgba.convert("RGB").save(dib_buf, "BMP")
+            dib = dib_buf.getvalue()[14:]
+
+            png_buf = io.BytesIO()
+            img_rgba.save(png_buf, "PNG")
+            png_bytes = png_buf.getvalue()
+
+            cf_png = u32.RegisterClipboardFormatW("PNG")
+
             if not u32.OpenClipboard(None):
-                k32.GlobalFree(h)
                 raise OSError("OpenClipboard failed")
             try:
                 u32.EmptyClipboard()
-                if not u32.SetClipboardData(8, h):  # CF_DIB
-                    k32.GlobalFree(h)
-                    raise OSError("SetClipboardData failed")
-                # On success the clipboard owns h — do NOT free it
+                h_dib = _make_hglobal(dib)
+                if not u32.SetClipboardData(8, h_dib):  # CF_DIB
+                    k32.GlobalFree(h_dib)
+                    raise OSError("SetClipboardData CF_DIB failed")
+                h_png = _make_hglobal(png_bytes)
+                if not u32.SetClipboardData(cf_png, h_png):
+                    k32.GlobalFree(h_png)
+                    raise OSError("SetClipboardData PNG failed")
             finally:
                 u32.CloseClipboard()
         except Exception as e:
