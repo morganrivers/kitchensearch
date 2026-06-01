@@ -77,7 +77,11 @@ def run_test(script_path: Path, run_dir: Path, baseline_dir: Path | None = None)
         print(f"  ERROR in {script_path.stem}: {exc}")
         raise
 
-    return harness.effective_settings, harness.effective_env
+    stderr = harness.stderr_output.strip()
+    if stderr:
+        print(f"  STDERR in {script_path.stem}:\n{stderr}\n")
+
+    return harness.effective_settings, harness.effective_env, stderr
 
 
 def main():
@@ -112,6 +116,8 @@ def main():
         print("No test scripts found.")
         sys.exit(1)
 
+    stderr_failures: list[str] = []
+
     if not args.compare_only:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -132,7 +138,7 @@ def main():
                 test_dir = _BASELINE_UNAPPROVED / script.stem
                 if test_dir.exists():
                     shutil.rmtree(test_dir)
-                effective_settings, effective_env = run_test(script, run_dir)
+                effective_settings, effective_env, _ = run_test(script, run_dir)
                 if test_dir.exists():
                     ts_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     (test_dir / "meta.json").write_text(
@@ -142,7 +148,9 @@ def main():
                         json.dumps({"settings": effective_settings, "env": effective_env}, indent=2), encoding="utf-8"
                     )
             else:
-                run_test(script, run_dir, baseline_dir=_BASELINE_APPROVED / script.stem)
+                _, _, stderr = run_test(script, run_dir, baseline_dir=_BASELINE_APPROVED / script.stem)
+                if stderr:
+                    stderr_failures.append(script.stem)
 
         if args.update_baseline:
             print(f"\n  Unapproved baseline saved → {_BASELINE_UNAPPROVED}")
@@ -183,9 +191,11 @@ def main():
 
     if total_changed:
         print(f"  python tests/viewer.py {_TEST_RUN_DIR}")
-    else:
+    if stderr_failures:
+        print(f"  Tests with stderr output: {stderr_failures}")
+    if not total_changed and not stderr_failures:
         print("  All screenshots match baseline.")
-    sys.exit(1 if total_changed else 0)
+    sys.exit(1 if (total_changed or stderr_failures) else 0)
 
 
 if __name__ == "__main__":

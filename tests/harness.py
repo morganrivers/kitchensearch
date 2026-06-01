@@ -94,6 +94,7 @@ class TestHarness:
         self._widget_server_ready = False
         self.effective_settings: dict = {}
         self.effective_env: dict = {}
+        self.stderr_output: str = ""
         subprocess.run(
             ["xclip", "-selection", "clipboard"],
             input=b"test started",
@@ -122,7 +123,7 @@ class TestHarness:
         env.update(extra_env)
 
         cmd = [sys.executable, str(_REPO / "emoji-picker-tk.py")]
-        self._proc = subprocess.Popen(cmd, env=env, cwd=str(_REPO))
+        self._proc = subprocess.Popen(cmd, env=env, cwd=str(_REPO), stderr=subprocess.PIPE)
 
         deadline = time.monotonic() + self.STARTUP_TIMEOUT
         while time.monotonic() < deadline:
@@ -156,6 +157,8 @@ class TestHarness:
                 self._proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self._proc.kill()
+        if self._proc and self._proc.stderr:
+            self.stderr_output = self._proc.stderr.read().decode(errors="replace")
         self._proc = None
         self._wid = None
 

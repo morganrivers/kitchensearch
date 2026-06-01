@@ -268,15 +268,8 @@ class TkPicker:
             cursor="hand2",
             relief="flat", bd=0,
         )
-        self._search_btn = tk.Button(
-            self._entry_row, text="Search",
-            command=self._on_return,
-            bg=self.ACCENT, fg="white",
-            font=("Helvetica", 11),
-            relief="flat", bd=4,
-            cursor="hand2",
-            activebackground=self.ACCENT, activeforeground="white",
-        )
+        self._research_cb.bind("<Tab>",       lambda e: self._focus_next())
+        self._research_cb.bind("<Shift-Tab>", lambda e: self._focus_prev())
 
         self._entry.bind("<Escape>",       self._cancel)
         self._entry.bind("<Return>",       self._on_return)
@@ -318,7 +311,8 @@ class TkPicker:
         list_outer = tk.Frame(cf, bg=self.BG)
         list_outer.pack(fill="both", expand=True, padx=2)
 
-        self._canvas = tk.Canvas(list_outer, bg=self.BG, highlightthickness=0, bd=0)
+        self._canvas = tk.Canvas(list_outer, bg=self.BG, highlightthickness=0, bd=0,
+                                 takefocus=True)
         self._sb = NiceScrollbar(list_outer, orientation="vertical",
                                  command=self._canvas.yview,
                                  fg_color="#e0e0e0",
@@ -350,6 +344,10 @@ class TkPicker:
             w.bind("<Prior>",         self._prev_page)
 
         self._canvas.bind("<ButtonPress-1>", lambda e: self._dismiss_popup(), add="+")
+        self._canvas.bind("<FocusIn>",  lambda e: self._canvas.configure(
+            highlightthickness=3, highlightbackground=self.ACCENT), add="+")
+        self._canvas.bind("<FocusOut>", lambda e: self._canvas.configure(
+            highlightthickness=0), add="+")
         root.bind("<FocusOut>", lambda e: self._dismiss_popup(), add="+")
 
         root.bind("<Escape>",       self._cancel)
@@ -362,6 +360,14 @@ class TkPicker:
         root.bind("<Control-Up>",   self._prev_page)
         root.bind("<Next>",         self._next_page)
         root.bind("<Prior>",        self._prev_page)
+
+        self._entry.bind("<Tab>",       lambda e: self._focus_next(), add="+")
+        self._entry.bind("<Shift-Tab>", lambda e: self._focus_prev(), add="+")
+        root.bind("<Tab>",       self._focus_next)
+        root.bind("<Shift-Tab>", self._focus_prev)
+
+        self._entry.bind("<FocusIn>",  lambda e: self._entry.configure(highlightthickness=3), add="+")
+        self._entry.bind("<FocusOut>", lambda e: self._entry.configure(highlightthickness=2), add="+")
 
         self._make_dm_button()
         self._make_back_btn()
@@ -379,8 +385,10 @@ class TkPicker:
         btn.bind("<Button-1>", lambda e: self._toggle_dark_mode())
         btn.bind("<Return>",   lambda e: self._toggle_dark_mode())
         btn.bind("<space>",    lambda e: self._toggle_dark_mode())
+        btn.bind("<Tab>",       lambda e: self._focus_next())
+        btn.bind("<Shift-Tab>", lambda e: self._focus_prev())
         btn.bind("<FocusIn>",  lambda e: btn.configure(
-            highlightthickness=2, highlightbackground=self.ACCENT))
+            highlightthickness=3, highlightbackground=self.ACCENT))
         btn.bind("<FocusOut>", lambda e: btn.configure(highlightthickness=0))
 
     def _dm_draw(self):
@@ -423,8 +431,10 @@ class TkPicker:
         btn.bind("<space>",    lambda e: self._cancel())
         btn.bind("<Enter>",    lambda e: self._back_draw(hover=True))
         btn.bind("<Leave>",    lambda e: self._back_draw(hover=False))
+        btn.bind("<Tab>",       lambda e: self._focus_next())
+        btn.bind("<Shift-Tab>", lambda e: self._focus_prev())
         btn.bind("<FocusIn>",  lambda e: btn.configure(
-            highlightthickness=2, highlightbackground=self.ACCENT))
+            highlightthickness=3, highlightbackground=self.ACCENT))
         btn.bind("<FocusOut>", lambda e: btn.configure(highlightthickness=0))
 
     def _back_draw(self, hover=False):
@@ -726,6 +736,12 @@ class TkPicker:
                 pass
             if self._entry.winfo_ismapped():
                 self._entry.focus_set()
+            else:
+                def _on_entry_map(e):
+                    self.root.focus_force()
+                    self._entry.focus_set()
+                    self._entry.unbind("<Map>")
+                self._entry.bind("<Map>", _on_entry_map)
         _activate()
         if self._pending_toast:
             _msg, self._pending_toast = self._pending_toast, None
@@ -839,6 +855,42 @@ class TkPicker:
                 pass
             self._active_popup = None
 
+    def _tab_order(self):
+        order = [self._entry]
+        if self._research_cb.winfo_ismapped():
+            order.append(self._research_cb)
+        if self._rows:
+            order.append(self._canvas)
+        if self._back_btn.winfo_ismapped():
+            order.append(self._back_btn)
+        if self._dm_btn.winfo_ismapped():
+            order.append(self._dm_btn)
+        return order
+
+    def _focus_next(self, e=None):
+        order = self._tab_order()
+        if not order:
+            return "break"
+        focused = self.root.focus_get()
+        try:
+            idx = order.index(focused)
+        except ValueError:
+            idx = -1
+        order[(idx + 1) % len(order)].focus_set()
+        return "break"
+
+    def _focus_prev(self, e=None):
+        order = self._tab_order()
+        if not order:
+            return "break"
+        focused = self.root.focus_get()
+        try:
+            idx = order.index(focused)
+        except ValueError:
+            idx = 1
+        order[(idx - 1) % len(order)].focus_set()
+        return "break"
+
     def _cancel(self, e=None):
         self._dismiss_popup()
         self._result = None
@@ -859,7 +911,7 @@ class TkPicker:
             self.root.quit()
         elif self._mode == "imagelist":
             val = self._real_text().strip()
-            if val:
+            if val and self._research_cb.winfo_ismapped() and self._research_var.get():
                 self._result = val
                 self.result_typed = True
                 self.root.quit()
@@ -1072,7 +1124,6 @@ class TkPicker:
         self._prog_frame.pack_forget()
         self._progbar.configure(mode="determinate")
         self._research_cb.pack_forget()
-        self._search_btn.pack_forget()
         if not self._entry_row.winfo_ismapped():
             self._entry_row.pack(fill="x", pady=(4, 0))
         if not self._entry.winfo_ismapped():
@@ -1965,7 +2016,6 @@ class TkPicker:
         _dbg(f"PICK_WITH_IMAGES: {'preloaded' if preload else 'all workers dispatched'} gen={gen}, calling _run")
         _ph_to_show = placeholder
         if show_research_cb:
-            self._search_btn.pack(side="right", padx=(0, 4))
             self._research_cb.pack(side="right", padx=(8, 0))
             _ph_search = placeholder if placeholder is not None else "type query, press Enter to search"
             _ph_filter = "start typing to filter"
@@ -1991,7 +2041,11 @@ class TkPicker:
                     return
                 if self._filter_after_id:
                     self.root.after_cancel(self._filter_after_id)
-                if not self._research_var.get():
+                if self._research_var.get():
+                    if self._sel >= 0:
+                        self._color_row(self._sel, selected=False)
+                        self._sel = -1
+                else:
                     self._filter_after_id = self.root.after(300, self._do_image_filter)
             self._trace_id = self._entry_var.trace_add("write", _research_aware_cb)
             _ph_to_show = _current_ph()
