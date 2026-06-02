@@ -1,4 +1,4 @@
-<p align="center"><img src="demo.gif" /></p>
+<p align="center"><img src="docs/demo.gif" /></p>
 
 # Kitchen Search
 
