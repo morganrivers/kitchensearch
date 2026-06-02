@@ -44,13 +44,18 @@ The base install uses ~100 MB (scripts + embedding data + Python virtualenv).
 
 When you first select `semantic search` or `emoji story` from the rofi menu, a background daemon will automatically download ML models (~340 MB total) - this only happens once:
 
-Thumbnail images are cached as you browse (~10 KB each) in `~/.local/share/kitchensearch/data/cache/thumbs/`. The cache grows gradually with use but is automatically pruned to stay under 200 MB.
+Thumbnail images are cached as you browse (~10 KB each) in `~/.cache/kitchensearch/thumbs/`. The cache grows gradually with use but is automatically pruned to stay under 200 MB.
 
 ## Uninstall
 
+**Linux:** navigate to the folder where you unzipped kitchensearch and run:
 ```bash
-curl -sSL https://github.com/morganrivers/kitchensearch/releases/latest/download/install.sh | bash -s uninstall
+rm -rf kitchensearch
+rm -rf ~/.cache/kitchensearch
+rm -rf ~/.config/kitchensearch
 ```
+
+**Windows:** uninstall via **Settings → Apps** (or **Control Panel → Programs**) as with any program.
 
 ## Setting a Keyboard Shortcut
 
