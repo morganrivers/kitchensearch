@@ -17,7 +17,7 @@ from picker_utils import (
     _has_semantic_models, _notify, _dbg,
     load_index, search, build_base_emoji_index, format_label,
     get_thumb, render_emoji_pil,
-    copy_image_to_clipboard,
+    copy_image_to_clipboard, record_copy,
     query_daemon,
     _trim_thumb_cache, _spawn_daemon, _daemon_alive,
     get_buymeacoffee_url, get_banner_config, _next_tuesday_ts,
@@ -409,6 +409,7 @@ def main():
                             path = get_thumb(url)
                             if path:
                                 copy_image_to_clipboard(path)
+                                record_copy(url, alt)
                                 settings["copy_count"] = settings.get("copy_count", 0) + 1
                                 save_settings(settings)
                                 if settings["notify_on_copy"]:
@@ -499,6 +500,7 @@ def main():
                             path = get_thumb(url)
                             if path:
                                 copy_image_to_clipboard(path)
+                                record_copy(url, alt)
                                 settings["copy_count"] = settings.get("copy_count", 0) + 1
                                 save_settings(settings)
                                 if settings["notify_on_copy"]:

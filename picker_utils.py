@@ -536,12 +536,59 @@ def build_base_emoji_index(entries):
 _THUMB_LIMIT = 200 * 1024 * 1024
 _THUMB_DL_SEM = threading.Semaphore(8)  # cap concurrent thumbnail downloads to avoid rate-limiting
 
+COPY_COUNTS_PATH = CACHE_DIR / "copy_counts.json"
+_copy_counts_lock = threading.Lock()
+
+
+def _load_copy_counts():
+    try:
+        return json.loads(COPY_COUNTS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_copy_counts(d):
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = COPY_COUNTS_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(d), encoding="utf-8")
+        tmp.replace(COPY_COUNTS_PATH)
+    except Exception as e:
+        print(f"[copy_counts save fail] err={e}", flush=True)
+
+
+def record_copy(url, alt):
+    key = hashlib.md5(url.encode()).hexdigest()
+    with _copy_counts_lock:
+        d = _load_copy_counts()
+        rec = d.get(key, {"count": 0, "alt": alt})
+        rec["count"] = int(rec.get("count", 0)) + 1
+        rec["alt"] = alt or rec.get("alt", "")
+        d[key] = rec
+        _save_copy_counts(d)
+    path = THUMB_DIR / (key + ".png")
+    if path.exists():
+        try:
+            path.touch()
+        except OSError:
+            pass
+
+
+def top_copied(n=10):
+    d = _load_copy_counts()
+    items = [(int(v.get("count", 0)), v.get("alt", "") or "(unnamed)")
+             for v in d.values() if int(v.get("count", 0)) > 0]
+    items.sort(reverse=True)
+    return items[:n]
+
 
 def _trim_thumb_cache():
+    counts = _load_copy_counts()
     entries, total = [], 0
     for p in THUMB_DIR.glob("*.png"):
         st = p.stat()
-        entries.append((st.st_mtime, st.st_size, p))
+        c = int(counts.get(p.stem, {}).get("count", 0))
+        entries.append(((c, st.st_mtime), st.st_size, p))
         total += st.st_size
     if total <= _THUMB_LIMIT:
         return

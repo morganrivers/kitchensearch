@@ -156,6 +156,12 @@ class TkPicker:
     _VIRT_ROW_H   = 34
     _DM_SIZE      = 26
     _BACK_W       = 58
+    # Max image rows packed in _inner at once. X11 has a 32767-pixel rendering
+    # limit for canvas-embedded windows; keeping the window under ~200 rows
+    # keeps _inner well below that ceiling even when _auto_height makes rows
+    # taller than the default 108 px. Rows beyond the window exist in _rows
+    # but aren't packed; _slide_window_to() re-packs as selection moves.
+    IMG_WINDOW_MAX = 200
 
     def _apply_theme(self, theme):
         self.BG         = theme["BG"]
@@ -221,6 +227,7 @@ class TkPicker:
         self._load_next_batch_fn = None
         self._last_batch_time    = 0.0
         self._load_poll_after_id = None
+        self._window_start       = 0
         self._ph_active = False
         self._pending_toast  = None
         self._toast_widget   = None
@@ -278,7 +285,7 @@ class TkPicker:
         self._research_cb.bind("<Tab>",       lambda e: self._focus_next())
         self._research_cb.bind("<Shift-Tab>", lambda e: self._focus_prev())
 
-        self._entry.bind("<Return>",       self._on_return)
+        self._entry.bind("<Return>",       lambda e: (self._on_return(e), "break")[1])
         self._entry.bind("<space>",        self._on_space_key)
         self._entry.bind("<Up>",           lambda e: (self._up(),            "break")[1])
         self._entry.bind("<Down>",         lambda e: (self._down(),          "break")[1])
@@ -359,10 +366,13 @@ class TkPicker:
         root.bind("<Home>",         self._home)
         root.bind("<End>",          self._end)
         root.bind("<Return>",       self._on_return)
+        root.bind("<F5>",           self._dump_geometry)
         root.bind("<Control-Down>", self._next_page)
         root.bind("<Control-Up>",   self._prev_page)
         root.bind("<Next>",         self._next_page)
         root.bind("<Prior>",        self._prev_page)
+        root.bind("<Control-e>",        self._dump_top_copies)
+        self._entry.bind("<Control-e>", self._dump_top_copies)
 
         self._entry.bind("<Tab>",       lambda e: self._focus_next(), add="+")
         self._entry.bind("<Shift-Tab>", lambda e: self._focus_prev(), add="+")
@@ -1006,14 +1016,123 @@ class TkPicker:
 
     # ── selection ─────────────────────────────────────────────────────────────
 
+    def _row_in_window(self, idx):
+        return self._window_start <= idx < self._window_start + self.IMG_WINDOW_MAX
+
+    def _ensure_in_window(self, idx):
+        if self._mode != "imagelist" or self._virt_mode:
+            return
+        n = len(self._rows)
+        if n == 0:
+            return
+        if n <= self.IMG_WINDOW_MAX:
+            return
+        if self._row_in_window(idx):
+            return
+        new_start = max(0, min(n - self.IMG_WINDOW_MAX,
+                               idx - self.IMG_WINDOW_MAX // 2))
+        self._slide_window_to(new_start)
+
+    def _slide_window_to(self, new_start):
+        n = len(self._rows)
+        max_start = max(0, n - self.IMG_WINDOW_MAX)
+        new_start = max(0, min(max_start, new_start))
+        if new_start == self._window_start:
+            return
+        new_end   = min(n, new_start + self.IMG_WINDOW_MAX)
+        window_rds = {id(self._rows[i]) for i in range(new_start, new_end)}
+        in_filter = self._filter_mode or (
+            self._research_cb.winfo_ismapped() and not self._research_var.get()
+        )
+        q = self._entry_var.get().lower().strip() if not self._ph_active else ""
+        for item in self._all_image_children:
+            try:
+                item[1].pack_forget()
+            except tk.TclError:
+                pass
+        for item in self._all_image_children:
+            if item[0] == "h":
+                try:
+                    item[1].pack(fill="x", padx=6, pady=(6, 2))
+                except tk.TclError:
+                    pass
+            else:
+                rd = item[2]
+                if in_filter and q and q not in rd["label"].lower():
+                    continue
+                if id(rd) in window_rds:
+                    try:
+                        rd["frame"].pack(fill="x", padx=2, pady=1)
+                    except tk.TclError:
+                        pass
+        self._window_start = new_start
+        _dbg(f"SLIDE_WINDOW start={new_start} end={new_end} nrows={n}")
+
     def _select(self, idx, scroll=True):
         if 0 <= self._sel < len(self._rows):
             self._color_row(self._sel, selected=False)
         self._sel = idx
         if 0 <= idx < len(self._rows):
+            self._ensure_in_window(idx)
             self._color_row(idx, selected=True)
             if scroll:
                 self._scroll_into_view(idx)
+
+    def _dump_top_copies(self, e=None):
+        import sys
+        from picker_utils import top_copied
+        rows = top_copied(10)
+        sys.stdout.write("\n=== TOP 10 MOST COPIED EMOJIS ===\n")
+        if not rows:
+            sys.stdout.write("(no copies recorded yet)\n")
+        else:
+            for i, (count, alt) in enumerate(rows, 1):
+                sys.stdout.write(f"{i:2d}. {count:5d}  {alt}\n")
+        sys.stdout.flush()
+        return "break"
+
+    def _dump_geometry(self, e=None):
+        import sys
+        n = len(self._rows)
+        canvas_h = self._canvas.winfo_height()
+        canvas_w = self._canvas.winfo_width()
+        inner_req_h = self._inner.winfo_reqheight()
+        inner_act_h = self._inner.winfo_height()
+        sr = self._canvas.cget("scrollregion")
+        yv = self._canvas.yview()
+        try:
+            win_bbox = self._canvas.bbox(self._win_id)
+        except Exception as ex:
+            win_bbox = f"err: {ex}"
+        msg = []
+        msg.append(f"\n=== GEOMETRY DUMP (F12) ===")
+        msg.append(f"nrows={n} virt_mode={self._virt_mode} sel={self._sel}")
+        msg.append(f"canvas: w={canvas_w} h={canvas_h}")
+        msg.append(f"_inner: req_h={inner_req_h} actual_h={inner_act_h}")
+        msg.append(f"scrollregion={sr}")
+        msg.append(f"yview={yv}  (top_px={yv[0] * inner_req_h:.1f}  bot_px={yv[1] * inner_req_h:.1f})")
+        msg.append(f"canvas.bbox(_win_id)={win_bbox}")
+        if n:
+            sample = [0, 1, 2, 5, 10, 50, 100, 200, 300, 400, n // 2, n - 3, n - 2, n - 1]
+            sample = sorted({i for i in sample if 0 <= i < n})
+            msg.append(f"row y/h samples:")
+            prev_y = None
+            for i in sample:
+                f = self._rows[i]["frame"]
+                ry = f.winfo_y()
+                rh = f.winfo_reqheight()
+                rah = f.winfo_height()
+                ism = f.winfo_ismapped()
+                gap = "" if prev_y is None else f" (Δ={ry - prev_y})"
+                msg.append(f"  row[{i:4d}] y={ry:6d} reqh={rh:3d} acth={rah:3d} mapped={ism}{gap}")
+                prev_y = ry
+        out = "\n".join(msg) + "\n"
+        sys.stderr.write(out)
+        sys.stderr.flush()
+        try:
+            _dbg(out)
+        except Exception:
+            pass
 
     def _scroll_into_view(self, idx):
         if self._virt_mode:
@@ -1165,6 +1284,7 @@ class TkPicker:
         self._result             = None
         self._filter_mode        = False
         self._all_image_children = []
+        self._window_start       = 0
         self._load_next_batch_fn = None
         self._last_batch_time    = 0.0
         if self._load_poll_after_id:
@@ -1335,21 +1455,25 @@ class TkPicker:
         if self._ph_active:
             return
         q = self._entry_var.get().lower().strip()
-        # Pack_forget all children first, then re-pack in original order so
-        # headers and data rows always appear in the right sequence.
         for item in self._all_image_children:
             item[1].pack_forget()
         visible = []
+        for item in self._all_image_children:
+            if item[0] == "d":
+                rd = item[2]
+                if not q or q in rd["label"].lower():
+                    visible.append(rd)
+        self._rows = visible
+        self._window_start = 0
+        window_rds = {id(rd) for rd in visible[:self.IMG_WINDOW_MAX]}
         for item in self._all_image_children:
             if item[0] == "h":
                 item[1].pack(fill="x", padx=6, pady=(6, 2))
             else:
                 rd = item[2]
-                if not q or q in rd["label"].lower():
+                if id(rd) in window_rds:
                     rd["frame"].pack(fill="x", padx=2, pady=1)
-                    visible.append(rd)
-        self._rows = visible
-        self._sel  = -1
+        self._sel = -1
         if visible:
             self._select(0)
         if not q:
@@ -1898,7 +2022,6 @@ class TkPicker:
                 _dbg(f"APPEND_ROW gen={gen} row_idx={i} label={label[:60]!r} inner_children={len(self._inner.winfo_children())}")
             rbg = self.ROW_COLORS[i % len(self.ROW_COLORS)]
             row = tk.Frame(self._inner, bg=rbg, cursor="hand2")
-            row.pack(fill="x", padx=2, pady=1)
             img_lbl = tk.Label(row, image=photo, bg=rbg, width=thumb, height=thumb)
             img_lbl.pack(side="left", padx=(6, 10), pady=4)
             self._img_refs.append(photo)
@@ -2005,10 +2128,12 @@ class TkPicker:
             in_filter_mode = self._filter_mode or (
                 self._research_cb.winfo_ismapped() and not self._research_var.get()
             )
-            if in_filter_mode and q and q not in label.lower():
-                row.pack_forget()
-            else:
+            hidden_by_filter = in_filter_mode and q and q not in label.lower()
+            if not hidden_by_filter:
                 self._rows.append(rd)
+                new_idx = len(self._rows) - 1
+                if new_idx < self._window_start + self.IMG_WINDOW_MAX:
+                    row.pack(fill="x", padx=2, pady=1)
             for w in all_widgets:
                 w.bind("<Button-1>",   lambda e, _rd=rd: self._click_image_row(_rd))
                 w.bind("<MouseWheel>", self._on_scroll)
