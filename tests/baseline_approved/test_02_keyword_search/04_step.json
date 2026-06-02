@@ -1,0 +1,892 @@
+{
+  "class": "Tk",
+  "mapped": true,
+  "x": 384,
+  "y": 256,
+  "w": 512,
+  "h": 512,
+  "bg": "#ffffff",
+  "relief": "flat",
+  "children": {
+    "!frame": {
+      "class": "Frame",
+      "mapped": true,
+      "x": 0,
+      "y": 0,
+      "w": 512,
+      "h": 2,
+      "bg": "#d9d9d9",
+      "relief": "flat",
+      "children": {
+        "!frame": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 0,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF0000",
+          "relief": "flat"
+        },
+        "!frame2": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 85,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF8C00",
+          "relief": "flat"
+        },
+        "!frame3": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 170,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FFD700",
+          "relief": "flat"
+        },
+        "!frame4": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 255,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#32CD32",
+          "relief": "flat"
+        },
+        "!frame5": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 340,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#1E90FF",
+          "relief": "flat"
+        },
+        "!frame6": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 426,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#8B00FF",
+          "relief": "flat"
+        }
+      }
+    },
+    "!frame2": {
+      "class": "Frame",
+      "mapped": true,
+      "x": 0,
+      "y": 510,
+      "w": 512,
+      "h": 2,
+      "bg": "#d9d9d9",
+      "relief": "flat",
+      "children": {
+        "!frame": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 0,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF0000",
+          "relief": "flat"
+        },
+        "!frame2": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 85,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF8C00",
+          "relief": "flat"
+        },
+        "!frame3": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 170,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FFD700",
+          "relief": "flat"
+        },
+        "!frame4": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 255,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#32CD32",
+          "relief": "flat"
+        },
+        "!frame5": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 340,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#1E90FF",
+          "relief": "flat"
+        },
+        "!frame6": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 426,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#8B00FF",
+          "relief": "flat"
+        }
+      }
+    },
+    "!frame3": {
+      "class": "Frame",
+      "mapped": true,
+      "x": 0,
+      "y": 2,
+      "w": 512,
+      "h": 508,
+      "bg": "#ffffff",
+      "relief": "flat",
+      "children": {
+        "!frame": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 508,
+          "bg": "#d9d9d9",
+          "relief": "flat",
+          "children": {
+            "!frame": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 0,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF0000",
+              "relief": "flat"
+            },
+            "!frame2": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 84,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF8C00",
+              "relief": "flat"
+            },
+            "!frame3": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 168,
+              "w": 2,
+              "h": 85,
+              "bg": "#FFD700",
+              "relief": "flat"
+            },
+            "!frame4": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 253,
+              "w": 2,
+              "h": 85,
+              "bg": "#32CD32",
+              "relief": "flat"
+            },
+            "!frame5": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 338,
+              "w": 2,
+              "h": 85,
+              "bg": "#1E90FF",
+              "relief": "flat"
+            },
+            "!frame6": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 423,
+              "w": 2,
+              "h": 85,
+              "bg": "#8B00FF",
+              "relief": "flat"
+            }
+          }
+        },
+        "!frame2": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 510,
+          "y": 0,
+          "w": 2,
+          "h": 508,
+          "bg": "#d9d9d9",
+          "relief": "flat",
+          "children": {
+            "!frame": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 0,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF0000",
+              "relief": "flat"
+            },
+            "!frame2": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 84,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF8C00",
+              "relief": "flat"
+            },
+            "!frame3": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 168,
+              "w": 2,
+              "h": 85,
+              "bg": "#FFD700",
+              "relief": "flat"
+            },
+            "!frame4": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 253,
+              "w": 2,
+              "h": 85,
+              "bg": "#32CD32",
+              "relief": "flat"
+            },
+            "!frame5": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 338,
+              "w": 2,
+              "h": 85,
+              "bg": "#1E90FF",
+              "relief": "flat"
+            },
+            "!frame6": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 423,
+              "w": 2,
+              "h": 85,
+              "bg": "#8B00FF",
+              "relief": "flat"
+            }
+          }
+        },
+        "!frame3": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 2,
+          "y": 0,
+          "w": 508,
+          "h": 508,
+          "bg": "#ffffff",
+          "relief": "flat",
+          "children": {
+            "!canvas": {
+              "class": "Canvas",
+              "mapped": true,
+              "x": 0,
+              "y": 0,
+              "w": 508,
+              "h": 52,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "state": "normal",
+              "canvas_items": 20,
+              "canvas_sample": [
+                {
+                  "type": "polygon",
+                  "coords": [
+                    -52.0,
+                    0.0,
+                    -21.0,
+                    0.0,
+                    31.0,
+                    52.0,
+                    0.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    -21.0,
+                    0.0,
+                    10.0,
+                    0.0,
+                    62.0,
+                    52.0,
+                    31.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    10.0,
+                    0.0,
+                    41.0,
+                    0.0,
+                    93.0,
+                    52.0,
+                    62.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    41.0,
+                    0.0,
+                    72.0,
+                    0.0,
+                    124.0,
+                    52.0,
+                    93.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    72.0,
+                    0.0,
+                    103.0,
+                    0.0,
+                    155.0,
+                    52.0,
+                    124.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    103.0,
+                    0.0,
+                    134.0,
+                    0.0,
+                    186.0,
+                    52.0,
+                    155.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    134.0,
+                    0.0,
+                    165.0,
+                    0.0,
+                    217.0,
+                    52.0,
+                    186.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    165.0,
+                    0.0,
+                    196.0,
+                    0.0,
+                    248.0,
+                    52.0,
+                    217.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    196.0,
+                    0.0,
+                    227.0,
+                    0.0,
+                    279.0,
+                    52.0,
+                    248.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    227.0,
+                    0.0,
+                    258.0,
+                    0.0,
+                    310.0,
+                    52.0,
+                    279.0,
+                    52.0
+                  ]
+                }
+              ]
+            },
+            "!frame": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 10,
+              "y": 62,
+              "w": 488,
+              "h": 66,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "children": {
+                "!frame": {
+                  "class": "Frame",
+                  "mapped": true,
+                  "x": 0,
+                  "y": 0,
+                  "w": 488,
+                  "h": 25,
+                  "bg": "#ffffff",
+                  "relief": "flat",
+                  "children": {
+                    "!label": {
+                      "class": "Label",
+                      "mapped": true,
+                      "x": 0,
+                      "y": 2,
+                      "w": 488,
+                      "h": 21,
+                      "text": "Use quick keyword search directly or select an option below.",
+                      "bg": "#ffffff",
+                      "fg": "#6633cc",
+                      "font": "Helvetica 11 bold",
+                      "relief": "flat",
+                      "state": "normal"
+                    }
+                  }
+                },
+                "!entry": {
+                  "class": "Entry",
+                  "mapped": true,
+                  "x": 0,
+                  "y": 29,
+                  "w": 488,
+                  "h": 37,
+                  "text": "PY_VAR0",
+                  "bg": "#f5f5f5",
+                  "fg": "#222222",
+                  "font": "Helvetica 13",
+                  "relief": "flat",
+                  "state": "normal",
+                  "value": "dancing "
+                }
+              }
+            },
+            "!frame2": {
+              "class": "Frame",
+              "mapped": false,
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "children": {
+                "!progressbar": {
+                  "class": "TProgressbar",
+                  "mapped": false,
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1
+                },
+                "!label": {
+                  "class": "Label",
+                  "mapped": false,
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1,
+                  "bg": "#ffffff",
+                  "fg": "#999999",
+                  "font": "Helvetica 9",
+                  "relief": "flat",
+                  "state": "normal"
+                }
+              }
+            },
+            "!frame3": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 2,
+              "y": 132,
+              "w": 504,
+              "h": 376,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "children": {
+                "!canvas": {
+                  "class": "Canvas",
+                  "mapped": true,
+                  "x": 0,
+                  "y": 0,
+                  "w": 504,
+                  "h": 376,
+                  "bg": "#ffffff",
+                  "relief": "flat",
+                  "state": "normal",
+                  "canvas_items": 1,
+                  "canvas_sample": [
+                    {
+                      "type": "window",
+                      "coords": [
+                        0.0,
+                        0.0
+                      ]
+                    }
+                  ],
+                  "children": {
+                    "!frame": {
+                      "class": "Frame",
+                      "mapped": true,
+                      "x": 0,
+                      "y": 0,
+                      "w": 504,
+                      "h": 300,
+                      "bg": "#ffffff",
+                      "relief": "flat",
+                      "children": {
+                        "!frame": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1,
+                          "w": 500,
+                          "h": 58,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 50,
+                              "h": 50,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 66,
+                              "y": 18,
+                              "w": 426,
+                              "h": 21,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "keyword search"
+                            }
+                          }
+                        },
+                        "!frame2": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 61,
+                          "w": 500,
+                          "h": 58,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 50,
+                              "h": 50,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 66,
+                              "y": 18,
+                              "w": 426,
+                              "h": 21,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "semantic search (better, slow)"
+                            }
+                          }
+                        },
+                        "!frame3": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 121,
+                          "w": 500,
+                          "h": 58,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 50,
+                              "h": 50,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 66,
+                              "y": 18,
+                              "w": 426,
+                              "h": 21,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "combo"
+                            }
+                          }
+                        },
+                        "!frame4": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 181,
+                          "w": 500,
+                          "h": 58,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 50,
+                              "h": 50,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 66,
+                              "y": 18,
+                              "w": 426,
+                              "h": 21,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "emoji story"
+                            }
+                          }
+                        },
+                        "!frame5": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 241,
+                          "w": 500,
+                          "h": 58,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 50,
+                              "h": 50,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 66,
+                              "y": 18,
+                              "w": 426,
+                              "h": 21,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "settings"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "!ctkscrollbar": {
+                  "class": "Frame",
+                  "mapped": false,
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1,
+                  "children": {
+                    "!ctkcanvas": {
+                      "class": "Canvas",
+                      "mapped": false,
+                      "x": 0,
+                      "y": 0,
+                      "w": 1,
+                      "h": 1,
+                      "bg": "#e0e0e0",
+                      "relief": "flat",
+                      "state": "normal",
+                      "canvas_items": 11,
+                      "canvas_sample": [
+                        {
+                          "type": "rectangle",
+                          "coords": null
+                        },
+                        {
+                          "type": "text",
+                          "coords": null
+                        },
+                        {
+                          "type": "text",
+                          "coords": null
+                        },
+                        {
+                          "type": "text",
+                          "coords": null
+                        },
+                        {
+                          "type": "text",
+                          "coords": null
+                        },
+                        {
+                          "type": "text",
+                          "coords": null
+                        },
+                        {
+                          "type": "text",
+                          "coords": null
+                        },
+                        {
+                          "type": "text",
+                          "coords": null
+                        },
+                        {
+                          "type": "text",
+                          "coords": null
+                        },
+                        {
+                          "type": "rectangle",
+                          "coords": null
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "!canvas2": {
+              "class": "Canvas",
+              "mapped": true,
+              "x": 476,
+              "y": 476,
+              "w": 26,
+              "h": 26,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "state": "normal",
+              "canvas_items": 2,
+              "canvas_sample": [
+                {
+                  "type": "oval",
+                  "coords": [
+                    3.0,
+                    3.0,
+                    23.0,
+                    23.0
+                  ]
+                },
+                {
+                  "type": "oval",
+                  "coords": [
+                    8.0,
+                    1.0,
+                    28.0,
+                    21.0
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

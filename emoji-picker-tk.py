@@ -344,7 +344,7 @@ def main():
 
             # ── story ────────────────────────────────────────────────────
             elif mode.startswith(story_label):
-                text = picker.ask("story text:")
+                text = picker.ask_story("story text:")
                 if not text:
                     continue
                 _story_cmd = ([str(STORY_BIN)] if STORY_BIN.exists() else [_PYTHON, str(STORY_PY)]) + ["--output", str(STORY_OUT), text]

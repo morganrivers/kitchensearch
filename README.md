@@ -40,11 +40,9 @@ sudo apt install python3-tk # install tkinter (python UI)
 
 ### Disk usage
 
-The base install uses ~100 MB (scripts + embedding data + Python virtualenv).
+The base install uses ~400 MB (scripts + embedding data + Python packages).
 
-When you first select `semantic search` or `emoji story` from the rofi menu, a background daemon will automatically download ML models (~340 MB total) - this only happens once:
-
-Thumbnail images are cached as you browse (~10 KB each) in `~/.cache/kitchensearch/thumbs/`. The cache grows gradually with use but is automatically pruned to stay under 200 MB.
+Thumbnail images are cached as you browse (~10 KB each) in `~/.cache/kitchensearch/thumbs/`. The cache grows gradually with use but is automatically pruned to stay under 200 MB. The cache grows gradually with use but is automatically pruned to stay under 200 MB. Copied emojis can always be rediscovered offline as well.
 
 ## Uninstall
 

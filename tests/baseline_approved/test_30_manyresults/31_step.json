@@ -1,0 +1,2308 @@
+{
+  "class": "Tk",
+  "mapped": true,
+  "x": 384,
+  "y": 256,
+  "w": 512,
+  "h": 512,
+  "bg": "#ffffff",
+  "relief": "flat",
+  "children": {
+    "!frame": {
+      "class": "Frame",
+      "mapped": true,
+      "x": 0,
+      "y": 0,
+      "w": 512,
+      "h": 2,
+      "bg": "#d9d9d9",
+      "relief": "flat",
+      "children": {
+        "!frame": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 0,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF0000",
+          "relief": "flat"
+        },
+        "!frame2": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 85,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF8C00",
+          "relief": "flat"
+        },
+        "!frame3": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 170,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FFD700",
+          "relief": "flat"
+        },
+        "!frame4": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 255,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#32CD32",
+          "relief": "flat"
+        },
+        "!frame5": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 340,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#1E90FF",
+          "relief": "flat"
+        },
+        "!frame6": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 426,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#8B00FF",
+          "relief": "flat"
+        }
+      }
+    },
+    "!frame2": {
+      "class": "Frame",
+      "mapped": true,
+      "x": 0,
+      "y": 510,
+      "w": 512,
+      "h": 2,
+      "bg": "#d9d9d9",
+      "relief": "flat",
+      "children": {
+        "!frame": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 0,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF0000",
+          "relief": "flat"
+        },
+        "!frame2": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 85,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF8C00",
+          "relief": "flat"
+        },
+        "!frame3": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 170,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FFD700",
+          "relief": "flat"
+        },
+        "!frame4": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 255,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#32CD32",
+          "relief": "flat"
+        },
+        "!frame5": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 340,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#1E90FF",
+          "relief": "flat"
+        },
+        "!frame6": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 426,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#8B00FF",
+          "relief": "flat"
+        }
+      }
+    },
+    "!frame3": {
+      "class": "Frame",
+      "mapped": true,
+      "x": 0,
+      "y": 2,
+      "w": 512,
+      "h": 508,
+      "bg": "#ffffff",
+      "relief": "flat",
+      "children": {
+        "!frame": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 508,
+          "bg": "#d9d9d9",
+          "relief": "flat",
+          "children": {
+            "!frame": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 0,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF0000",
+              "relief": "flat"
+            },
+            "!frame2": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 84,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF8C00",
+              "relief": "flat"
+            },
+            "!frame3": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 168,
+              "w": 2,
+              "h": 85,
+              "bg": "#FFD700",
+              "relief": "flat"
+            },
+            "!frame4": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 253,
+              "w": 2,
+              "h": 85,
+              "bg": "#32CD32",
+              "relief": "flat"
+            },
+            "!frame5": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 338,
+              "w": 2,
+              "h": 85,
+              "bg": "#1E90FF",
+              "relief": "flat"
+            },
+            "!frame6": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 423,
+              "w": 2,
+              "h": 85,
+              "bg": "#8B00FF",
+              "relief": "flat"
+            }
+          }
+        },
+        "!frame2": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 510,
+          "y": 0,
+          "w": 2,
+          "h": 508,
+          "bg": "#d9d9d9",
+          "relief": "flat",
+          "children": {
+            "!frame": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 0,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF0000",
+              "relief": "flat"
+            },
+            "!frame2": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 84,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF8C00",
+              "relief": "flat"
+            },
+            "!frame3": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 168,
+              "w": 2,
+              "h": 85,
+              "bg": "#FFD700",
+              "relief": "flat"
+            },
+            "!frame4": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 253,
+              "w": 2,
+              "h": 85,
+              "bg": "#32CD32",
+              "relief": "flat"
+            },
+            "!frame5": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 338,
+              "w": 2,
+              "h": 85,
+              "bg": "#1E90FF",
+              "relief": "flat"
+            },
+            "!frame6": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 423,
+              "w": 2,
+              "h": 85,
+              "bg": "#8B00FF",
+              "relief": "flat"
+            }
+          }
+        },
+        "!frame3": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 2,
+          "y": 0,
+          "w": 508,
+          "h": 508,
+          "bg": "#ffffff",
+          "relief": "flat",
+          "children": {
+            "!canvas": {
+              "class": "Canvas",
+              "mapped": true,
+              "x": 0,
+              "y": 0,
+              "w": 508,
+              "h": 52,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "state": "normal",
+              "canvas_items": 20,
+              "canvas_sample": [
+                {
+                  "type": "polygon",
+                  "coords": [
+                    -52.0,
+                    0.0,
+                    -21.0,
+                    0.0,
+                    31.0,
+                    52.0,
+                    0.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    -21.0,
+                    0.0,
+                    10.0,
+                    0.0,
+                    62.0,
+                    52.0,
+                    31.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    10.0,
+                    0.0,
+                    41.0,
+                    0.0,
+                    93.0,
+                    52.0,
+                    62.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    41.0,
+                    0.0,
+                    72.0,
+                    0.0,
+                    124.0,
+                    52.0,
+                    93.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    72.0,
+                    0.0,
+                    103.0,
+                    0.0,
+                    155.0,
+                    52.0,
+                    124.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    103.0,
+                    0.0,
+                    134.0,
+                    0.0,
+                    186.0,
+                    52.0,
+                    155.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    134.0,
+                    0.0,
+                    165.0,
+                    0.0,
+                    217.0,
+                    52.0,
+                    186.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    165.0,
+                    0.0,
+                    196.0,
+                    0.0,
+                    248.0,
+                    52.0,
+                    217.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    196.0,
+                    0.0,
+                    227.0,
+                    0.0,
+                    279.0,
+                    52.0,
+                    248.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    227.0,
+                    0.0,
+                    258.0,
+                    0.0,
+                    310.0,
+                    52.0,
+                    279.0,
+                    52.0
+                  ]
+                }
+              ]
+            },
+            "!frame": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 10,
+              "y": 62,
+              "w": 488,
+              "h": 68,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "children": {
+                "!frame": {
+                  "class": "Frame",
+                  "mapped": true,
+                  "x": 0,
+                  "y": 0,
+                  "w": 488,
+                  "h": 25,
+                  "bg": "#ffffff",
+                  "relief": "flat",
+                  "children": {
+                    "!label": {
+                      "class": "Label",
+                      "mapped": true,
+                      "x": 0,
+                      "y": 2,
+                      "w": 488,
+                      "h": 21,
+                      "text": "'wow!' (normal) (1-40 of 5000):",
+                      "bg": "#ffffff",
+                      "fg": "#6633cc",
+                      "font": "Helvetica 11 bold",
+                      "relief": "flat",
+                      "state": "normal"
+                    }
+                  }
+                },
+                "!frame2": {
+                  "class": "Frame",
+                  "mapped": true,
+                  "x": 0,
+                  "y": 29,
+                  "w": 488,
+                  "h": 39,
+                  "bg": "#ffffff",
+                  "relief": "flat",
+                  "children": {
+                    "!entry": {
+                      "class": "Entry",
+                      "mapped": true,
+                      "x": 0,
+                      "y": 0,
+                      "w": 387,
+                      "h": 39,
+                      "text": "PY_VAR0",
+                      "bg": "#f5f5f5",
+                      "fg": "#aaaaaa",
+                      "font": "Helvetica 13",
+                      "relief": "flat",
+                      "state": "normal",
+                      "value": "type query, press Enter to search"
+                    },
+                    "!checkbutton-1": {
+                      "class": "Checkbutton",
+                      "mapped": true,
+                      "x": 395,
+                      "y": 9,
+                      "w": 93,
+                      "h": 21,
+                      "text": "re-search",
+                      "bg": "#ffffff",
+                      "fg": "#222222",
+                      "font": "Helvetica 11",
+                      "relief": "flat",
+                      "state": "normal"
+                    }
+                  }
+                }
+              }
+            },
+            "!frame2": {
+              "class": "Frame",
+              "mapped": false,
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "children": {
+                "!progressbar": {
+                  "class": "TProgressbar",
+                  "mapped": false,
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1
+                },
+                "!label": {
+                  "class": "Label",
+                  "mapped": false,
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1,
+                  "bg": "#ffffff",
+                  "fg": "#999999",
+                  "font": "Helvetica 9",
+                  "relief": "flat",
+                  "state": "normal"
+                }
+              }
+            },
+            "!frame3": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 2,
+              "y": 134,
+              "w": 504,
+              "h": 374,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "children": {
+                "!canvas": {
+                  "class": "Canvas",
+                  "mapped": true,
+                  "x": 0,
+                  "y": 0,
+                  "w": 490,
+                  "h": 374,
+                  "bg": "#ffffff",
+                  "relief": "flat",
+                  "state": "normal",
+                  "canvas_items": 1,
+                  "canvas_sample": [
+                    {
+                      "type": "window",
+                      "coords": [
+                        0.0,
+                        0.0
+                      ]
+                    }
+                  ],
+                  "children": {
+                    "!frame": {
+                      "class": "Frame",
+                      "mapped": true,
+                      "x": 0,
+                      "y": 0,
+                      "w": 490,
+                      "h": 4440,
+                      "bg": "#ffffff",
+                      "relief": "flat",
+                      "children": {
+                        "!frame166": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "astonished-astonished    (astonished-astonished astonished_face face xox surprised poisoned amazed drunk\u00a0face gasp gasping shocked totally astonished astonished_face face xox surprised poisoned amazed"
+                            }
+                          }
+                        },
+                        "!frame167": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 119,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#dde0ff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#dde0ff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#dde0ff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-pretzel    (index_pointing_at_the_viewer-pretzel pretzel food bread twisted germany bakery soft twist index pointing at the viewer you recruit point index_pointing_at_the_"
+                            }
+                          }
+                        },
+                        "!frame168": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 227,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-earth_africa    (index_pointing_at_the_viewer-earth_africa globe_showing_europe_africa globe world earth international planet earth_africa index pointing at the viewer you"
+                            }
+                          }
+                        },
+                        "!frame169": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 345,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-bricks    (index_pointing_at_the_viewer-bricks brick bricks clay construction mortar wall infrastructure index pointing at the viewer you recruit point index_pointing_at_t"
+                            }
+                          }
+                        },
+                        "!frame170": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 463,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-copyright  \u00a9  (index_pointing_at_the_viewer-copyright copyright ip license circle law legal c sign index pointing at the viewer you recruit point index_pointing_at_the_vie"
+                            }
+                          }
+                        },
+                        "!frame171": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 571,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "flying_saucer-index_pointing_at_the_viewer    (flying_saucer-index_pointing_at_the_viewer flying_saucer transportation vehicle ufo alien extraterrestrial fantasy space index pointing at the viewer you"
+                            }
+                          }
+                        },
+                        "!frame172": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 689,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-bread    (index_pointing_at_the_viewer-bread bread food wheat breakfast toast loaf index pointing at the viewer you recruit point index_pointing_at_the_viewer food & drink"
+                            }
+                          }
+                        },
+                        "!frame173": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 797,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-house    (index_pointing_at_the_viewer-house house building home index pointing at the viewer you recruit point index_pointing_at_the_viewer travel & places people & body)"
+                            }
+                          }
+                        },
+                        "!frame174": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 905,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-cut_of_meat    (index_pointing_at_the_viewer-cut_of_meat cut_of_meat food cow meat cut chop lambchop porkchop steak index pointing at the viewer you recruit point index_po"
+                            }
+                          }
+                        },
+                        "!frame175": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1023,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 23,
+                              "w": 364,
+                              "h": 59,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "comet-bar_chart    (comet-bar_chart bar_chart graph presentation stats metrics comet space objects travel & places)"
+                            }
+                          }
+                        },
+                        "!frame176": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1131,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-registered  \u00ae  (index_pointing_at_the_viewer-registered registered alphabet circle r sign index pointing at the viewer you recruit point index_pointing_at_the_viewer  peop"
+                            }
+                          }
+                        },
+                        "!frame177": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1239,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-flatbread    (index_pointing_at_the_viewer-flatbread flatbread flour food bakery arepa bread flat lavash naan pita index pointing at the viewer you recruit point index_poi"
+                            }
+                          }
+                        },
+                        "!frame178": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1357,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-handbag    (index_pointing_at_the_viewer-handbag handbag fashion accessory accessories shopping bag clothing purse women\u2019s index pointing at the viewer you recruit point i"
+                            }
+                          }
+                        },
+                        "!frame179": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1475,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "luggage-index_pointing_at_the_viewer    (luggage-index_pointing_at_the_viewer luggage packing travel suitcase index pointing at the viewer you recruit point index_pointing_at_the_viewer travel & place"
+                            }
+                          }
+                        },
+                        "!frame180": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1583,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-honey_pot    (index_pointing_at_the_viewer-honey_pot honey_pot bees sweet kitchen honeypot index pointing at the viewer you recruit point index_pointing_at_the_viewer food"
+                            }
+                          }
+                        },
+                        "!frame181": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1691,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-up    (index_pointing_at_the_viewer-up up_button blue-square above high exclamation level mark sign squared up! up index pointing at the viewer you recruit point index_poi"
+                            }
+                          }
+                        },
+                        "!frame182": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1809,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 23,
+                              "w": 364,
+                              "h": 59,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "comet-pretzel    (comet-pretzel pretzel food bread twisted germany bakery soft twist comet space food & drink travel & places)"
+                            }
+                          }
+                        },
+                        "!frame183": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1917,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-motorway    (index_pointing_at_the_viewer-motorway motorway road cupertino interstate highway index pointing at the viewer you recruit point index_pointing_at_the_viewer t"
+                            }
+                          }
+                        },
+                        "!frame184": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2025,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-classical_building    (index_pointing_at_the_viewer-classical_building classical_building art culture history index pointing at the viewer you recruit point index_pointing"
+                            }
+                          }
+                        },
+                        "!frame185": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2133,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-doughnut    (index_pointing_at_the_viewer-doughnut doughnut food dessert snack sweet donut breakfast index pointing at the viewer you recruit point index_pointing_at_the_v"
+                            }
+                          }
+                        },
+                        "!frame186": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2251,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-bar_chart    (index_pointing_at_the_viewer-bar_chart bar_chart graph presentation stats metrics index pointing at the viewer you recruit point index_pointing_at_the_viewer"
+                            }
+                          }
+                        },
+                        "!frame187": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2359,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "pager-index_pointing_at_the_viewer    (pager-index_pointing_at_the_viewer pager bbcall oldschool 90s beeper bleeper communication index pointing at the viewer you recruit point index_pointing_at_the_v"
+                            }
+                          }
+                        },
+                        "!frame188": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2467,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 23,
+                              "w": 364,
+                              "h": 59,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "comet-tv    (comet-tv television technology program oldschool show entertainment tv video comet space objects travel & places)"
+                            }
+                          }
+                        },
+                        "!frame189": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2575,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-spaghetti    (index_pointing_at_the_viewer-spaghetti spaghetti food italian pasta noodle index pointing at the viewer you recruit point index_pointing_at_the_viewer food &"
+                            }
+                          }
+                        },
+                        "!frame190": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2683,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 23,
+                              "w": 364,
+                              "h": 59,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "pager-comet    (pager-comet pager bbcall oldschool 90s beeper bleeper communication comet space objects travel & places)"
+                            }
+                          }
+                        },
+                        "!frame191": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2791,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-tokyo_tower    (index_pointing_at_the_viewer-tokyo_tower tokyo_tower photo japanese eiffel red index pointing at the viewer you recruit point index_pointing_at_the_viewer "
+                            }
+                          }
+                        },
+                        "!frame192": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2899,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-national_park    (index_pointing_at_the_viewer-national_park national_park photo environment nature index pointing at the viewer you recruit point index_pointing_at_the_vi"
+                            }
+                          }
+                        },
+                        "!frame193": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3017,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-lock    (index_pointing_at_the_viewer-lock locked security password padlock closed lock private privacy index pointing at the viewer you recruit point index_pointing_at_th"
+                            }
+                          }
+                        },
+                        "!frame194": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3125,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-goat    (index_pointing_at_the_viewer-goat goat animal nature capricorn zodiac index pointing at the viewer you recruit point index_pointing_at_the_viewer animals & nature"
+                            }
+                          }
+                        },
+                        "!frame195": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3233,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-european_castle    (index_pointing_at_the_viewer-european_castle castle building royalty history european turrets european_castle index pointing at the viewer you recruit "
+                            }
+                          }
+                        },
+                        "!frame196": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3351,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 23,
+                              "w": 364,
+                              "h": 59,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "comet-sewing_needle    (comet-sewing_needle sewing needle stitches embroidery sutures tailoring sewing_needle comet space activities travel & places)"
+                            }
+                          }
+                        },
+                        "!frame197": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3459,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-burrito    (index_pointing_at_the_viewer-burrito burrito food mexican wrap index pointing at the viewer you recruit point index_pointing_at_the_viewer food & drink people "
+                            }
+                          }
+                        },
+                        "!frame198": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3567,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "pager-100    (pager-100 hundred_points score perfect numbers century exam quiz test pass hundred 100 full keep symbol pager bbcall oldschool 90s beeper bleeper communication smileys & emotion objects)"
+                            }
+                          }
+                        },
+                        "!frame199": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3675,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 23,
+                              "w": 364,
+                              "h": 59,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "comet-bagel    (comet-bagel bagel food bread bakery schmear jewish_bakery breakfast cheese cream comet space food & drink travel & places)"
+                            }
+                          }
+                        },
+                        "!frame200": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3783,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-stadium    (index_pointing_at_the_viewer-stadium stadium photo place sports concert venue grandstand sport index pointing at the viewer you recruit point index_pointing_at"
+                            }
+                          }
+                        },
+                        "!frame201": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3901,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-mahjong    (index_pointing_at_the_viewer-mahjong mahjong_red_dragon game play chinese kanji tile mahjong index pointing at the viewer you recruit point index_pointing_at_t"
+                            }
+                          }
+                        },
+                        "!frame202": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 4009,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 23,
+                              "w": 364,
+                              "h": 59,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "comet-thread    (comet-thread thread needle sewing spool string crafts comet space activities travel & places)"
+                            }
+                          }
+                        },
+                        "!frame203": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 4117,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "pager-rocket    (pager-rocket pager bbcall oldschool 90s beeper bleeper communication rocket launch ship staffmode NASA outer space outer_space fly shuttle vehicle deploy objects travel & places)"
+                            }
+                          }
+                        },
+                        "!frame204": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 4225,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "tractor-tv    (tractor-tv television technology program oldschool show entertainment tv video tractor vehicle car farming agriculture farm objects travel & places)"
+                            }
+                          }
+                        },
+                        "!frame205": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 4333,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "index_pointing_at_the_viewer-llama    (index_pointing_at_the_viewer-llama llama animal nature alpaca guanaco vicu\u00f1a wool index pointing at the viewer you recruit point index_pointing_at_the_viewer ani"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "!nicescrollbar": {
+                  "class": "Canvas",
+                  "mapped": true,
+                  "x": 490,
+                  "y": 0,
+                  "w": 14,
+                  "h": 374,
+                  "bg": "#e0e0e0",
+                  "relief": "flat",
+                  "state": "normal",
+                  "canvas_items": 6,
+                  "canvas_sample": [
+                    {
+                      "type": "arc",
+                      "coords": [
+                        2.0,
+                        2.0,
+                        14.0,
+                        14.0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "coords": [
+                        0.0,
+                        2.0,
+                        12.0,
+                        14.0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "coords": [
+                        2.0,
+                        17.0,
+                        14.0,
+                        29.0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "coords": [
+                        0.0,
+                        17.0,
+                        12.0,
+                        29.0
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "coords": [
+                        6.0,
+                        2.0,
+                        8.0,
+                        29.0
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "coords": [
+                        2.0,
+                        8.0,
+                        12.0,
+                        23.0
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "!canvas2": {
+              "class": "Canvas",
+              "mapped": false,
+              "x": 476,
+              "y": 476,
+              "w": 26,
+              "h": 26,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "state": "normal",
+              "canvas_items": 2,
+              "canvas_sample": [
+                {
+                  "type": "oval",
+                  "coords": [
+                    3.0,
+                    3.0,
+                    23.0,
+                    23.0
+                  ]
+                },
+                {
+                  "type": "oval",
+                  "coords": [
+                    8.0,
+                    1.0,
+                    28.0,
+                    21.0
+                  ]
+                }
+              ]
+            },
+            "!canvas3": {
+              "class": "Canvas",
+              "mapped": true,
+              "x": 6,
+              "y": 13,
+              "w": 58,
+              "h": 26,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "state": "normal",
+              "canvas_items": 1,
+              "canvas_sample": [
+                {
+                  "type": "text",
+                  "coords": [
+                    29.0,
+                    13.0
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

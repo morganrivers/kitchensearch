@@ -178,6 +178,7 @@ class TkPicker:
         self._on_dark_toggle  = on_dark_toggle
         self._apply_theme(self.DARK if dark else self.LIGHT)
         root = tk.Tk()
+        root.withdraw()
         root.configure(bg=self.BG)
         root.title("Kitchen Search")
         self._frameless = frameless
@@ -202,7 +203,6 @@ class TkPicker:
         y = my + (mh - side) // 2
         self._geometry   = f"{side}x{side}+{x}+{y}"
         root.geometry(self._geometry)
-        root.withdraw()  # stay hidden until _run() so first paint is fully populated
         self.root       = root
         self._result       = None
         self.result_typed  = False
@@ -299,6 +299,36 @@ class TkPicker:
         self._entry.bind("<Prior>",        lambda e: (_dbg("ENTRY PageUp"),    self._prev_page(), "break")[2])
         self._entry.bind("<Key>",          self._dbg_keypress)
         self._entry.bind("<Key>",          self._on_entry_key_for_ph, add="+")
+
+        # ── story multiline text (hidden by default) ──────────────────────
+        self._story_text_height = 6
+        self._story_frame = tk.Frame(top, bg=self.BG)
+        self._story_text = tk.Text(
+            self._story_frame,
+            height=self._story_text_height,
+            wrap="word",
+            bg=self.ENTRY_BG, fg=self.FG,
+            insertbackground=self.FG,
+            font=("Helvetica", 13),
+            relief="flat", bd=6,
+            highlightthickness=2,
+            highlightbackground="#dddddd",
+            highlightcolor=self.ACCENT,
+            insertofftime=0 if os.environ.get("KITCHENSEARCH_NO_BLINK") else 300,
+        )
+        self._story_text.pack(fill="x")
+        self._story_expand_btn = tk.Label(
+            self._story_frame,
+            text="▾",
+            bg=self.BG, fg=self.FG_DIM,
+            font=("Helvetica", 14),
+            cursor="hand2",
+        )
+        self._story_expand_btn.pack(anchor="center", pady=(0, 2))
+        self._story_expand_btn.bind("<Button-1>", self._expand_story_text)
+        self._story_text.bind("<Return>", lambda e: (self._on_return(e), "break")[1])
+        self._story_text.bind("<FocusIn>",  lambda e: self._story_text.configure(highlightthickness=3), add="+")
+        self._story_text.bind("<FocusOut>", lambda e: self._story_text.configure(highlightthickness=2), add="+")
 
         # ── progress bar (hidden until explicitly shown) ──────────────────
         self._prog_frame = tk.Frame(cf, bg=self.BG)
@@ -505,6 +535,11 @@ class TkPicker:
 
         # Entry-specific attrs not caught by the widget walk
         self._entry.configure(
+            insertbackground=self.FG,
+            highlightbackground=new_theme["ENTRY_BORDER"],
+            highlightcolor=self.ACCENT,
+        )
+        self._story_text.configure(
             insertbackground=self.FG,
             highlightbackground=new_theme["ENTRY_BORDER"],
             highlightcolor=self.ACCENT,
@@ -751,7 +786,9 @@ class TkPicker:
                         self.root.grab_set()
             except tk.TclError:
                 pass
-            if self._entry.winfo_ismapped():
+            if self._mode == "story_input":
+                self._story_text.focus_set()
+            elif self._entry.winfo_ismapped():
                 self._entry.focus_set()
             else:
                 def _on_entry_map(e):
@@ -850,14 +887,15 @@ class TkPicker:
 
     def _on_yscroll(self, first, last):
         _dbg(f"YSCROLL first={first} last={last} mode={self._mode!r} gen={self._gen_id} nrows={len(self._rows)} inner_children={len(self._inner.winfo_children())}")
-        if float(first) <= 0.001 and float(last) >= 0.999:
+        first_f, last_f = float(first), float(last)
+        if self._mode == "story_input" or (first_f <= 0.001 and last_f >= 0.999):
             self._sb.pack_forget()
         else:
             self._sb.pack(side="right", fill="y")
         self._sb.set(first, last)
         if self._virt_mode:
             self._virt_refresh()
-        if float(last) > 0.8:
+        if last_f > 0.8:
             self._maybe_load_more(check_sel=False)
 
     def _on_scroll(self, e):
@@ -959,6 +997,10 @@ class TkPicker:
                 self._result = None
                 self.result_typed = False
                 self.root.quit()
+        elif self._mode == "story_input":
+            val = self._story_text.get("1.0", "end-1c").strip()
+            self._result = val or None
+            self.root.quit()
         elif self._mode == "showimage":
             self._result = "copy"
             self.root.quit()
@@ -1296,6 +1338,8 @@ class TkPicker:
         self._prog_frame.pack_forget()
         self._progbar.configure(mode="determinate")
         self._research_cb.pack_forget()
+        self._story_frame.pack_forget()
+        self._sb.pack_forget()
         if not self._entry_row.winfo_ismapped():
             self._entry_row.pack(fill="x", pady=(4, 0))
         if not self._entry.winfo_ismapped():
@@ -1315,6 +1359,23 @@ class TkPicker:
         if placeholder is not None:
             self._show_ph(placeholder)
         return self._run()
+
+    def ask_story(self, prompt):
+        """Multiline text input for story prompts. Returns typed text or None."""
+        self._reset()
+        self._mode = "story_input"
+        self._set_prompt(prompt)
+        self._show_back_btn()
+        self._entry_row.pack_forget()
+        self._story_text_height = 6
+        self._story_text.configure(height=self._story_text_height)
+        self._story_text.delete("1.0", "end")
+        self._story_frame.pack(fill="x", pady=(4, 0))
+        return self._run()
+
+    def _expand_story_text(self, e=None):
+        self._story_text_height += 4
+        self._story_text.configure(height=self._story_text_height)
 
     def ask_with_loading_bar(self, prompt, placeholder=None):
         """

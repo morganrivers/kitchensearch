@@ -1,0 +1,37 @@
+"""
+Recorded test: darkmode
+"""
+
+
+def run(h):
+    h.screenshot("01_initial")
+    h.wait(2.18)
+    h.click(574, 562, button=1)
+    h.screenshot("02_click_574_562")
+    h.wait(2.06)
+    h.key("Return")
+    h.screenshot("03_Return")
+    h.wait(1.01)
+    h.wait(0.16)
+    h.type("fun")
+    h.key("space")
+    h.screenshot("04_space")
+    h.wait(0.45)
+    h.wait(0.19)
+    h.screenshot("05_step")
+    h.wait(0.27)
+    h.type("cow")
+    h.key("Return")
+    h.screenshot("06_Return")
+    h.screenshot("07_step")
+    h.wait(1.35)
+    h.key("Down")
+    h.wait(0.27)
+    h.key("Down")
+    h.screenshot("08_Down")
+    h.wait(0.38)
+    h.key("Escape")
+    h.screenshot("09_Escape")
+    h.screenshot("10_step")
+    h.wait(2.39)
+    h.key("Escape")

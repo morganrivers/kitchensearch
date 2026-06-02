@@ -1,0 +1,37 @@
+"""
+Recorded test: searchandfilter
+"""
+
+
+def run(h):
+    h.wait(0.44)
+    h.key("Down")
+    h.screenshot("01_initial")
+    h.wait(0.2)
+    h.key("Down")
+    h.wait(0.16)
+    h.key("Down")
+    h.key("Down")
+    h.screenshot("02_Down")
+    h.wait(0.33)
+    h.key("Return")
+    h.screenshot("03_Return")
+    h.screenshot("04_step")
+    h.wait(1.57)
+    h.key("Down")
+    h.wait(0.22)
+    h.key("Down")
+    h.wait(0.21)
+    h.key("Down")
+    h.screenshot("05_Down")
+    h.wait(0.21)
+    h.key("Down")
+    h.wait(0.26)
+    h.key("Down")
+    h.screenshot("06_Down")
+    h.screenshot("07_step")
+    h.wait(3.0)
+    h.key("Escape")
+    h.screenshot("08_Escape")
+    h.wait(0.65)
+    h.key("Escape")
