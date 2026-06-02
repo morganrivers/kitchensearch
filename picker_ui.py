@@ -109,6 +109,7 @@ from picker_utils import (
     DAEMON_STATUS,
     HEADER_MARKER,
     LOAD_MORE,
+    BATCH_SIZE,
     render_emoji_pil,
     _daemon_alive,
     _daemon_ready,
@@ -217,6 +218,9 @@ class TkPicker:
         self._virt_items        = {}   # idx -> {rect, cids, photos}
         self._virt_photo_cache  = {}   # (char, size) -> PhotoImage, lives for session
         self._all_image_children = []  # ("h", frame) | ("d", frame, rd) in insertion order
+        self._load_next_batch_fn = None
+        self._last_batch_time    = 0.0
+        self._load_poll_after_id = None
         self._ph_active = False
         self._pending_toast  = None
         self._toast_widget   = None
@@ -330,9 +334,10 @@ class TkPicker:
         def _on_inner_configure(e):
             if self._virt_mode:
                 return
-            sr = self._canvas.bbox("all")
-            _dbg(f"INNER_CONFIGURE scrollregion={sr} inner_h={self._inner.winfo_reqheight()} gen={self._gen_id} nrows={len(self._rows)}")
-            self._canvas.configure(scrollregion=sr)
+            w = self._canvas.winfo_width()
+            h = self._inner.winfo_reqheight()
+            _dbg(f"INNER_CONFIGURE w={w} h={h} gen={self._gen_id} nrows={len(self._rows)}")
+            self._canvas.configure(scrollregion=(0, 0, w, h))
         self._inner.bind("<Configure>", _on_inner_configure)
         self._canvas.bind("<Configure>", self._on_canvas_configure)
 
@@ -784,7 +789,14 @@ class TkPicker:
                 return "break"
 
     def _set_prompt(self, text):
-        for w in self._prompt_frame.winfo_children():
+        has_emoji = any(self._is_emoji_char(ch) for ch in text)
+        children = self._prompt_frame.winfo_children()
+        if (not has_emoji and len(children) == 1
+                and isinstance(children[0], tk.Label)
+                and not children[0].cget("image")):
+            children[0].config(text=text)
+            return
+        for w in children:
             w.destroy()
         self._prompt_img_refs = []
         widgets = self._pack_rich_label(
@@ -835,6 +847,8 @@ class TkPicker:
         self._sb.set(first, last)
         if self._virt_mode:
             self._virt_refresh()
+        if float(last) > 0.8:
+            self._maybe_load_more(check_sel=False)
 
     def _on_scroll(self, e):
         going_down = e.num == 5 or (e.num == 0 and (e.delta or 0) < 0)
@@ -914,6 +928,10 @@ class TkPicker:
         elif self._mode == "imagelist":
             val = self._real_text().strip()
             if val and self._sel < 0:
+                if self._research_cb.winfo_ismapped() and not self._research_var.get():
+                    if self._rows:
+                        self._select(0)
+                    return
                 self._result = val
                 self.result_typed = True
                 self.root.quit()
@@ -942,6 +960,7 @@ class TkPicker:
     def _down(self, e=None):
         if self._rows and self._sel < len(self._rows) - 1:
             self._select(self._sel + 1)
+        self._maybe_load_more()
 
     def _home(self, e=None):
         if self._rows:
@@ -950,6 +969,30 @@ class TkPicker:
     def _end(self, e=None):
         if self._rows:
             self._select(len(self._rows) - 1)
+        self._maybe_load_more()
+
+    def _poll_load_more(self):
+        self._load_poll_after_id = None
+        if self._load_next_batch_fn is None or self._mode != "imagelist" or self._result is not None:
+            return
+        if self._canvas.yview()[1] > 0.8:
+            self._load_next_batch_fn()
+            self._last_batch_time = time.time()
+            # _dispatch_next_batch reschedules via _load_poll_after_id when _load_poll_after_id is None
+        else:
+            self._load_poll_after_id = self.root.after(2000, self._poll_load_more)
+
+    def _maybe_load_more(self, check_sel=True):
+        if self._mode != "imagelist" or self._load_next_batch_fn is None or self._result is not None or not self._rows:
+            return
+        if check_sel and self._sel < len(self._rows) - 5:
+            return
+        now = time.time()
+        if now - self._last_batch_time < 2.0:
+            return
+        self._last_batch_time = now
+        _dbg(f"MAYBE_LOAD_MORE triggering sel={self._sel} nrows={len(self._rows)} check_sel={check_sel}")
+        self._load_next_batch_fn()
 
     def _next_page(self, e=None):
         first, last = self._canvas.yview()
@@ -996,6 +1039,7 @@ class TkPicker:
         total_h  = self._inner.winfo_reqheight()
         if total_h <= 0:
             return
+        self._canvas.configure(scrollregion=(0, 0, self._canvas.winfo_width(), total_h))
         view_top = self._canvas.yview()[0] * total_h
         view_bot = self._canvas.yview()[1] * total_h
         if row_y < view_top:
@@ -1118,8 +1162,14 @@ class TkPicker:
         self._rows               = []
         self._img_refs           = []
         self._sel                = -1
+        self._result             = None
         self._filter_mode        = False
         self._all_image_children = []
+        self._load_next_batch_fn = None
+        self._last_batch_time    = 0.0
+        if self._load_poll_after_id:
+            self.root.after_cancel(self._load_poll_after_id)
+        self._load_poll_after_id = None
         self._ph_active = False
         self._entry.config(fg=self.FG)
         self._entry_var.set("")
@@ -1794,7 +1844,7 @@ class TkPicker:
             self.root.quit()
         snooze.bind("<Button-1>", _on_snooze)
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, banner=None, show_dark_btn=False, show_research_cb=False):
+    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, banner=None, show_dark_btn=False, show_research_cb=False, prompt_fn=None):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
         if show_dark_btn:
@@ -1950,8 +2000,15 @@ class TkPicker:
             rd = {"frame": row, "label": label,
                   "row_bg": rbg, "all_widgets": all_widgets,
                   "txt": txt, "_copied": False}
-            self._rows.append(rd)
             self._all_image_children.append(("d", row, rd))
+            q = self._entry_var.get().lower().strip() if not self._ph_active else ""
+            in_filter_mode = self._filter_mode or (
+                self._research_cb.winfo_ismapped() and not self._research_var.get()
+            )
+            if in_filter_mode and q and q not in label.lower():
+                row.pack_forget()
+            else:
+                self._rows.append(rd)
             for w in all_widgets:
                 w.bind("<Button-1>",   lambda e, _rd=rd: self._click_image_row(_rd))
                 w.bind("<MouseWheel>", self._on_scroll)
@@ -1990,39 +2047,50 @@ class TkPicker:
             pending[rank] = None if photo is None else (label, photo, score)
             _flush()
 
-        _dbg(f"PICK_WITH_IMAGES: dispatching workers gen={gen} n_entries={len(entries)} preload={preload}")
-        for rank, entry in enumerate(entries):
-            label      = entry[0]
-            url        = entry[1] if len(entry) > 1 else None
-            score      = entry[2] if len(entry) > 2 else None
-            image_path = entry[3] if len(entry) > 3 else None
-            if url == HEADER_MARKER:
-                pending[rank] = ("__HEADER__", label, score, image_path)
-                _flush()
-                continue
-            if url is None:
-                # LOAD_MORE or similar text-only entry — invisible 1×1 image
-                photo = ImageTk.PhotoImage(
-                    Image.new("RGBA", (1, 1), (0, 0, 0, 0)))
-                self._img_refs.append(photo)
-                pending[rank] = (label, photo, None)
-                _flush()
-                continue
+        dispatched = [0]
 
-            if preload:
-                # Synchronous load: rows fully built before _run(), no empty-then-populate flash
-                path = on_url(url)
-                _on_image_ready(rank, label, path, score)
-            else:
-                def _worker(rank=rank, label=label, url=url, score=score):
-                    _dbg(f"WORKER start rank={rank} url={url[:60]!r}")
+        def _dispatch_next_batch():
+            start = dispatched[0]
+            end   = min(start + BATCH_SIZE, len(entries))
+            _dbg(f"DISPATCH_BATCH gen={gen} start={start} end={end} total={len(entries)}")
+            for rank in range(start, end):
+                entry      = entries[rank]
+                label      = entry[0]
+                url        = entry[1] if len(entry) > 1 else None
+                score      = entry[2] if len(entry) > 2 else None
+                image_path = entry[3] if len(entry) > 3 else None
+                if url == HEADER_MARKER:
+                    pending[rank] = ("__HEADER__", label, score, image_path)
+                    _flush()
+                    continue
+                if url is None:
+                    photo = ImageTk.PhotoImage(Image.new("RGBA", (1, 1), (0, 0, 0, 0)))
+                    self._img_refs.append(photo)
+                    pending[rank] = (label, photo, None)
+                    _flush()
+                    continue
+                if preload:
                     path = on_url(url)
-                    _dbg(f"WORKER done  rank={rank} path_ok={path is not None}")
-                    try:
-                        self.root.after(0, lambda: _on_image_ready(rank, label, path, score))
-                    except RuntimeError:
-                        pass
-                threading.Thread(target=_worker, daemon=True).start()
+                    _on_image_ready(rank, label, path, score)
+                else:
+                    def _worker(rank=rank, label=label, url=url, score=score):
+                        _dbg(f"WORKER start rank={rank} url={url[:60]!r}")
+                        path = on_url(url)
+                        _dbg(f"WORKER done  rank={rank} path_ok={path is not None}")
+                        try:
+                            self.root.after(0, lambda: _on_image_ready(rank, label, path, score))
+                        except RuntimeError:
+                            pass
+                    threading.Thread(target=_worker, daemon=True).start()
+            dispatched[0] = end
+            self._load_next_batch_fn = _dispatch_next_batch if end < len(entries) else None
+            if prompt_fn:
+                self._set_prompt(prompt_fn(end, len(entries)))
+            if self._load_next_batch_fn and self._load_poll_after_id is None:
+                self._load_poll_after_id = self.root.after(2000, self._poll_load_more)
+
+        _dbg(f"PICK_WITH_IMAGES: dispatching workers gen={gen} n_entries={len(entries)} preload={preload}")
+        _dispatch_next_batch()
 
         if preload:
             _maybe_append_banner()

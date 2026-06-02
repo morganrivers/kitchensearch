@@ -84,7 +84,7 @@ _ensure_data()
 TILE_SIZE   = 200
 MAX_RESULTS = 5000
 SHOW_BROKEN_THUMBS = False
-BATCH_SIZE     = 100
+BATCH_SIZE     = 20
 LOAD_MORE      = "⬇  load more results..."
 HEADER_MARKER  = "__HEADER__"
 STORY_PY    = _REPO / "emoji-story.py"

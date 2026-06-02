@@ -416,47 +416,45 @@ def main():
                             break
 
                 on_sel_combo = None if settings["exit_on_select"] else _copy_combo
-                offset = 0
-                while True:
-                    batch_rest = rest[0:offset + BATCH_SIZE]
-                    if len(rest) > 0:
-                        similar_range = f"1-{len(batch_rest)} of {len(rest)}"
-                    else:
-                        similar_range = "0"
-                    if exact:
-                        count = f"({len(exact)} exact, {similar_range} similar)"
-                        combo_entries = [
-                            ("Match found!", HEADER_MARKER, "#228844", _match_img),
-                            *[(format_label(alt, url, text), url, ts)
-                              for ts, alt, url, text in exact],
-                            ("Other similar combos", HEADER_MARKER, "#999999"),
-                            *[(format_label(alt, url, text), url, ts)
-                              for ts, alt, url, text in batch_rest],
-                        ]
-                    else:
-                        count = f"({similar_range} similar)"
-                        combo_entries = [
-                            ("Match could not be found", HEADER_MARKER, "#8B0000", _no_match_img),
-                            ("Other similar combos", HEADER_MARKER, "#999999"),
-                            *[(format_label(alt, url, text), url, ts)
-                              for ts, alt, url, text in batch_rest],
-                        ]
-                    if offset + BATCH_SIZE < len(rest):
-                        combo_entries.append((LOAD_MORE, None))
-                    _dbg(f"COMBO: pick_with_images offset={offset} n_entries={len(combo_entries)}")
-                    result = picker.pick_with_images(
-                        f"{query_label} {count}:", combo_entries, get_thumb,
-                        on_select=on_sel_combo, patterns=patterns)
-                    _dbg(f"COMBO: pick_with_images done result={result!r}")
-                    if result == LOAD_MORE:
-                        offset += BATCH_SIZE
-                        continue
-                    if result and settings["exit_on_select"]:
-                        _copy_combo(result)
-                    break
+                rest_entries = [(format_label(alt, url, text), url, ts)
+                                for ts, alt, url, text in rest]
+                if exact:
+                    n_fixed = 2 + len(exact)
+                    similar_init = f"1-{min(BATCH_SIZE, len(rest))} of {len(rest)}"
+                    count = f"({len(exact)} exact, {similar_init} similar)"
+                    combo_entries = [
+                        ("Match found!", HEADER_MARKER, "#228844", _match_img),
+                        *[(format_label(alt, url, text), url, ts)
+                          for ts, alt, url, text in exact],
+                        ("Other similar combos", HEADER_MARKER, "#999999"),
+                        *rest_entries,
+                    ]
+                    def _combo_prompt(loaded, total, _ne=len(exact), _nr=len(rest)):
+                        sim = max(0, min(loaded - (2 + _ne), _nr))
+                        return f"{query_label} ({_ne} exact, 1-{sim} of {_nr} similar):"
+                else:
+                    n_fixed = 2
+                    similar_init = f"1-{min(BATCH_SIZE, len(rest))} of {len(rest)}" if rest else "0"
+                    count = f"({similar_init} similar)"
+                    combo_entries = [
+                        ("Match could not be found", HEADER_MARKER, "#8B0000", _no_match_img),
+                        ("Other similar combos", HEADER_MARKER, "#999999"),
+                        *rest_entries,
+                    ]
+                    def _combo_prompt(loaded, total, _nr=len(rest)):
+                        sim = max(0, min(loaded - 2, _nr))
+                        return f"{query_label} (1-{sim} of {_nr} similar):"
+                _dbg(f"COMBO: pick_with_images n_entries={len(combo_entries)}")
+                result = picker.pick_with_images(
+                    f"{query_label} {count}:", combo_entries, get_thumb,
+                    on_select=on_sel_combo, patterns=patterns,
+                    prompt_fn=_combo_prompt)
+                _dbg(f"COMBO: pick_with_images done result={result!r}")
+                if result and settings["exit_on_select"]:
+                    _copy_combo(result)
 
                 _trim_thumb_cache()
-                if settings["exit_on_select"] and result and result != LOAD_MORE:
+                if settings["exit_on_select"] and result:
                     break
                 continue
 
@@ -488,14 +486,10 @@ def main():
                 is_semantic = False
 
             # ── results ──────────────────────────────────────────────────
-            offset = 0
             while True:
-                batch = results[0:offset + BATCH_SIZE]
-                count = f"(1-{len(batch)} of {len(results)})"
+                count = f"(1-{min(BATCH_SIZE, len(results))} of {len(results)})"
                 icon_entries = [(format_label(alt, url, text), url, ts)
-                                for ts, alt, url, text in batch]
-                if offset + BATCH_SIZE < len(results):
-                    icon_entries.append((LOAD_MORE, None))
+                                for ts, alt, url, text in results]
 
                 def _copy_selected(label, _results=results):
                     m = re.match(r'^\S+', label)
@@ -512,27 +506,27 @@ def main():
                             break
 
                 on_sel = None if settings["exit_on_select"] else _copy_selected
+                _ql = query_label
+                def _make_prompt(loaded, total, _ql=_ql):
+                    return f"{_ql} (1-{loaded} of {total}):"
                 result = picker.pick_with_images(
                     f"{query_label} {count}:", icon_entries, get_thumb,
-                    on_select=on_sel, patterns=patterns, show_research_cb=True)
+                    on_select=on_sel, patterns=patterns, show_research_cb=True,
+                    prompt_fn=_make_prompt)
 
-                if result == LOAD_MORE:
-                    offset += BATCH_SIZE
-                    continue
                 if picker.result_typed and result:
                     query = result
                     out = _run_semantic(query) if is_semantic else _run_keyword(query)
                     if out is None:
                         break
                     results, patterns, query_label = out
-                    offset = 0
                     continue
                 if result and settings["exit_on_select"]:
                     _copy_selected(result)
                 break
 
             _trim_thumb_cache()
-            if settings["exit_on_select"] and result and result != LOAD_MORE:
+            if settings["exit_on_select"] and result:
                 break
 
     finally:
