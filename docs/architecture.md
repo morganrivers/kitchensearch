@@ -60,7 +60,7 @@ combined = sim(query, keyword_text) + 2.0 * sim(query, image)
 | `build-base-emoji-embeddings.py` | Build | Embed the ~618 individual base emoji names with the text model (full 768-dim, no PCA) |
 | `_jina_text.py` | Both | Shared helper: downloads `text_model_int8.onnx` + tokenizer from HF hub, wraps onnxruntime inference |
 | `emoji-split-daemon.py` | Runtime | Persistent daemon; loads model + embeddings once, serves ranked results over Unix socket |
-| `emoji-picker-tk.py` | Runtime | Tkinter UI; spawns daemon on first semantic search, sends queries, renders thumbnail results |
+| `kitchensearch.py` | Runtime | Tkinter UI; spawns daemon on first semantic search, sends queries, renders thumbnail results |
 
 ### Data files (distributed in `data.tar.gz` from GitHub releases)
 
@@ -135,7 +135,7 @@ embeddings without loss of cross-modal comparability.
 
 ### Startup
 
-1. User opens `emoji-picker-tk.py`.
+1. User opens `kitchensearch.py`.
 2. If `data.tar.gz` has not been downloaded, a progress dialog fetches it from
    the GitHub release and extracts it.
 3. When the user selects *semantic search*, the UI spawns `emoji-split-daemon.py`

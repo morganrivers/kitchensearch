@@ -44,7 +44,7 @@ cd kitchensearch
 git clone https://github.com/morganrivers/kitchensearch.git
 sudo apt install python3-tk # install tkinter (python UI)
 ./install_from_source.sh # installs a venv and unzips app assets
-.venv/bin/python3 emoji-picker-tk.py # launch the app
+.venv/bin/python3 kitchensearch.py # launch the app
 ```
 
 

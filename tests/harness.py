@@ -135,7 +135,7 @@ class TestHarness:
         env["KITCHENSEARCH_NO_BLINK"] = "1"
         env.update(extra_env)
 
-        cmd = [sys.executable, str(_REPO / "emoji-picker-tk.py")]
+        cmd = [sys.executable, str(_REPO / "kitchensearch.py")]
         self._stderr_buf = []
         self._proc = subprocess.Popen(cmd, env=env, cwd=str(_REPO),
                                       stderr=subprocess.PIPE,

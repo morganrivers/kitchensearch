@@ -322,7 +322,7 @@ def main():
         env["XDG_CACHE_HOME"] = os.environ["KITCHENSEARCH_CACHE_DIR"]
 
     proc = subprocess.Popen(
-        [sys.executable, str(_REPO / "emoji-picker-tk.py")],
+        [sys.executable, str(_REPO / "kitchensearch.py")],
         env=env, cwd=str(_REPO),
     )
 

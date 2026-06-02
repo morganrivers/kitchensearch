@@ -33,5 +33,5 @@ echo "  GNOME : Settings → Keyboard → View and Customize Shortcuts → Custo
 echo "  KDE   : System Settings → Shortcuts → Custom Shortcuts"
 echo "  XFCE  : Settings → Keyboard → Application Shortcuts"
 echo "  i3    : add to ~/.config/i3/config:"
-echo "            bindsym \$mod+shift+e exec $INSTALL_DIR/.venv/bin/python $INSTALL_DIR/emoji-picker-tk.py"
+echo "            bindsym \$mod+shift+e exec $INSTALL_DIR/.venv/bin/python $INSTALL_DIR/kitchensearch.py"
 echo "  sway  : same syntax in ~/.config/sway/config"

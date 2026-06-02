@@ -41,8 +41,8 @@ _SELF    = Path(sys.executable).resolve() if _frozen else Path(__file__).resolve
 _PYTHON  = Path(sys.executable).resolve()
 _PYTHONW = _PYTHON.parent / "pythonw.exe"
 
-_PICKER_EXE = _HERE / "emoji-picker-tk.exe"
-_PICKER_PY  = _HERE / "emoji-picker-tk.py"
+_PICKER_EXE = _HERE / "kitchensearch.exe"
+_PICKER_PY  = _HERE / "kitchensearch.py"
 _DAEMON_EXE = _HERE / "kitchensearch-daemon.exe"
 
 APP_NAME       = "KitchenSearch"

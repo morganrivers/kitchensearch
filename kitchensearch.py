@@ -4,7 +4,7 @@ Emoji kitchen picker - tkinter UI replacing rofi.
 Results appear one-by-one as thumbnails download. Borderless, half-screen, centered.
 
 Bind in i3 config:
-  bindsym $mod+shift+e exec --no-startup-id python3 ~/.local/bin/emoji-picker-tk.py
+  bindsym $mod+shift+e exec --no-startup-id python3 ~/.local/bin/kitchensearch.py
 """
 import os, sys, re, json, hashlib, webbrowser, time
 from PIL import Image

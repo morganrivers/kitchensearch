@@ -14,12 +14,12 @@ else
   TRAY_ICON_ARG=""
 fi
 
-echo "=== Building multidist (all three binaries, shared packages) ==="
+echo "=== Building multidist (all four binaries, shared packages) ==="
 python -m nuitka \
   --standalone \
   --main=emoji-split-daemon.py \
   --main=emoji-story.py \
-  --main=emoji-picker-tk.py \
+  --main=kitchensearch.py \
   --main=kitchensearch-daemon.py \
   --enable-plugin=numpy \
   --enable-plugin=tk-inter \
@@ -59,7 +59,7 @@ cd kitchensearch
 
 if [ "$OS" = "Windows_NT" ]; then
   echo "Windows build — separate .exe per entry point, no symlinks or tar"
-  cp emoji-split-daemon.exe emoji-picker-tk.exe
+  cp emoji-split-daemon.exe kitchensearch.exe
   cp emoji-split-daemon.exe emoji-story.exe
   cp emoji-split-daemon.exe kitchensearch-daemon.exe
 
@@ -68,7 +68,7 @@ else
   # Rename primary binary (strip .bin if present)
   [ -f emoji-split-daemon.bin ] && mv emoji-split-daemon.bin emoji-split-daemon
   # Multidist: single binary dispatches on argv[0] — create symlinks for other entry points
-  ln -sf emoji-split-daemon emoji-picker-tk
+  ln -sf emoji-split-daemon kitchensearch
   ln -sf emoji-split-daemon emoji-story
   ln -sf emoji-split-daemon kitchensearch-daemon
   cd "$REPO_DIR/nuitka-build"
