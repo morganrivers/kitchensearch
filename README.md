@@ -4,10 +4,18 @@ A collection of Python tools for searching [Emoji Kitchen](https://emojipedia.or
 
 Emojikitchen has approximately 147,000 images. Many of them are *delightful*.
 
-I found the existing Emoji Kitchen options missing essential features like a proper image search, or lacking features like quickly combining specific emojis. I use this app all the time when messaging friends on my desktop. It's convenient to set a keyboard shortcut to launch it like `Alt+Shift+K`, search or browse for fun emojis, and copy them into your messaging app of choice.
+I found the existing Emoji Kitchen options missing essential features like a proper search feature, especially when combining specific emojis. I use this app all the time when messaging friends on my desktop. It's convenient to set a keyboard shortcut to launch it like `Alt+Shift+K`, search or browse for fun emojis, and copy them into your messaging app of choice.
 
 ## Easy install (tested on Ubuntu and Windows)
 ## Linux
+
+Check your system is compatible (should print `x86_64`, then a non-empty `$DISPLAY` like `:0` (means X11 or XWayland is reachable), then glibc 2.15 or newer):
+```bash
+uname -m
+echo "${DISPLAY:-NO DISPLAY}"
+ldd --version | head -1
+```
+
 Manual install:
 * Go to the [releases](https://github.com/morganrivers/kitchensearch/releases) page 
 * Download `kitchensearch-linux-x86_64.tar.gz`
@@ -26,6 +34,7 @@ cd kitchensearch
 * Go to the [releases](https://github.com/morganrivers/kitchensearch/releases) page
 * Download `kitchensearch-windows-x86_64.exe`
 * Run it and follow the installer
+
 ## Installing from source (tested on Ubuntu)
 
 - Linux with X11 or Wayland (not sure which? run `echo $XDG_SESSION_TYPE`)
