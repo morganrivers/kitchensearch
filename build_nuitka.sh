@@ -8,6 +8,12 @@ if [ ! -d "$REPO_DIR/data/fonts" ]; then
   python "$REPO_DIR/extract_app_assets.py"
 fi
 
+if [ "$OS" = "Windows_NT" ]; then
+  TRAY_ICON_ARG="--include-data-file=$REPO_DIR/data/ui_assets/tray-icon.png=data/ui_assets/tray-icon.png"
+else
+  TRAY_ICON_ARG=""
+fi
+
 echo "=== Building multidist (all three binaries, shared packages) ==="
 python -m nuitka \
   --standalone \
@@ -42,14 +48,14 @@ python -m nuitka \
   --include-data-dir="$REPO_DIR/data/embeddings=data/embeddings" \
   --include-data-dir="$REPO_DIR/data/fonts=data/fonts" \
   --include-data-file="$REPO_DIR/data/app_assets.tar.gz=data/app_assets.tar.gz" \
-  --include-data-file="$REPO_DIR/data/ui_assets/tray-icon.png=data/ui_assets/tray-icon.png" \
+  ${TRAY_ICON_ARG:+"$TRAY_ICON_ARG"} \
   --output-dir="$REPO_DIR/nuitka-build"
 echo "=== build done ==="
 
 cd "$REPO_DIR/nuitka-build"
-rm -rf emoji-kitchen
-mv emoji-split-daemon.dist emoji-kitchen
-cd emoji-kitchen
+rm -rf kitchensearch
+mv emoji-split-daemon.dist kitchensearch
+cd kitchensearch
 
 if [ "$OS" = "Windows_NT" ]; then
   echo "Windows build — separate .exe per entry point, no symlinks or tar"
@@ -64,7 +70,8 @@ else
   # Multidist: single binary dispatches on argv[0] — create symlinks for other entry points
   ln -sf emoji-split-daemon emoji-picker-tk
   ln -sf emoji-split-daemon emoji-story
+  ln -sf emoji-split-daemon kitchensearch-daemon
   cd "$REPO_DIR/nuitka-build"
-  tar -czf "$REPO_DIR/emoji-kitchen-linux-x86_64.tar.gz" emoji-kitchen/
-  echo "=== Done: emoji-kitchen-linux-x86_64.tar.gz ==="
+  tar -czf "$REPO_DIR/kitchensearch-linux-x86_64.tar.gz" kitchensearch/
+  echo "=== Done: kitchensearch-linux-x86_64.tar.gz ==="
 fi

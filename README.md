@@ -1,6 +1,6 @@
 <p align="center"><img src="demo.gif" /></p>
 
-A collection of Python tools for searching [Emoji Kitchen](https://emojipedia.org/emoji-kitchen) combos on your Linux desktop. 
+A collection of Python tools for searching [Google's Emoji Kitchen](https://emojipedia.org/emoji-kitchen) combos on your Linux desktop. 
 
 Emojikitchen has approximately 147,000 images. Many of them are *delightful*.
 

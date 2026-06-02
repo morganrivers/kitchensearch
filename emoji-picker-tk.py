@@ -21,6 +21,7 @@ from picker_utils import (
     query_daemon,
     _trim_thumb_cache, _spawn_daemon, _daemon_alive,
     get_buymeacoffee_url, get_banner_config, _next_tuesday_ts,
+    _banner_suppressed,
 )
 from picker_ui import (
     TkPicker, pick_base_emoji,
@@ -263,9 +264,8 @@ def main():
             _dbg(f"MENU_BUILD_DONE n={len(menu_entries)}")
 
             _dbg("MENU_SHOW_START")
-            snoozed = time.time() < settings.get("snooze_until", 0)
             force_banner = os.environ.get("KITCHENSEARCH_SHOW_BANNER") == "1"
-            banner = None if (settings.get("hide_ads") or snoozed) and not force_banner else get_banner_config()
+            banner = None if _banner_suppressed(settings, time.time()) and not force_banner else get_banner_config()
             if banner is not None and "hide_ads" not in settings:
                 settings["hide_ads"] = False
                 save_settings(settings)

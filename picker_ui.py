@@ -113,6 +113,7 @@ from picker_utils import (
     render_emoji_pil,
     _daemon_alive,
     _daemon_ready,
+    _kill_daemon,
     _cleanup_incomplete_data,
     get_buymeacoffee_url,
 )                                                                                                                                                                      

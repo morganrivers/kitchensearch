@@ -333,14 +333,83 @@ def _process_exists(pid: int) -> bool:
     return True
 
 
+def _proc_start_time(pid):
+    """Opaque process-start identifier, used with the PID to detect reuse."""
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        kernel32 = ctypes.windll.kernel32
+        h = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not h:
+            return None
+        try:
+            creation = wintypes.FILETIME()
+            exit_t   = wintypes.FILETIME()
+            kt       = wintypes.FILETIME()
+            ut       = wintypes.FILETIME()
+            ok = kernel32.GetProcessTimes(
+                h, ctypes.byref(creation), ctypes.byref(exit_t),
+                ctypes.byref(kt), ctypes.byref(ut))
+        finally:
+            kernel32.CloseHandle(h)
+        if not ok:
+            return None
+        return (creation.dwHighDateTime << 32) | creation.dwLowDateTime
+    try:
+        data = Path(f"/proc/{pid}/stat").read_bytes()
+    except OSError:
+        return None
+    try:
+        # comm (field 2) is wrapped in parens and may itself contain spaces or
+        # parens; everything after the final ')' is space-separated.
+        return int(data.rsplit(b")", 1)[1].split()[19])
+    except (ValueError, IndexError):
+        return None
+
+
+def _read_pid_record():
+    try:
+        text = DAEMON_PID.read_text(encoding="utf-8").strip()
+    except OSError:
+        return (None, None)
+    if not text:
+        return (None, None)
+    try:
+        obj = json.loads(text)
+        if isinstance(obj, dict) and "pid" in obj:
+            return (int(obj["pid"]), obj.get("start_time"))
+    except ValueError:
+        pass
+    try:
+        return (int(text), None)
+    except ValueError:
+        return (None, None)
+
+
+def _write_pid_record(pid):
+    payload = json.dumps({"pid": pid, "start_time": _proc_start_time(pid)})
+    tmp = DAEMON_PID.with_suffix(".pid.tmp")
+    tmp.write_text(payload, encoding="utf-8")
+    tmp.replace(DAEMON_PID)
+
+
+def _identity_matches(pid, expected_start):
+    if expected_start is None:
+        return True
+    live = _proc_start_time(pid)
+    return live is not None and live == expected_start
+
+
 def _kill_daemon():
     if not DAEMON_PID.exists():
         return
-    try:
-        pid = int(DAEMON_PID.read_text(encoding="utf-8").strip())
-        os.kill(pid, signal.SIGTERM)
-    except (ValueError, OSError, ProcessLookupError):
-        pass
+    pid, expected_start = _read_pid_record()
+    if pid is not None and _identity_matches(pid, expected_start):
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except (OSError, ProcessLookupError):
+            pass
     DAEMON_PID.unlink(missing_ok=True)
     if not IS_NAMED_PIPE:
         Path(IPC_ADDRESS).unlink(missing_ok=True)
@@ -349,12 +418,16 @@ def _kill_daemon():
 def _daemon_alive():
     if not DAEMON_PID.exists():
         return False
-    try:
-        pid = int(DAEMON_PID.read_text(encoding="utf-8").strip())
-    except (ValueError, OSError):
+    pid, expected_start = _read_pid_record()
+    if pid is None:
         DAEMON_PID.unlink(missing_ok=True)
         return False
     if not _process_exists(pid):
+        DAEMON_PID.unlink(missing_ok=True)
+        return False
+    # PID-reuse detection: the recorded start time must match the live one.
+    # Legacy bare-int PID files have no start time and skip this check.
+    if not _identity_matches(pid, expected_start):
         DAEMON_PID.unlink(missing_ok=True)
         return False
     # Zombie detection: process is alive, claimed Ready, but socket is gone.
@@ -386,7 +459,7 @@ def _spawn_daemon():
     else:
         kwargs["start_new_session"] = True
     proc = subprocess.Popen(cmd, **kwargs)
-    DAEMON_PID.write_text(str(proc.pid), encoding="utf-8")
+    _write_pid_record(proc.pid)
     return proc
 
 
@@ -710,6 +783,10 @@ def should_show_banner():
     bucket   = _ab_bucket()
     timing_v = ("A", "B", "C")[bucket % 3]
     return _ab_hours_elapsed() >= _AB_TIMING_HOURS[timing_v]
+
+
+def _banner_suppressed(settings, now):
+    return bool(settings.get("hide_ads")) or now < settings.get("snooze_until", 0)
 
 
 def get_banner_config():

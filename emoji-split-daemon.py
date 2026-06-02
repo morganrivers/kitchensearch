@@ -107,7 +107,6 @@ def load():
     combo_urls = COMBO_URLS.read_text(encoding="utf-8").splitlines()[:n]
     combo_alts = COMBO_ALTS.read_text(encoding="utf-8").splitlines()[:n]
 
-    _write_status("Ready", 100)
     print(f"Ready - {len(base_codes)} base emojis, {len(combo_map):,} combos, "
           f"{len(combo_urls):,} embedded.", flush=True)
 
@@ -227,6 +226,7 @@ def main():
      combo_alts, combo_urls) = load()
 
     listener = Listener(IPC_ADDRESS)
+    _write_status("Ready", 100)
 
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     print(f"Listening on {IPC_ADDRESS}", flush=True)
