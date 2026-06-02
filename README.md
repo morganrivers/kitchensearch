@@ -1,10 +1,11 @@
 <p align="center"><img src="demo.gif" /></p>
 
-A collection of Python tools for searching [Emoji Kitchen](https://emojikitchen.dev/) combos on your Linux desktop. 
+A collection of Python tools for searching [Emoji Kitchen](https://emojipedia.org/emoji-kitchen) combos on your Linux desktop. 
 
 Emojikitchen has approximately 147,000 images. Many of them are *delightful*.
 
 I found the existing Emoji Kitchen options missing essential features like a proper image search, or lacking features like quickly combining specific emojis. I use this app all the time when messaging friends on my desktop. It's convenient to set a keyboard shortcut to launch it like `Alt+Shift+K`, search or browse for fun emojis, and copy them into your messaging app of choice.
+
 ## Easy install (tested on Ubuntu, MacOS, Windows)
 ## Linux/MacOS
 Manual install:
