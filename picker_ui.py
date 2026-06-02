@@ -1295,6 +1295,7 @@ class TkPicker:
             self._mark_copied(idx)
         else:
             self._result = label
+            self.result_typed = False
             self.root.quit()
 
     # ── state management ──────────────────────────────────────────────────────

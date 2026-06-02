@@ -1,15 +1,15 @@
 ; Kitchen Search — Windows Installer
 ; Requires Inno Setup 6+ : https://jrsoftware.org/isinfo.php
 ;
-; To build the installer:
-;   ISCC.exe installer.iss
+; To build the installer (run from repo root):
+;   ISCC.exe packaging\installer.iss
 ; or open this file in the Inno Setup GUI and click Build.
 ;
-; Prerequisites: run build_nuitka.sh first to produce nuitka-build\emoji-kitchen\
+; Prerequisites: run scripts\build_nuitka.sh first to produce nuitka-build\kitchensearch\
 
 #define AppName    "Kitchen Search"
 #define AppVersion "1.0"
-#define BuildDir   "nuitka-build\emoji-kitchen"
+#define BuildDir   "..\nuitka-build\kitchensearch"
 
 [Setup]
 ; Keep AppId stable across updates so Windows recognises upgrades.
@@ -23,13 +23,13 @@ DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 ; No admin rights needed — installs to %LOCALAPPDATA%
 PrivilegesRequired=lowest
-OutputDir=.
+OutputDir=..
 OutputBaseFilename=kitchensearch-windows-x86_64
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 CloseApplications=no
-UninstallDisplayIcon={app}\emoji-picker-tk.exe
+UninstallDisplayIcon={app}\kitchensearch.exe
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -46,10 +46,10 @@ Source: "{#BuildDir}\*"; \
   Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#AppName}";                Filename: "{app}\emoji-picker-tk.exe"
+Name: "{group}\{#AppName}";                Filename: "{app}\kitchensearch.exe"
 Name: "{group}\{#AppName} Settings";       Filename: "{app}\kitchensearch-daemon.exe"; Parameters: "--settings"
 Name: "{group}\Uninstall {#AppName}";      Filename: "{uninstallexe}"
-Name: "{userdesktop}\{#AppName}";          Filename: "{app}\emoji-picker-tk.exe"; Tasks: desktopicon
+Name: "{userdesktop}\{#AppName}";          Filename: "{app}\kitchensearch.exe"; Tasks: desktopicon
 
 [Registry]
 ; Write startup entry when the checkbox is ticked; remove it on uninstall.
@@ -73,7 +73,7 @@ Filename: "{app}\kitchensearch-daemon.exe"; \
 Filename: "{app}\kitchensearch-daemon.exe"; \
   Flags: nowait runhidden
 ; Optionally launch the picker (user-visible checkbox on finish page).
-Filename: "{app}\emoji-picker-tk.exe"; \
+Filename: "{app}\kitchensearch.exe"; \
   Flags: nowait postinstall skipifsilent; \
   Description: "Launch {#AppName} now"
 
@@ -101,7 +101,7 @@ var
 begin
   Exec('taskkill.exe', '/F /IM kitchensearch-daemon.exe', '', SW_HIDE,
        ewWaitUntilTerminated, ResultCode);
-  Exec('taskkill.exe', '/F /IM emoji-picker-tk.exe', '', SW_HIDE,
+  Exec('taskkill.exe', '/F /IM kitchensearch.exe', '', SW_HIDE,
        ewWaitUntilTerminated, ResultCode);
   Result := '';
 end;
@@ -139,7 +139,7 @@ begin
          ewWaitUntilTerminated, ResultCode);
     Exec('taskkill.exe', '/F /IM emoji-split-daemon.exe', '', SW_HIDE,
          ewWaitUntilTerminated, ResultCode);
-    Exec('taskkill.exe', '/F /IM emoji-picker-tk.exe', '', SW_HIDE,
+    Exec('taskkill.exe', '/F /IM kitchensearch.exe', '', SW_HIDE,
          ewWaitUntilTerminated, ResultCode);
   end;
   if CurUninstallStep = usPostUninstall then

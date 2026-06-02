@@ -21,9 +21,9 @@ echo "Extracting data assets..."
 tar -xzf data/app_assets.tar.gz
 
 echo "Installing .desktop file..."
-INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+INSTALL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$HOME/.local/share/applications"
-sed "s|__INSTALL_DIR__|$INSTALL_DIR|g" kitchensearch.desktop \
+sed "s|__INSTALL_DIR__|$INSTALL_DIR|g" "$INSTALL_DIR/packaging/kitchensearch.desktop" \
     > "$HOME/.local/share/applications/kitchensearch.desktop"
 update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 

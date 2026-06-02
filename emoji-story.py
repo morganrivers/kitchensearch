@@ -29,7 +29,7 @@ if not (_REPO / "data").exists():
 CACHE_DIR  = Path(user_cache_dir("kitchensearch"))
 THUMB_DIR  = CACHE_DIR / "thumbs"
 DAEMON_PY  = _REPO / "emoji-split-daemon.py"
-DAEMON_BIN = _REPO / "emoji-split-daemon"
+DAEMON_BIN = _REPO / ("emoji-split-daemon.exe" if sys.platform == "win32" else "emoji-split-daemon")
 
 
 def _ipc_address() -> str:

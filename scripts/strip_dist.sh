@@ -2,8 +2,8 @@
 # Creates a stripped copy of the nuitka dist and reports size savings.
 set -e
 REPO_DIR=$(pwd)
-SRC="$REPO_DIR/nuitka-build/emoji-kitchen"
-DST="$REPO_DIR/nuitka-build/emoji-kitchen-stripped"
+SRC="$REPO_DIR/nuitka-build/kitchensearch"
+DST="$REPO_DIR/nuitka-build/kitchensearch-stripped"
 
 if [ ! -d "$SRC" ]; then
   echo "ERROR: $SRC not found — run build_nuitka.sh first"
@@ -52,6 +52,6 @@ echo "  Saved:  ~${saved}M"
 echo ""
 echo "=== Tarball ==="
 cd "$REPO_DIR/nuitka-build"
-tar -czf "$REPO_DIR/emoji-kitchen-stripped-linux-x86_64.tar.gz" emoji-kitchen-stripped/
-sz=$(du -sh "$REPO_DIR/emoji-kitchen-stripped-linux-x86_64.tar.gz" | cut -f1)
-echo "  emoji-kitchen-stripped-linux-x86_64.tar.gz: $sz"
+tar -czf "$REPO_DIR/kitchensearch-stripped-linux-x86_64.tar.gz" kitchensearch-stripped/
+sz=$(du -sh "$REPO_DIR/kitchensearch-stripped-linux-x86_64.tar.gz" | cut -f1)
+echo "  kitchensearch-stripped-linux-x86_64.tar.gz: $sz"

@@ -88,7 +88,7 @@ BATCH_SIZE     = 20
 LOAD_MORE      = "⬇  load more results..."
 HEADER_MARKER  = "__HEADER__"
 STORY_PY    = _REPO / "emoji-story.py"
-STORY_BIN   = _REPO / "emoji-story"
+STORY_BIN   = _REPO / ("emoji-story.exe" if sys.platform == "win32" else "emoji-story")
 STORY_OUT   = CACHE_DIR / "emoji-story.png"
 
 PRIORITY_EMOJIS = frozenset({

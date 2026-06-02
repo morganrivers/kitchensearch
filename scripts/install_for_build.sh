@@ -25,7 +25,7 @@ echo "=== Upgrading pip ==="
 python -m pip install --upgrade pip
 
 echo "=== Installing build requirements ==="
-pip install -r requirements_to_build_nuitka.txt
+pip install -r "$(dirname "$0")/requirements_to_build_nuitka.txt"
 
 echo ""
 echo "=== Done ==="

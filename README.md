@@ -2,11 +2,20 @@
 
 # Kitchen Search
 
-A desktop app for searching [Google's Emoji Kitchen](https://emojipedia.org/emoji-kitchen) combo images. 
+A desktop app for searching [Google's Emoji Kitchen](https://emojipedia.org/emoji-kitchen) combo images. I use this app all the time when messaging friends from my laptop.
 
-Emojikitchen has approximately 147,000 images. Many of them are *delightful*.
+Emojikitchen has approximately 147,000 images. Many of them are *delightful*. 
 
-I found the existing Emoji Kitchen options missing essential features like a proper search feature, especially when combining specific emojis. I use this app all the time when messaging friends on my desktop. It's convenient to set a keyboard shortcut to launch it like `Alt+Shift+K`, search or browse for fun emojis, and copy them into your messaging app of choice.
+I found the existing Emoji Kitchen options missing essential features like a proper search feature, especially when combining specific emojis. It's convenient to set a keyboard shortcut to launch it like `Alt+Shift+K`, search or browse for fun emojis, and copy them into your messaging app of choice.
+
+## Usage
+
+There are a few options on the main menu. Once you find an image, you can click on it or hit enter to copy it to the clipboard.
+
+* Normal search: just type in the search box, and the search function will find the emojikitchen images closest to that search. Some fun examples: "ski chicken", "those were fun times", or even just "volcano".
+* Combo search: this is for quickly finding two base emojis to combine. For example, "ballet" and "cow" gives you a dancing cow.
+* Story: type or paste in a story to make an image illustrating that story. For example, "I love to see stories about my favorite emojis :)".
+* Settings: customize your experience by choosing whether to have copy notifications, exit the app on copy, keybinding for the app (Windows only), etc.
 
 ## Easy install (tested on Ubuntu and Windows)
 ## Linux
@@ -45,7 +54,7 @@ cd kitchensearch
 ```bash
 git clone https://github.com/morganrivers/kitchensearch.git
 sudo apt install python3-tk # install tkinter (python UI)
-./install_from_source.sh # installs a venv and unzips app assets
+./scripts/install_from_source.sh # installs a venv and unzips app assets
 .venv/bin/python3 kitchensearch.py # launch the app
 ```
 

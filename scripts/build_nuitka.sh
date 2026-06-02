@@ -5,7 +5,7 @@ VERSION=$(git -C "$REPO_DIR" describe --tags --abbrev=0 2>/dev/null || echo "dev
 
 if [ ! -d "$REPO_DIR/data/fonts" ]; then
   echo "=== Extracting app assets ==="
-  python "$REPO_DIR/extract_app_assets.py"
+  python "$REPO_DIR/scripts/extract_app_assets.py"
 fi
 
 if [ "$OS" = "Windows_NT" ]; then
