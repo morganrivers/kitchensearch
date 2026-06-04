@@ -118,6 +118,8 @@ bindsym alt+shift+k exec --no-startup-id ~/kitchensearch/kitchensearch
 2. Click **Edit → New → Global Shortcut → Command/URL**
 3. Set the command to the full path of the extracted binary (e.g. `/home/yourname/kitchensearch/kitchensearch`) and assign `Alt+Shift+K` as the trigger
 
+</details>
+
 See **[docs/README.md](docs/README.md)** for clipboard setup and the full tool reference.
 
 ## How does it work?
