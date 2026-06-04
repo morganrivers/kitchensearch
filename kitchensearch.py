@@ -28,6 +28,16 @@ from picker_ui import (
 )
 
 
+# ── menu mode keys ───────────────────────────────────────────────────────────
+
+_MODE_SEMANTIC = "semantic"
+_MODE_KEYWORD  = "keyword"
+_MODE_COMBO    = "combo"
+_MODE_STORY    = "story"
+_MODE_SETTINGS = "settings"
+
+_SETTINGS_KEY_HOTKEY = "__hotkey__"
+
 # ── settings ──────────────────────────────────────────────────────────────────
 
 SETTINGS_FILE = CONFIG_DIR / "picker-settings.json"
@@ -46,6 +56,18 @@ _DEFAULT_SETTINGS = {
     "dark_mode":       False,
     "copy_count":      0,
 }
+
+_BOOL_SETTINGS_ITEMS = [
+    ("notify_on_copy", "Show notification when copied"),
+    ("semantic_first", "Normal search as default (first in menu)"),
+    ("show_keyword",   "Show keyword search on front menu"),
+    ("show_semantic",  "Show normal search on front menu"),
+    ("show_combo",     "Show combo search on front menu"),
+    ("show_story",     "Show emoji story on front menu"),
+    ("exit_on_select", "Exit app when emoji selected"),
+    ("always_on_top",  "Always on top (takes effect on restart)"),
+    ("floating",       "Start as floating window (takes effect on restart)"),
+]
 
 
 def load_settings():
@@ -142,45 +164,33 @@ def _open_hotkey_settings():
 def _run_settings(picker, settings):
     sel_idx = 0
     while True:
-        def _lbl(key, text):
-            return f"{'[x]' if settings[key] else '[ ]'} {text}"
-        items = [
-            _lbl("notify_on_copy",  "Show notification when copied"),
-            _lbl("semantic_first",  "Normal search as default (first in menu)"),
-            _lbl("show_keyword",    "Show keyword search on front menu"),
-            _lbl("show_semantic",   "Show normal search on front menu"),
-            _lbl("show_combo",      "Show combo search on front menu"),
-            _lbl("show_story",      "Show emoji story on front menu"),
-            _lbl("exit_on_select",  "Exit app when emoji selected"),
-            _lbl("always_on_top",   "Always on top (takes effect on restart)"),
-            _lbl("floating",        "Start as floating window (takes effect on restart)"),
-        ]
-        if not sys.platform == "win32":
-            items.append(_lbl("frameless", "Start frameless & no title bar (takes effect on restart)"))
+        base = list(_BOOL_SETTINGS_ITEMS)
+        if sys.platform != "win32":
+            base.append(("frameless", "Start frameless & no title bar (takes effect on restart)"))
+
+        item_keys     = [key for key, _ in base]
+        display_items = [f"{'[x]' if settings[key] else '[ ]'} {text}" for key, text in base]
+
         if sys.platform == "win32":
             hotkey = settings.get("hotkey", "Ctrl+Alt+K")
-            items.append(f"Keyboard shortcut: {hotkey}  (click to change)")
+            display_items.append(f"Keyboard shortcut: {hotkey}  (click to change)")
+            item_keys.append(_SETTINGS_KEY_HOTKEY)
         if "hide_ads" in settings and not (time.time() < settings.get("snooze_until", 0)):
-            items.append(_lbl("hide_ads", "Don't show support banner"))
-        choice = picker.pick_settings("Settings", items, initial_sel=sel_idx)
+            display_items.append(f"{'[x]' if settings['hide_ads'] else '[ ]'} Don't show support banner")
+            item_keys.append("hide_ads")
+
+        assert len(item_keys) == len(display_items)
+
+        choice = picker.pick_settings("Settings", display_items, initial_sel=sel_idx)
         if not choice:
             return
         try:
-            sel_idx = items.index(choice)
+            sel_idx = display_items.index(choice)
         except ValueError:
             sel_idx = 0
-        if "notification when copied"    in choice: settings["notify_on_copy"]  = not settings["notify_on_copy"]
-        elif "Normal search as default" in choice: settings["semantic_first"]  = not settings["semantic_first"]
-        elif "Exit app when emoji selected" in choice: settings["exit_on_select"] = not settings["exit_on_select"]
-        elif "keyword search"  in choice: settings["show_keyword"]  = not settings["show_keyword"]
-        elif "normal"        in choice: settings["show_semantic"] = not settings["show_semantic"]
-        elif "combo"           in choice: settings["show_combo"]    = not settings["show_combo"]
-        elif "emoji story"     in choice: settings["show_story"]    = not settings["show_story"]
-        elif "Always on top"   in choice: settings["always_on_top"] = not settings["always_on_top"]
-        elif "floating window" in choice: settings["floating"]      = not settings["floating"]
-        elif "no title bar"    in choice: settings["frameless"]     = not settings["frameless"]
-        elif "support banner"  in choice: settings["hide_ads"]      = not settings["hide_ads"]
-        elif sys.platform == "win32" and "Keyboard shortcut:" in choice:
+
+        key = item_keys[sel_idx]
+        if key == _SETTINGS_KEY_HOTKEY:
             _open_hotkey_settings()
             try:
                 updated = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
@@ -188,6 +198,7 @@ def _run_settings(picker, settings):
             except Exception as e:
                 _dbg(f"re-read settings after hotkey change failed: {e}")
             continue
+        settings[key] = not settings[key]
         save_settings(settings)
 
 
@@ -235,37 +246,39 @@ def main():
         _dbg(f"APP: load_index done n_entries={len(entries)}")
         base_index  = build_base_emoji_index(entries)
         while True:
-            has_sem     = _has_semantic_models()
-            has_data    = SEARCH_INDEX.exists()
-            sem_label   = "normal search"
-            story_label = "emoji story"
-            _nd         = "  (not downloaded)"
+            has_sem  = _has_semantic_models()
+            has_data = SEARCH_INDEX.exists()
+            _nd      = "  (not downloaded)"
 
             # build menu entries with combo thumbnail icons
             _dbg("MENU_BUILD_START")
-            menu_entries = []
-            sem_entry = (sem_label + ("" if has_sem else _nd),
-                         _find_combo_url_or_emoji(entries, "sunrise_over_mountains", "mag_right"))
-            kw_entry  = ("keyword search",
-                         _find_combo_url_or_emoji(entries, "tornado", "mag_right"))
+            sem_spec = (_MODE_SEMANTIC, "normal search" + ("" if has_sem else _nd),
+                        _find_combo_url_or_emoji(entries, "sunrise_over_mountains", "mag_right"))
+            kw_spec  = (_MODE_KEYWORD,  "keyword search",
+                        _find_combo_url_or_emoji(entries, "tornado", "mag_right"))
             if settings.get("semantic_first", True):
-                first, second = sem_entry, kw_entry
+                first_spec, second_spec = sem_spec, kw_spec
                 show_first, show_second = settings["show_semantic"], settings["show_keyword"]
             else:
-                first, second = kw_entry, sem_entry
+                first_spec, second_spec = kw_spec, sem_spec
                 show_first, show_second = settings["show_keyword"], settings["show_semantic"]
+
+            raw_menu = []
             if show_first:
-                menu_entries.append(first)
+                raw_menu.append(first_spec)
             if show_second:
-                menu_entries.append(second)
+                raw_menu.append(second_spec)
             if settings["show_combo"]:
-                menu_entries.append(("combine two emojis",
-                                     _find_combo_url_or_emoji(entries, "fire", "slot_machine")))
+                raw_menu.append((_MODE_COMBO, "combine two emojis",
+                                 _find_combo_url_or_emoji(entries, "fire", "slot_machine")))
             if settings["show_story"]:
-                menu_entries.append((story_label + ("" if has_data else _nd),
-                                     _find_combo_url_or_emoji(entries, "llama", "fire")))
-            menu_entries.append(("settings",
-                                 _find_combo_url_or_emoji(entries, "computer", "face_with_raised_eyebrow")))
+                raw_menu.append((_MODE_STORY, "emoji story" + ("" if has_data else _nd),
+                                 _find_combo_url_or_emoji(entries, "llama", "fire")))
+            raw_menu.append((_MODE_SETTINGS, "settings",
+                             _find_combo_url_or_emoji(entries, "computer", "face_with_raised_eyebrow")))
+
+            menu_entries   = [(label, icon) for _, label, icon in raw_menu]
+            _label_to_mode = {label: key for key, label, _ in raw_menu}
             _dbg(f"MENU_BUILD_DONE n={len(menu_entries)}")
 
             _dbg("MENU_SHOW_START")
@@ -298,8 +311,10 @@ def main():
                 save_settings(settings)
                 continue
 
+            mode_key = _label_to_mode.get(mode)
+
             # ── settings ─────────────────────────────────────────────────
-            if mode == "settings":
+            if mode_key == _MODE_SETTINGS:
                 _run_settings(picker, settings)
                 continue
 
@@ -329,8 +344,7 @@ def main():
                 return r, pats, f"'{q}'"
 
             # ── typed text → default search ───────────────────────────────
-            mode_names = {e[0] for e in menu_entries}
-            if picker.result_typed or mode not in mode_names:
+            if picker.result_typed or mode_key is None:
                 query = mode
                 if settings.get("semantic_first", True) and has_sem:
                     if not _daemon_alive():
@@ -348,7 +362,7 @@ def main():
                 mode = "_results"
 
             # ── story ────────────────────────────────────────────────────
-            elif mode.startswith(story_label):
+            elif mode_key == _MODE_STORY:
                 text = picker.ask_story("story text:")
                 if not text:
                     continue
@@ -372,7 +386,7 @@ def main():
                 continue
 
             # ── combo ────────────────────────────────────────────────────
-            elif mode == "combine two emojis":
+            elif mode_key == _MODE_COMBO:
                 _dbg("COMBO_SELECTED")
                 _dbg("COMBO: pick_first_emoji start")
                 first = pick_base_emoji(base_index, "first emoji:", picker)
@@ -465,7 +479,7 @@ def main():
                 continue
 
             # ── semantic ─────────────────────────────────────────────────
-            elif mode.startswith(sem_label):
+            elif mode_key == _MODE_SEMANTIC:
                 if not has_sem:
                     picker.message("Search data not available.")
                     continue
@@ -481,7 +495,7 @@ def main():
                 is_semantic = True
 
             # ── keyword ──────────────────────────────────────────────────
-            else:
+            elif mode_key == _MODE_KEYWORD:
                 query = picker.ask("emoji search:", placeholder='try e.g. "ski chicken" then press enter')
                 if not query:
                     continue
@@ -490,6 +504,10 @@ def main():
                     continue
                 results, patterns, query_label = out
                 is_semantic = False
+
+            else:
+                _dbg(f"unexpected mode_key={mode_key!r} mode={mode!r}")
+                continue
 
             # ── results ──────────────────────────────────────────────────
             while True:
