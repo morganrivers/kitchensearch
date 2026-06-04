@@ -33,6 +33,7 @@ import urllib.request
 import winreg
 from pathlib import Path
 from _log import _dbg
+from _ssl_ctx import ssl_ctx
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 
@@ -272,7 +273,7 @@ def _get_tray_hicon():
             req = urllib.request.Request(
                 _TRAY_ICON_URL, headers={"User-Agent": "kitchensearch/1.0"}
             )
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx()) as resp:
                 img = Image.open(io.BytesIO(resp.read())).convert("RGBA")
             CONFIG_DIR.mkdir(parents=True, exist_ok=True)
             img.save(str(CONFIG_DIR / "tray-icon.png"))

@@ -28,6 +28,8 @@ python -m nuitka \
   --include-package=tokenizers \
   --include-package=PIL \
   --include-package=screeninfo \
+  --include-package=certifi \
+  --include-package-data=certifi \
   --nofollow-import-to=pytest \
   --nofollow-import-to=torch \
   --nofollow-import-to=matplotlib \

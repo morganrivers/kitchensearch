@@ -5,5 +5,6 @@ platformdirs
 onnxruntime
 tokenizers
 screeninfo
+certifi
 python-xlib; sys_platform == "linux"
 

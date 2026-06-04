@@ -13,6 +13,7 @@ from PIL import Image, ImageDraw, ImageFont as _ImageFont
 
 
 from _log import _dbg
+from _ssl_ctx import ssl_ctx
 
 
 from platformdirs import user_cache_dir, user_config_dir
@@ -668,7 +669,7 @@ def get_thumb(url):
         for attempt in range(2):
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "emojikitchen-picker"})
-                with urllib.request.urlopen(req, timeout=10) as resp, open(tmp, "wb") as f:
+                with urllib.request.urlopen(req, timeout=10, context=ssl_ctx()) as resp, open(tmp, "wb") as f:
                     shutil.copyfileobj(resp, f)
                 if tmp.stat().st_size > 0:
                     tmp.replace(path)

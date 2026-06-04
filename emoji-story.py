@@ -23,6 +23,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from platformdirs import user_cache_dir
 from _log import _dbg
+from _ssl_ctx import ssl_ctx
 
 _REPO      = Path(__file__).resolve().parent
 if not (_REPO / "data").exists():
@@ -164,7 +165,7 @@ def get_thumb(url):
     for attempt in range(2):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "emojikitchen-story"})
-            with urllib.request.urlopen(req, timeout=10) as resp, open(tmp, "wb") as f:
+            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx()) as resp, open(tmp, "wb") as f:
                 shutil.copyfileobj(resp, f)
             if tmp.stat().st_size > 0:
                 tmp.replace(path)
