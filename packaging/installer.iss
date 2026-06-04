@@ -98,11 +98,25 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
+  I: Integer;
 begin
   Exec('taskkill.exe', '/F /IM kitchensearch-daemon.exe', '', SW_HIDE,
        ewWaitUntilTerminated, ResultCode);
   Exec('taskkill.exe', '/F /IM kitchensearch.exe', '', SW_HIDE,
        ewWaitUntilTerminated, ResultCode);
+  Exec('taskkill.exe', '/F /IM emoji-split-daemon.exe', '', SW_HIDE,
+       ewWaitUntilTerminated, ResultCode);
+  { taskkill returns before the OS fully releases file handles;
+    poll until processes are gone (up to ~3 s) to avoid Error 5. }
+  for I := 1 to 6 do
+  begin
+    Sleep(500);
+    Exec('cmd.exe', '/C tasklist /FI "IMAGENAME eq kitchensearch.exe" 2>nul | find /I "kitchensearch.exe" >nul 2>nul',
+         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    if ResultCode <> 0 then
+      Break;
+  end;
+  Sleep(500);
   Result := '';
 end;
 

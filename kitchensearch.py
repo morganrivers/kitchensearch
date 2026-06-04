@@ -36,12 +36,13 @@ _DEFAULT_SETTINGS = {
     "notify_on_copy":  True,
     "exit_on_select":  False,
     "semantic_first":  True,
-    "show_keyword":    True,
+    "show_keyword":    False,
     "show_semantic":   True,
     "show_combo":      True,
     "show_story":      True,
     "floating":        True,
     "frameless":       False,
+    "always_on_top":   True,
     "dark_mode":       False,
     "copy_count":      0,
 }
@@ -150,6 +151,7 @@ def _run_settings(picker, settings):
             _lbl("show_combo",      "Show combo search on front menu"),
             _lbl("show_story",      "Show emoji story on front menu"),
             _lbl("exit_on_select",  "Exit app when emoji selected"),
+            _lbl("always_on_top",   "Always on top (takes effect on restart)"),
             _lbl("floating",        "Start as floating window (takes effect on restart)"),
         ]
         if not sys.platform == "win32":
@@ -173,6 +175,7 @@ def _run_settings(picker, settings):
         elif "normal"        in choice: settings["show_semantic"] = not settings["show_semantic"]
         elif "combo"           in choice: settings["show_combo"]    = not settings["show_combo"]
         elif "emoji story"     in choice: settings["show_story"]    = not settings["show_story"]
+        elif "Always on top"   in choice: settings["always_on_top"] = not settings["always_on_top"]
         elif "floating window" in choice: settings["floating"]      = not settings["floating"]
         elif "no title bar"    in choice: settings["frameless"]     = not settings["frameless"]
         elif "support banner"  in choice: settings["hide_ads"]      = not settings["hide_ads"]
@@ -221,6 +224,7 @@ def main():
         frameless=settings["frameless"] and not sys.platform == "win32",
         dark=settings.get("dark_mode", False),
         on_dark_toggle=_on_dark_toggle,
+        always_on_top=settings.get("always_on_top", True),
     )
     _dbg("APP: TkPicker init done")
 

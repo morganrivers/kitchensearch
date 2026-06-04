@@ -63,7 +63,7 @@ sudo apt install python3-tk # install tkinter (python UI)
 
 The base install uses ~400 MB (scripts + embedding data + Python packages).
 
-Thumbnail images are cached as you browse (~10 KB each) in `~/.cache/kitchensearch/thumbs/`. The cache grows gradually with use but is automatically pruned to stay under 200 MB. The cache grows gradually with use but is automatically pruned to stay under 200 MB. Copied emojis can always be rediscovered offline as well.
+Thumbnail images are cached as you browse (~10 KB each) in `~/.cache/kitchensearch/thumbs/`. The cache grows gradually with use but is automatically pruned to stay under 200 MB. Copied emojis can always be rediscovered offline as well.
 
 ## Uninstall
 

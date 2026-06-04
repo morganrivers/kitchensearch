@@ -174,7 +174,7 @@ class TkPicker:
         self.SEL_BG     = theme["SEL_BG"]
         self._theme     = theme
 
-    def __init__(self, floating=False, frameless=True, dark=False, on_dark_toggle=None):
+    def __init__(self, floating=False, frameless=True, dark=False, on_dark_toggle=None, always_on_top=True):
         self._dark            = dark
         self._on_dark_toggle  = on_dark_toggle
         self._apply_theme(self.DARK if dark else self.LIGHT)
@@ -183,7 +183,7 @@ class TkPicker:
         root.configure(bg=self.BG)
         root.title("Kitchen Search")
         self._frameless = frameless
-        self._floating  = self._setup_floating(root, floating=floating, frameless=frameless)
+        self._floating  = self._setup_floating(root, floating=floating, frameless=frameless, always_on_top=always_on_top)
         mouse_x = root.winfo_pointerx()
         mouse_y = root.winfo_pointery()
         mon = None
@@ -387,6 +387,11 @@ class TkPicker:
             w.bind("<Control-Up>",    self._prev_page)
             w.bind("<Next>",          self._next_page)
             w.bind("<Prior>",         self._prev_page)
+        # On Windows, MouseWheel is delivered to the focused widget (the entry),
+        # not the widget under the cursor — so bind directly on the entry too.
+        self._entry.bind("<MouseWheel>", self._on_scroll)
+        self._entry.bind("<Button-4>",   self._on_scroll)
+        self._entry.bind("<Button-5>",   self._on_scroll)
 
         self._canvas.bind("<ButtonPress-1>", lambda e: self._dismiss_popup(), add="+")
         root.bind("<FocusOut>", lambda e: self._dismiss_popup(), add="+")
@@ -708,12 +713,15 @@ class TkPicker:
                       fill="#ffffff", anchor="center")
 
     @staticmethod
-    def _setup_floating(root, floating=False, frameless=True):
+    def _setup_floating(root, floating=False, frameless=True, always_on_top=True):
+        if always_on_top:
+            root.attributes("-topmost", True)
         if floating:
             # Bypasses WM entirely — no title bar on any WM including i3.
             # focus_force + grab_set_global in _run() handle keyboard focus.
             # root.overrideredirect(True)
-            root.attributes("-topmost", True)
+            if not always_on_top:
+                root.attributes("-topmost", True)
             try:
                 root.wm_attributes("-type", "splash")
             except tk.TclError:
@@ -900,7 +908,11 @@ class TkPicker:
             self._maybe_load_more(check_sel=False)
 
     def _on_scroll(self, e):
-        going_down = e.num == 5 or (e.num == 0 and (e.delta or 0) < 0)
+        if self._mode == "story_input":
+            return  # let the Text widget scroll naturally
+        # e.num==5 = Linux scroll-down button; e.delta<0 = Windows scroll down.
+        # Don't gate the delta check on e.num==0: on Windows e.num may not be 0.
+        going_down = e.num == 5 or e.delta < 0
         if not self._rows:
             # No list rows — pan the canvas directly (story/image view)
             self._canvas.yview_scroll(1 if going_down else -1, "units")
