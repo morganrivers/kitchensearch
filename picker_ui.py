@@ -182,6 +182,7 @@ class TkPicker:
         self._theme     = theme
 
     def __init__(self, floating=False, frameless=True, dark=False, on_dark_toggle=None, always_on_top=True):
+        self._destroyed       = False
         self._dark            = dark
         self._on_dark_toggle  = on_dark_toggle
         self._apply_theme(self.DARK if dark else self.LIGHT)
@@ -2283,6 +2284,8 @@ class TkPicker:
             _maybe_append_banner()
 
         def _on_image_ready(rank, label, path, score):
+            if self._destroyed:
+                return
             cur_gen = self._gen_id
             _dbg(f"ON_IMAGE_READY gen={gen} cur_gen={cur_gen} rank={rank} label={label[:50]!r} path_ok={path is not None}")
             if cur_gen != gen:
@@ -2329,9 +2332,11 @@ class TkPicker:
                         _dbg(f"WORKER start rank={rank} url={url[:60]!r}")
                         path = on_url(url)
                         _dbg(f"WORKER done  rank={rank} path_ok={path is not None}")
+                        if self._destroyed:
+                            return
                         try:
                             self.root.after(0, lambda: _on_image_ready(rank, label, path, score))
-                        except RuntimeError:
+                        except (RuntimeError, tk.TclError):
                             pass
                     threading.Thread(target=_worker, daemon=True).start()
             dispatched[0] = end
@@ -2729,6 +2734,7 @@ class TkPicker:
         return self._run()
 
     def destroy(self):
+        self._destroyed = True
         try: self.root.destroy()
         except Exception as e: _dbg(f"root destroy failed: {e}")
 
