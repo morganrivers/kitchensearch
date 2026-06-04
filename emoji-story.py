@@ -22,6 +22,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 from platformdirs import user_cache_dir
+from _log import _dbg
 
 _REPO      = Path(__file__).resolve().parent
 if not (_REPO / "data").exists():
@@ -124,8 +125,8 @@ def query_daemon(phrase, limit=10):
             results = json.loads(conn.recv_bytes().decode())
             if isinstance(results, list):
                 return [r["url"] for r in results]
-        except Exception:
-            pass
+        except Exception as e:
+            _dbg(f"query_daemon IPC failed: {e}")
         finally:
             conn.close()
     return []
@@ -168,8 +169,8 @@ def get_thumb(url):
             if tmp.stat().st_size > 0:
                 tmp.replace(path)
                 return path
-        except Exception:
-            pass
+        except Exception as e:
+            _dbg(f"get_thumb attempt={attempt} url={url[:60]!r}: {e}")
         tmp.unlink(missing_ok=True)
         if attempt == 0:
             time.sleep(0.3)
@@ -225,8 +226,8 @@ def build_png(pairs, output_path, font):
             try:
                 emoji = Image.open(path).convert("RGBA").resize((IMG_SIZE, IMG_SIZE), Image.LANCZOS)
                 canvas.paste(emoji, (IMG_X, img_y), emoji)
-            except Exception:
-                pass
+            except Exception as e:
+                _dbg(f"build_png emoji paste failed path={path!r}: {e}")
 
         # Divider between rows (skip last)
         if i < len(row_data) - 1:

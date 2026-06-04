@@ -52,7 +52,8 @@ def load_settings():
     try:
         data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
         return {**_DEFAULT_SETTINGS, **data}
-    except Exception:
+    except Exception as e:
+        _dbg(f"load_settings failed: {e}")
         return dict(_DEFAULT_SETTINGS)
 
 
@@ -60,8 +61,8 @@ def save_settings(s):
     try:
         SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
         SETTINGS_FILE.write_text(json.dumps(s, indent=2), encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as e:
+        _dbg(f"save_settings failed: {e}")
 
 
 def _find_combo_url(entries, name1, name2):
@@ -184,8 +185,8 @@ def _run_settings(picker, settings):
             try:
                 updated = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
                 settings["hotkey"] = updated.get("hotkey", settings.get("hotkey", "Ctrl+Alt+K"))
-            except Exception:
-                pass
+            except Exception as e:
+                _dbg(f"re-read settings after hotkey change failed: {e}")
             continue
         save_settings(settings)
 

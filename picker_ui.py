@@ -119,6 +119,13 @@ from picker_utils import (
 )                                                                                                                                                                      
 
 
+def _darken(hex_color, factor=0.75):
+    """Return a darker shade of a #rrggbb colour."""
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return "#{:02x}{:02x}{:02x}".format(int(r*factor), int(g*factor), int(b*factor))
+
+
 # ── TkPicker ──────────────────────────────────────────────────────────────────
 
 class TkPicker:
@@ -318,6 +325,7 @@ class TkPicker:
             insertofftime=0 if os.environ.get("KITCHENSEARCH_NO_BLINK") else 300,
         )
         self._story_text.pack(fill="x")
+
         self._story_expand_btn = tk.Label(
             self._story_frame,
             text="▾",
@@ -327,7 +335,39 @@ class TkPicker:
         )
         self._story_expand_btn.pack(anchor="center", pady=(0, 2))
         self._story_expand_btn.bind("<Button-1>", self._expand_story_text)
-        self._story_text.bind("<Return>", lambda e: (self._on_return(e), "break")[1])
+
+        # ── Generate Story button ─────────────────────────────────────────
+        _BW, _BH, _BR = 160, 36, 18
+        self._story_gen_btn = tk.Canvas(
+            self._story_frame, width=_BW, height=_BH,
+            bg=self.BG, highlightthickness=0, bd=0, cursor="hand2",
+        )
+        self._story_gen_btn.pack(anchor="center", pady=(2, 8))
+
+        def _draw_gen_btn(color):
+            self._story_gen_btn.delete("all")
+            for x0, y0, x1, y1, s, e in [
+                (0, 0, 2*_BR, 2*_BR, 90, 90),
+                (_BW-2*_BR, 0, _BW, 2*_BR, 0, 90),
+                (0, _BH-2*_BR, 2*_BR, _BH, 180, 90),
+                (_BW-2*_BR, _BH-2*_BR, _BW, _BH, 270, 90),
+            ]:
+                self._story_gen_btn.create_arc(x0, y0, x1, y1, start=s, extent=e,
+                                               fill=color, outline="")
+            self._story_gen_btn.create_rectangle(_BR, 0, _BW-_BR, _BH, fill=color, outline="")
+            self._story_gen_btn.create_rectangle(0, _BR, _BW, _BH-_BR, fill=color, outline="")
+            self._story_gen_btn.create_text(_BW//2, _BH//2, text="Generate Story",
+                                            fill="#ffffff", font=("Helvetica", 12, "bold"))
+
+        _draw_gen_btn(self.ACCENT)
+        self._story_gen_btn.bind("<Enter>",    lambda e: _draw_gen_btn(_darken(self.ACCENT)))
+        self._story_gen_btn.bind("<Leave>",    lambda e: _draw_gen_btn(self.ACCENT))
+        self._story_gen_btn.bind("<Button-1>", lambda e: self._on_return(e))
+        self._redraw_story_gen_btn = _draw_gen_btn
+
+        self._story_text.bind("<Return>",
+                              lambda e: (self._story_text.insert("insert", "\n"), "break")[1])
+        self._story_text.bind("<Control-Return>", lambda e: (self._on_return(e), "break")[1])
         self._story_text.bind("<FocusIn>",  lambda e: self._story_text.configure(highlightthickness=3), add="+")
         self._story_text.bind("<FocusOut>", lambda e: self._story_text.configure(highlightthickness=2), add="+")
 
@@ -552,6 +592,8 @@ class TkPicker:
         )
         if self._ph_active:
             self._entry.config(fg=self._PH_COLOR)
+        self._redraw_story_gen_btn(self.ACCENT)
+        self._story_gen_btn.configure(bg=self.BG)
         self._research_cb.configure(
             selectcolor=new_theme["ENTRY_BG"],
             activebackground=self.BG,
@@ -701,8 +743,8 @@ class TkPicker:
             c.create_image(0, 0, image=photo, anchor="nw")
             c._title_photo = photo
             return
-        except Exception:
-            pass
+        except Exception as e:
+            _dbg(f"_draw_title PIL render failed: {e}")
         c.create_text(W // 2 + 1, H // 2 + 1,
                       text="Kitchen Search",
                       font=("Helvetica", 18, "bold"),
@@ -758,8 +800,8 @@ class TkPicker:
                     _sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent / "tests"))
                     from widget_dump import start_test_server
                     start_test_server(self.root)
-                except Exception:
-                    pass
+                except Exception as e:
+                    _dbg(f"start_test_server failed: {e}")
             if sys.platform == "win32":
                 # Flush pending Win32 messages so the window is fully mapped
                 # before SetForegroundWindow / focus calls below.
@@ -782,8 +824,8 @@ class TkPicker:
                         ctypes.windll.user32.AttachThreadInput(my_tid, fg_tid, False)
                     else:
                         ctypes.windll.user32.SetForegroundWindow(hwnd)
-                except Exception:
-                    pass
+                except Exception as e:
+                    _dbg(f"SetForegroundWindow failed: {e}")
             self.root.focus_force()
             try:
                 if not os.environ.get("KITCHENSEARCH_NO_GRAB"):
@@ -926,8 +968,8 @@ class TkPicker:
         if self._active_popup:
             try:
                 self._active_popup.unpost()
-            except Exception:
-                pass
+            except Exception as e:
+                _dbg(f"popup unpost failed: {e}")
             self._active_popup = None
 
     def _tab_order(self):
@@ -1255,14 +1297,14 @@ class TkPicker:
         if self._toast_after_id:
             try:
                 self.root.after_cancel(self._toast_after_id)
-            except Exception:
-                pass
+            except Exception as e:
+                _dbg(f"toast after_cancel failed: {e}")
             self._toast_after_id = None
         if self._toast_widget:
             try:
                 self._toast_widget.destroy()
-            except Exception:
-                pass
+            except Exception as e:
+                _dbg(f"toast widget destroy failed: {e}")
             self._toast_widget = None
 
     @staticmethod
@@ -1282,8 +1324,8 @@ class TkPicker:
                     t.delete("copied_mark", "end")
                     rd["_copied"] = False
                     self._resize_txt(t)
-                except Exception:
-                    pass
+                except Exception as e:
+                    _dbg(f"_mark_copied clear failed: {e}")
         if 0 <= idx < len(self._rows):
             rd = self._rows[idx]
             t = rd.get("txt")
@@ -1294,8 +1336,8 @@ class TkPicker:
                     t.insert("copied_mark", "  Copied", "copied_tag")
                     rd["_copied"] = True
                     self._resize_txt(t)
-                except Exception:
-                    pass
+                except Exception as e:
+                    _dbg(f"_mark_copied set failed: {e}")
 
     def _click_row(self, idx):
         self._select(idx, scroll=False)
@@ -1315,11 +1357,11 @@ class TkPicker:
         _dbg(f"RESET gen={self._gen_id} mode={self._mode!r} nrows={len(self._rows)} inner_children={len(self._inner.winfo_children())}")
         if self._trace_id:
             try: self._entry_var.trace_remove("write", self._trace_id)
-            except Exception: pass
+            except Exception as e: _dbg(f"trace_remove _trace_id: {e}")
             self._trace_id = None
         if self._toggle_trace_id:
             try: self._research_var.trace_remove("write", self._toggle_trace_id)
-            except Exception: pass
+            except Exception as e: _dbg(f"trace_remove _toggle_trace_id: {e}")
             self._toggle_trace_id = None
         if self._filter_after_id:
             self.root.after_cancel(self._filter_after_id)
@@ -1447,8 +1489,8 @@ class TkPicker:
                     self._prog_frame.pack_forget()
                     try:
                         desc_lbl.destroy()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        _dbg(f"desc_lbl destroy failed: {e}")
                 return
             if not _daemon_alive():
                 desc_var.set("Daemon failed to start.")
@@ -1458,8 +1500,8 @@ class TkPicker:
                 data = json.loads(DAEMON_STATUS.read_text(encoding="utf-8"))
                 self._prog_var.set(float(data.get("pct", 0)))
                 desc_var.set(data.get("step", "Starting..."))
-            except Exception:
-                pass
+            except Exception as e:
+                _dbg(f"daemon status poll failed: {e}")
             self.root.after(150, _poll)
 
         self.root.after(150, _poll)
@@ -1968,8 +2010,8 @@ class TkPicker:
                 self._img_refs.append(photo)
                 img_lbl = tk.Label(body, image=photo, bg=self.BG, cursor="hand2")
                 img_lbl.pack(anchor="w")
-            except Exception:
-                pass
+            except Exception as e:
+                _dbg(f"banner image load failed: {e}")
         if img_lbl is None:
             img_lbl = tk.Label(body, text="❤  Buy me a coffee",
                                bg="#587180", fg="#ffffff", cursor="hand2",
@@ -2527,8 +2569,8 @@ class TkPicker:
                 step = data.get("step", "Starting...")
                 self._prog_var.set(pct)
                 desc_var.set(step)
-            except Exception:
-                pass
+            except Exception as e:
+                _dbg(f"model loading status poll failed: {e}")
             self.root.after(150, _poll)
 
         self.root.after(150, _poll)
@@ -2676,7 +2718,7 @@ class TkPicker:
 
     def destroy(self):
         try: self.root.destroy()
-        except Exception: pass
+        except Exception as e: _dbg(f"root destroy failed: {e}")
 
 
 # ── helpers that need picker ───────────────────────────────────────────────────

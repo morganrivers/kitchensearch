@@ -26,6 +26,7 @@ import numpy as np
 import _minilm_text
 
 from platformdirs import user_cache_dir
+from _log import _dbg
 
 _REPO         = Path(sys.argv[0]).resolve().parent
 DATA_DIR      = _REPO / "data" / "embeddings"
@@ -61,8 +62,8 @@ def _write_status(step, pct):
         tmp = STATUS_PATH.with_suffix(".tmp")
         tmp.write_text(json.dumps({"step": step, "pct": round(float(pct), 1)}), encoding="utf-8")
         tmp.replace(STATUS_PATH)
-    except Exception:
-        pass
+    except Exception as e:
+        _dbg(f"_write_status failed: {e}")
 
 
 def load():
@@ -189,8 +190,8 @@ def handle(conn, model, base_minilm, code_to_idx, combo_map,
     except Exception as e:
         try:
             conn.send_bytes(json.dumps({"error": str(e)}).encode())
-        except Exception:
-            pass
+        except Exception as e2:
+            _dbg(f"handle: failed to send error response: {e2}")
     finally:
         _last_activity[0] = time.monotonic()
         conn.close()

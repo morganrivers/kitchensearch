@@ -1,5 +1,5 @@
 import sys, os, re, json, hashlib, shutil, signal, subprocess, math
-import time, urllib.request, threading, random as _random, traceback, getpass
+import time, urllib.request, threading, random as _random, getpass
 from datetime import date, timedelta, datetime as _datetime
 from multiprocessing.connection import Client
 from pathlib import Path                                                                                                                                                                     
@@ -12,25 +12,7 @@ except ImportError:
 from PIL import Image, ImageDraw, ImageFont as _ImageFont                                                                                                                           
 
 
-# ── debug log ─────────────────────────────────────────────────────────────────
-_DBG_ENABLED  = "--logging" in sys.argv
-_DBG_LOG_PATH = Path("/tmp/emojipicker-debug.log")
-if _DBG_ENABLED:
-    _DBG_LOG_PATH.write_text("", encoding="utf-8")  # truncate on each launch
-_dbg_lock = threading.Lock()
-
-def _dbg(msg, include_tb=False):
-    if not _DBG_ENABLED:
-        return
-    ts = time.strftime("%H:%M:%S") + f".{int(time.time()*1000)%1000:03d}"
-    tid = threading.get_ident()
-    lines = [f"[{ts}][tid={tid}] {msg}"]
-    if include_tb:
-        tb_lines = traceback.format_stack(limit=8)
-        lines.append("  STACK: " + " | ".join(l.strip() for l in tb_lines[:-1]))
-    with _dbg_lock:
-        with open(_DBG_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
+from _log import _dbg
 
 
 from platformdirs import user_cache_dir, user_config_dir
@@ -440,8 +422,8 @@ def _daemon_alive():
                 os.kill(pid, signal.SIGTERM)
                 DAEMON_PID.unlink(missing_ok=True)
                 return False
-        except Exception:
-            pass
+        except Exception as e:
+            _dbg(f"_daemon_alive zombie check failed: {e}")
     return True
 
 
@@ -825,8 +807,8 @@ def _find_emoji_ttf():
         path = out.strip().splitlines()[0]
         if path and Path(path).exists():
             return path
-    except Exception:
-        pass
+    except Exception as e:
+        _dbg(f"_find_emoji_ttf fc-list failed: {e}")
     return None
 
 
@@ -840,7 +822,8 @@ def _get_pil_emoji_font():
         return None
     try:
         _PIL_EMOJI_FONT = ImageFont.truetype(ttf, 109)
-    except Exception:
+    except Exception as e:
+        _dbg(f"_get_pil_emoji_font truetype load failed: {e}")
         return None
     return _PIL_EMOJI_FONT
 
@@ -864,7 +847,8 @@ def render_emoji_pil(char, size=20):
         img = canvas.crop(bbox).resize((size, size), Image.LANCZOS)
         _PIL_EMOJI_CACHE[char] = img
         return img
-    except Exception:
+    except Exception as e:
+        _dbg(f"render_emoji_pil failed char={char!r}: {e}")
         _PIL_EMOJI_CACHE[char] = None
         return None
 

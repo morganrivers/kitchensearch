@@ -32,6 +32,7 @@ import threading
 import urllib.request
 import winreg
 from pathlib import Path
+from _log import _dbg
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,8 @@ def load_config():
     try:
         with open(CONFIG_FILE) as f:
             return json.load(f)
-    except Exception:
+    except Exception as e:
+        _dbg(f"load_config failed: {e}")
         return {}
 
 def save_config(data):
@@ -145,7 +147,8 @@ def _autostart_current():
                             0, winreg.KEY_READ) as k:
             val, _ = winreg.QueryValueEx(k, APP_NAME)
             return str(_SELF) in val
-    except Exception:
+    except Exception as e:
+        _dbg(f"_autostart_current registry read failed: {e}")
         return False
 
 # ── spawn picker ──────────────────────────────────────────────────────────────
@@ -158,8 +161,8 @@ def _spawn():
         return
     try:
         ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY
-    except Exception:
-        pass
+    except Exception as e:
+        _dbg(f"AllowSetForegroundWindow failed: {e}")
     if _PICKER_EXE.exists() and _PICKER_EXE != _SELF:
         cmd = [str(_PICKER_EXE)]
     else:
@@ -263,8 +266,8 @@ def _get_tray_hicon():
                 try:
                     img = Image.open(str(p)).convert("RGBA")
                     break
-                except Exception:
-                    pass
+                except Exception as e:
+                    _dbg(f"tray icon candidate load failed {p}: {e}")
         if img is None:
             req = urllib.request.Request(
                 _TRAY_ICON_URL, headers={"User-Agent": "kitchensearch/1.0"}
