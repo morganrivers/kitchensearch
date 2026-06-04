@@ -1,0 +1,2423 @@
+{
+  "class": "Tk",
+  "mapped": true,
+  "x": 384,
+  "y": 256,
+  "w": 512,
+  "h": 512,
+  "bg": "#ffffff",
+  "relief": "flat",
+  "children": {
+    "!frame": {
+      "class": "Frame",
+      "mapped": true,
+      "x": 0,
+      "y": 0,
+      "w": 512,
+      "h": 2,
+      "bg": "#d9d9d9",
+      "relief": "flat",
+      "children": {
+        "!frame": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 0,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF0000",
+          "relief": "flat"
+        },
+        "!frame2": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 85,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF8C00",
+          "relief": "flat"
+        },
+        "!frame3": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 170,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FFD700",
+          "relief": "flat"
+        },
+        "!frame4": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 255,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#32CD32",
+          "relief": "flat"
+        },
+        "!frame5": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 340,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#1E90FF",
+          "relief": "flat"
+        },
+        "!frame6": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 426,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#8B00FF",
+          "relief": "flat"
+        }
+      }
+    },
+    "!frame2": {
+      "class": "Frame",
+      "mapped": true,
+      "x": 0,
+      "y": 510,
+      "w": 512,
+      "h": 2,
+      "bg": "#d9d9d9",
+      "relief": "flat",
+      "children": {
+        "!frame": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 0,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF0000",
+          "relief": "flat"
+        },
+        "!frame2": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 85,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FF8C00",
+          "relief": "flat"
+        },
+        "!frame3": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 170,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#FFD700",
+          "relief": "flat"
+        },
+        "!frame4": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 255,
+          "y": 0,
+          "w": 85,
+          "h": 2,
+          "bg": "#32CD32",
+          "relief": "flat"
+        },
+        "!frame5": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 340,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#1E90FF",
+          "relief": "flat"
+        },
+        "!frame6": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 426,
+          "y": 0,
+          "w": 86,
+          "h": 2,
+          "bg": "#8B00FF",
+          "relief": "flat"
+        }
+      }
+    },
+    "!frame3": {
+      "class": "Frame",
+      "mapped": true,
+      "x": 0,
+      "y": 2,
+      "w": 512,
+      "h": 508,
+      "bg": "#ffffff",
+      "relief": "flat",
+      "children": {
+        "!frame": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 508,
+          "bg": "#d9d9d9",
+          "relief": "flat",
+          "children": {
+            "!frame": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 0,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF0000",
+              "relief": "flat"
+            },
+            "!frame2": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 84,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF8C00",
+              "relief": "flat"
+            },
+            "!frame3": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 168,
+              "w": 2,
+              "h": 85,
+              "bg": "#FFD700",
+              "relief": "flat"
+            },
+            "!frame4": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 253,
+              "w": 2,
+              "h": 85,
+              "bg": "#32CD32",
+              "relief": "flat"
+            },
+            "!frame5": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 338,
+              "w": 2,
+              "h": 85,
+              "bg": "#1E90FF",
+              "relief": "flat"
+            },
+            "!frame6": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 423,
+              "w": 2,
+              "h": 85,
+              "bg": "#8B00FF",
+              "relief": "flat"
+            }
+          }
+        },
+        "!frame2": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 510,
+          "y": 0,
+          "w": 2,
+          "h": 508,
+          "bg": "#d9d9d9",
+          "relief": "flat",
+          "children": {
+            "!frame": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 0,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF0000",
+              "relief": "flat"
+            },
+            "!frame2": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 84,
+              "w": 2,
+              "h": 84,
+              "bg": "#FF8C00",
+              "relief": "flat"
+            },
+            "!frame3": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 168,
+              "w": 2,
+              "h": 85,
+              "bg": "#FFD700",
+              "relief": "flat"
+            },
+            "!frame4": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 253,
+              "w": 2,
+              "h": 85,
+              "bg": "#32CD32",
+              "relief": "flat"
+            },
+            "!frame5": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 338,
+              "w": 2,
+              "h": 85,
+              "bg": "#1E90FF",
+              "relief": "flat"
+            },
+            "!frame6": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 0,
+              "y": 423,
+              "w": 2,
+              "h": 85,
+              "bg": "#8B00FF",
+              "relief": "flat"
+            }
+          }
+        },
+        "!frame3": {
+          "class": "Frame",
+          "mapped": true,
+          "x": 2,
+          "y": 0,
+          "w": 508,
+          "h": 508,
+          "bg": "#ffffff",
+          "relief": "flat",
+          "children": {
+            "!canvas": {
+              "class": "Canvas",
+              "mapped": true,
+              "x": 0,
+              "y": 0,
+              "w": 508,
+              "h": 52,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "state": "normal",
+              "canvas_items": 20,
+              "canvas_sample": [
+                {
+                  "type": "polygon",
+                  "coords": [
+                    -52.0,
+                    0.0,
+                    -21.0,
+                    0.0,
+                    31.0,
+                    52.0,
+                    0.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    -21.0,
+                    0.0,
+                    10.0,
+                    0.0,
+                    62.0,
+                    52.0,
+                    31.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    10.0,
+                    0.0,
+                    41.0,
+                    0.0,
+                    93.0,
+                    52.0,
+                    62.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    41.0,
+                    0.0,
+                    72.0,
+                    0.0,
+                    124.0,
+                    52.0,
+                    93.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    72.0,
+                    0.0,
+                    103.0,
+                    0.0,
+                    155.0,
+                    52.0,
+                    124.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    103.0,
+                    0.0,
+                    134.0,
+                    0.0,
+                    186.0,
+                    52.0,
+                    155.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    134.0,
+                    0.0,
+                    165.0,
+                    0.0,
+                    217.0,
+                    52.0,
+                    186.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    165.0,
+                    0.0,
+                    196.0,
+                    0.0,
+                    248.0,
+                    52.0,
+                    217.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    196.0,
+                    0.0,
+                    227.0,
+                    0.0,
+                    279.0,
+                    52.0,
+                    248.0,
+                    52.0
+                  ]
+                },
+                {
+                  "type": "polygon",
+                  "coords": [
+                    227.0,
+                    0.0,
+                    258.0,
+                    0.0,
+                    310.0,
+                    52.0,
+                    279.0,
+                    52.0
+                  ]
+                }
+              ]
+            },
+            "!frame": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 10,
+              "y": 62,
+              "w": 488,
+              "h": 68,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "children": {
+                "!frame": {
+                  "class": "Frame",
+                  "mapped": true,
+                  "x": 0,
+                  "y": 0,
+                  "w": 488,
+                  "h": 25,
+                  "bg": "#ffffff",
+                  "relief": "flat",
+                  "children": {
+                    "!label": {
+                      "class": "Label",
+                      "mapped": true,
+                      "x": 0,
+                      "y": 2,
+                      "w": 488,
+                      "h": 21,
+                      "text": "'love letter' (1-40 of 5000):",
+                      "bg": "#ffffff",
+                      "fg": "#6633cc",
+                      "font": "Helvetica 11 bold",
+                      "relief": "flat",
+                      "state": "normal"
+                    }
+                  }
+                },
+                "!frame2": {
+                  "class": "Frame",
+                  "mapped": true,
+                  "x": 0,
+                  "y": 29,
+                  "w": 488,
+                  "h": 39,
+                  "bg": "#ffffff",
+                  "relief": "flat",
+                  "children": {
+                    "!entry": {
+                      "class": "Entry",
+                      "mapped": true,
+                      "x": 0,
+                      "y": 0,
+                      "w": 387,
+                      "h": 39,
+                      "text": "PY_VAR0",
+                      "bg": "#f5f5f5",
+                      "fg": "#aaaaaa",
+                      "font": "Helvetica 13",
+                      "relief": "flat",
+                      "state": "normal",
+                      "value": "type query, press Enter to search"
+                    },
+                    "!checkbutton-1": {
+                      "class": "Checkbutton",
+                      "mapped": true,
+                      "x": 395,
+                      "y": 9,
+                      "w": 93,
+                      "h": 21,
+                      "text": "re-search",
+                      "bg": "#ffffff",
+                      "fg": "#222222",
+                      "font": "Helvetica 11",
+                      "relief": "flat",
+                      "state": "normal"
+                    }
+                  }
+                },
+                "!frame3": {
+                  "class": "Frame",
+                  "mapped": false,
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1,
+                  "bg": "#ffffff",
+                  "relief": "flat",
+                  "children": {
+                    "!text": {
+                      "class": "Text",
+                      "mapped": false,
+                      "x": 0,
+                      "y": 0,
+                      "w": 1,
+                      "h": 1,
+                      "bg": "#f5f5f5",
+                      "fg": "#222222",
+                      "font": "Helvetica 13",
+                      "relief": "flat",
+                      "state": "normal",
+                      "value": ""
+                    },
+                    "!label": {
+                      "class": "Label",
+                      "mapped": false,
+                      "x": 0,
+                      "y": 0,
+                      "w": 1,
+                      "h": 1,
+                      "text": "\u25be",
+                      "bg": "#ffffff",
+                      "fg": "#999999",
+                      "font": "Helvetica 14",
+                      "relief": "flat",
+                      "state": "normal"
+                    },
+                    "!canvas": {
+                      "class": "Canvas",
+                      "mapped": false,
+                      "x": 0,
+                      "y": 0,
+                      "w": 1,
+                      "h": 1,
+                      "bg": "#ffffff",
+                      "relief": "flat",
+                      "state": "normal",
+                      "canvas_items": 7,
+                      "canvas_sample": [
+                        {
+                          "type": "arc",
+                          "coords": [
+                            0.0,
+                            0.0,
+                            36.0,
+                            36.0
+                          ]
+                        },
+                        {
+                          "type": "arc",
+                          "coords": [
+                            124.0,
+                            0.0,
+                            160.0,
+                            36.0
+                          ]
+                        },
+                        {
+                          "type": "arc",
+                          "coords": [
+                            0.0,
+                            0.0,
+                            36.0,
+                            36.0
+                          ]
+                        },
+                        {
+                          "type": "arc",
+                          "coords": [
+                            124.0,
+                            0.0,
+                            160.0,
+                            36.0
+                          ]
+                        },
+                        {
+                          "type": "rectangle",
+                          "coords": [
+                            18.0,
+                            0.0,
+                            142.0,
+                            36.0
+                          ]
+                        },
+                        {
+                          "type": "rectangle",
+                          "coords": [
+                            0.0,
+                            18.0,
+                            160.0,
+                            18.0
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "coords": [
+                            80.0,
+                            18.0
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "!frame2": {
+              "class": "Frame",
+              "mapped": false,
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "children": {
+                "!progressbar": {
+                  "class": "TProgressbar",
+                  "mapped": false,
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1
+                },
+                "!label": {
+                  "class": "Label",
+                  "mapped": false,
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1,
+                  "bg": "#ffffff",
+                  "fg": "#999999",
+                  "font": "Helvetica 9",
+                  "relief": "flat",
+                  "state": "normal"
+                }
+              }
+            },
+            "!frame3": {
+              "class": "Frame",
+              "mapped": true,
+              "x": 2,
+              "y": 134,
+              "w": 504,
+              "h": 374,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "children": {
+                "!canvas": {
+                  "class": "Canvas",
+                  "mapped": true,
+                  "x": 0,
+                  "y": 0,
+                  "w": 490,
+                  "h": 374,
+                  "bg": "#ffffff",
+                  "relief": "flat",
+                  "state": "normal",
+                  "canvas_items": 1,
+                  "canvas_sample": [
+                    {
+                      "type": "window",
+                      "coords": [
+                        0.0,
+                        0.0
+                      ]
+                    }
+                  ],
+                  "children": {
+                    "!frame": {
+                      "class": "Frame",
+                      "mapped": true,
+                      "x": 0,
+                      "y": 0,
+                      "w": 490,
+                      "h": 4525,
+                      "bg": "#ffffff",
+                      "relief": "flat",
+                      "children": {
+                        "!frame111": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#dde0ff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#dde0ff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#dde0ff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "sparkling_heart-love_letter    (sparkling_heart-love_letter love_letter email like affection envelope valentines heart mail note romance sparkling_heart love like affection valentines excited sparkle "
+                            }
+                          }
+                        },
+                        "!frame112": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 119,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "green_heart-love_letter    (green_heart-love_letter love_letter email like affection envelope valentines heart mail note romance green_heart love like affection valentines nct smileys & emotion smiley"
+                            }
+                          }
+                        },
+                        "!frame113": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 227,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "kissing-love_letter    (kissing-love_letter love_letter email like affection envelope valentines heart mail note romance kissing_face love like face 3 valentines infatuation kiss duck kissy whistling "
+                            }
+                          }
+                        },
+                        "!frame114": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 335,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "yellow_heart-love_letter    (yellow_heart-love_letter love_letter email like affection envelope valentines heart mail note romance yellow_heart love like affection valentines bf gold snapchat smileys "
+                            }
+                          }
+                        },
+                        "!frame115": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 443,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "revolving_hearts-love_letter    (revolving_hearts-love_letter love_letter email like affection envelope valentines heart mail note romance revolving_hearts love like affection valentines heart two smi"
+                            }
+                          }
+                        },
+                        "!frame116": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 551,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "heartbeat-love_letter    (heartbeat-love_letter love_letter email like affection envelope valentines heart mail note romance beating_heart love like affection valentines pink heart alarm heartbeat pul"
+                            }
+                          }
+                        },
+                        "!frame117": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 659,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "heartpulse-love_letter    (heartpulse-love_letter love_letter email like affection envelope valentines heart mail note romance growing_heart like love affection valentines pink excited heartpulse mult"
+                            }
+                          }
+                        },
+                        "!frame118": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 767,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "heart_eyes-love_letter    (heart_eyes-love_letter love_letter email like affection envelope valentines heart mail note romance smiling_face_with_heart_eyes face love like affection valentines infatuat"
+                            }
+                          }
+                        },
+                        "!frame119": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 885,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "cupid-love_letter    (cupid-love_letter love_letter email like affection envelope valentines heart mail note romance heart_with_arrow love like heart affection valentines cupid lovestruck romance smil"
+                            }
+                          }
+                        },
+                        "!frame120": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 993,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "purple_heart-love_letter    (purple_heart-love_letter love_letter email like affection envelope valentines heart mail note romance purple_heart love like affection valentines bts emoji smileys & emoti"
+                            }
+                          }
+                        },
+                        "!frame121": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1101,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "heart-love_letter    (heart-love_letter love_letter email like affection envelope valentines heart mail note romance red_heart love like valentines black heavy heart smileys & emotion smileys & emotio"
+                            }
+                          }
+                        },
+                        "!frame122": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1209,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "kissing_heart-love_letter    (kissing_heart-love_letter love_letter email like affection envelope valentines heart mail note romance face_blowing_a_kiss face love like affection valentines infatuation"
+                            }
+                          }
+                        },
+                        "!frame123": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1327,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "kiss-love_letter    (kiss-love_letter kiss_mark face lips love like affection valentines heart kissing lipstick romance kiss love_letter email like affection envelope valentines heart mail note romanc"
+                            }
+                          }
+                        },
+                        "!frame124": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1435,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "kissing_closed_eyes-love_letter    (kissing_closed_eyes-love_letter love_letter email like affection envelope valentines heart mail note romance kissing_face_with_closed_eyes face love like affection "
+                            }
+                          }
+                        },
+                        "!frame125": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1553,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "gift_heart-love_letter    (gift_heart-love_letter love_letter email like affection envelope valentines heart mail note romance heart_with_ribbon love valentines box chocolate chocolates gift valentine"
+                            }
+                          }
+                        },
+                        "!frame126": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1661,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "orange_heart-love_letter    (orange_heart-love_letter love_letter email like affection envelope valentines heart mail note romance orange_heart love like affection valentines smileys & emotion smileys"
+                            }
+                          }
+                        },
+                        "!frame127": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1769,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "blue_heart-love_letter    (blue_heart-love_letter love_letter email like affection envelope valentines heart mail note romance blue_heart love like affection valentines brand neutral smileys & emotion"
+                            }
+                          }
+                        },
+                        "!frame128": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 1877,
+                          "w": 486,
+                          "h": 154,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 28,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 154,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "love_letter-heavy_heart_exclamation_mark_ornament    (love_letter-heavy_heart_exclamation_mark_ornament love_letter email like affection envelope valentines heart mail note romance heart_exclamation d"
+                            }
+                          }
+                        },
+                        "!frame129": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2033,
+                          "w": 486,
+                          "h": 135,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 18,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 135,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "smiling_face_with_3_hearts-love_letter    (smiling_face_with_3_hearts-love_letter love_letter email like affection envelope valentines heart mail note romance smiling_face_with_hearts face love like a"
+                            }
+                          }
+                        },
+                        "!frame130": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2170,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "two_hearts-love_letter    (two_hearts-love_letter love_letter email like affection envelope valentines heart mail note romance two_hearts love like affection valentines heart pink small smileys & emot"
+                            }
+                          }
+                        },
+                        "!frame131": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2278,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "love_letter-rose    (love_letter-rose love_letter email like affection envelope valentines heart mail note romance rose flowers valentines love spring flower plant red smileys & emotion animals & natu"
+                            }
+                          }
+                        },
+                        "!frame132": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2386,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "kiss-exclamation    (kiss-exclamation exclamation_mark heavy_exclamation_mark danger surprise punctuation wow warning bang red symbol exclamation kiss_mark face lips love like affection valentines hea"
+                            }
+                          }
+                        },
+                        "!frame133": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2504,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "heartpulse-milky_way    (heartpulse-milky_way growing_heart like love affection valentines pink excited heartpulse multiple nervous pulse triple milky_way photo space stars galaxy night sky universe w"
+                            }
+                          }
+                        },
+                        "!frame134": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2612,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "persevere-sparkling_heart    (persevere-sparkling_heart sparkling_heart love like affection valentines excited sparkle sparkly stars\u00a0heart persevering_face face sick no upset oops eyes helpless persev"
+                            }
+                          }
+                        },
+                        "!frame135": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2730,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "two_hearts-koala    (two_hearts-koala koala animal nature bear face marsupial two_hearts love like affection valentines heart pink small animals & nature smileys & emotion)"
+                            }
+                          }
+                        },
+                        "!frame136": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2838,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "sunglasses-kiss    (sunglasses-kiss kiss_mark face lips love like affection valentines heart kissing lipstick romance kiss smiling_face_with_sunglasses face cool smile summer beach sunglass best brigh"
+                            }
+                          }
+                        },
+                        "!frame137": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 2956,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "heartpulse-koala    (heartpulse-koala koala animal nature bear face marsupial growing_heart like love affection valentines pink excited heartpulse multiple nervous pulse triple animals & nature smiley"
+                            }
+                          }
+                        },
+                        "!frame138": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3064,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "neutral_face-sparkling_heart    (neutral_face-sparkling_heart sparkling_heart love like affection valentines excited sparkle sparkly stars\u00a0heart neutral_face indifference meh :| neutral deadpan faced "
+                            }
+                          }
+                        },
+                        "!frame139": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3172,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "dragon-sparkling_heart    (dragon-sparkling_heart sparkling_heart love like affection valentines excited sparkle sparkly stars\u00a0heart dragon animal myth nature chinese green fairy tale smileys & emotio"
+                            }
+                          }
+                        },
+                        "!frame140": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3280,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "kissing-mouse    (kissing-mouse mouse_face animal nature cheese_wedge rodent mouse kissing_face love like face 3 valentines infatuation kiss duck kissy whistling kissing animals & nature smileys & emo"
+                            }
+                          }
+                        },
+                        "!frame141": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3388,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "shrug-heart    (shrug-heart person_shrugging regardless doubt ignorance indifference shrug shruggie \u00af\\ red_heart love like valentines black heavy heart people & body smileys & emotion)"
+                            }
+                          }
+                        },
+                        "!frame142": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3496,
+                          "w": 486,
+                          "h": 116,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 9,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 116,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "heart_eyes-dango    (heart_eyes-dango smiling_face_with_heart_eyes face love like affection valentines infatuation crush heart eye shaped smile heart_eyes dango food dessert sweet japanese barbecue me"
+                            }
+                          }
+                        },
+                        "!frame143": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3614,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "sparkling_heart-revolving_hearts    (sparkling_heart-revolving_hearts sparkling_heart love like affection valentines excited sparkle sparkly stars\u00a0heart revolving_hearts love like affection valentines"
+                            }
+                          }
+                        },
+                        "!frame144": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3722,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "sparkling_heart-bell_pepper    (sparkling_heart-bell_pepper sparkling_heart love like affection valentines excited sparkle sparkly stars\u00a0heart bell pepper fruit plant capsicum vegetable bell_pepper sm"
+                            }
+                          }
+                        },
+                        "!frame145": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3830,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "revolving_hearts-broccoli    (revolving_hearts-broccoli revolving_hearts love like affection valentines heart two broccoli fruit food vegetable cabbage wild smileys & emotion food & drink)"
+                            }
+                          }
+                        },
+                        "!frame146": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 3938,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "whale-purple_heart    (whale-purple_heart spouting_whale animal nature sea ocean cute face whale purple_heart love like affection valentines bts emoji animals & nature smileys & emotion)"
+                            }
+                          }
+                        },
+                        "!frame147": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 4046,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "gift_heart-cat    (gift_heart-cat cat_face animal meow nature pet kitten kitty cat heart_with_ribbon love valentines box chocolate chocolates gift valentine gift_heart animals & nature smileys & emoti"
+                            }
+                          }
+                        },
+                        "!frame148": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 4154,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 4,
+                              "w": 364,
+                              "h": 97,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "shrug-yellow_heart    (shrug-yellow_heart person_shrugging regardless doubt ignorance indifference shrug shruggie \u00af\\ yellow_heart love like affection valentines bf gold snapchat people & body smileys "
+                            }
+                          }
+                        },
+                        "!frame149": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 4262,
+                          "w": 486,
+                          "h": 154,
+                          "bg": "#f5f5f5",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 28,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#f5f5f5",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 0,
+                              "w": 364,
+                              "h": 154,
+                              "bg": "#f5f5f5",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "facepunch-smiling_face_with_3_hearts    (facepunch-smiling_face_with_3_hearts smiling_face_with_hearts face love like affection valentines infatuation crush hearts adore eyes three smiling_face_with_3"
+                            }
+                          }
+                        },
+                        "!frame150": {
+                          "class": "Frame",
+                          "mapped": true,
+                          "x": 2,
+                          "y": 4418,
+                          "w": 486,
+                          "h": 106,
+                          "bg": "#ffffff",
+                          "relief": "flat",
+                          "children": {
+                            "!label": {
+                              "class": "Label",
+                              "mapped": true,
+                              "x": 6,
+                              "y": 4,
+                              "w": 98,
+                              "h": 98,
+                              "bg": "#ffffff",
+                              "fg": "#000000",
+                              "font": "TkDefaultFont",
+                              "relief": "flat",
+                              "state": "normal"
+                            },
+                            "!text": {
+                              "class": "Text",
+                              "mapped": true,
+                              "x": 114,
+                              "y": 14,
+                              "w": 364,
+                              "h": 78,
+                              "bg": "#ffffff",
+                              "fg": "#222222",
+                              "font": "Helvetica 11 bold",
+                              "relief": "flat",
+                              "state": "normal",
+                              "value": "sparkling_heart-goose    (sparkling_heart-goose sparkling_heart love like affection valentines excited sparkle sparkly stars\u00a0heart goose silly jemima goosebumps honk smileys & emotion animals & nature"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "!nicescrollbar": {
+                  "class": "Canvas",
+                  "mapped": true,
+                  "x": 490,
+                  "y": 0,
+                  "w": 14,
+                  "h": 374,
+                  "bg": "#e0e0e0",
+                  "relief": "flat",
+                  "state": "normal",
+                  "canvas_items": 6,
+                  "canvas_sample": [
+                    {
+                      "type": "arc",
+                      "coords": [
+                        2.0,
+                        2.0,
+                        14.0,
+                        14.0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "coords": [
+                        0.0,
+                        2.0,
+                        12.0,
+                        14.0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "coords": [
+                        2.0,
+                        16.0,
+                        14.0,
+                        28.0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "coords": [
+                        0.0,
+                        16.0,
+                        12.0,
+                        28.0
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "coords": [
+                        6.0,
+                        2.0,
+                        8.0,
+                        28.0
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "coords": [
+                        2.0,
+                        8.0,
+                        12.0,
+                        22.0
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "!canvas2": {
+              "class": "Canvas",
+              "mapped": false,
+              "x": 476,
+              "y": 476,
+              "w": 26,
+              "h": 26,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "state": "normal",
+              "canvas_items": 2,
+              "canvas_sample": [
+                {
+                  "type": "oval",
+                  "coords": [
+                    3.0,
+                    3.0,
+                    23.0,
+                    23.0
+                  ]
+                },
+                {
+                  "type": "oval",
+                  "coords": [
+                    8.0,
+                    1.0,
+                    28.0,
+                    21.0
+                  ]
+                }
+              ]
+            },
+            "!canvas3": {
+              "class": "Canvas",
+              "mapped": true,
+              "x": 6,
+              "y": 13,
+              "w": 58,
+              "h": 26,
+              "bg": "#ffffff",
+              "relief": "flat",
+              "state": "normal",
+              "canvas_items": 1,
+              "canvas_sample": [
+                {
+                  "type": "text",
+                  "coords": [
+                    29.0,
+                    13.0
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

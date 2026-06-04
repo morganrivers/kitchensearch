@@ -2084,6 +2084,7 @@ class TkPicker:
         def _on_dismiss(e=None):
             self._result = self.BMC_DISMISS_LABEL
             self.root.quit()
+            return "break"
         dismiss.bind("<Button-1>", _on_dismiss)
         dismiss.bind("<Enter>",    lambda e: dismiss.configure(fg=self.FG))
         dismiss.bind("<Leave>",    lambda e: dismiss.configure(fg=self.FG_DIM))
@@ -2091,6 +2092,7 @@ class TkPicker:
         def _on_snooze(e=None):
             self._result = self.BMC_SNOOZE_LABEL
             self.root.quit()
+            return "break"
         snooze.bind("<Button-1>", _on_snooze)
 
     def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, banner=None, show_dark_btn=False, show_research_cb=False, prompt_fn=None):
