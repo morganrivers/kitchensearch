@@ -42,7 +42,7 @@ _DEFAULT_SETTINGS = {
     "show_story":      True,
     "floating":        True,
     "frameless":       False,
-    "always_on_top":   True,
+    "always_on_top":   False,
     "dark_mode":       False,
     "copy_count":      0,
 }
@@ -224,7 +224,7 @@ def main():
         frameless=settings["frameless"] and not sys.platform == "win32",
         dark=settings.get("dark_mode", False),
         on_dark_toggle=_on_dark_toggle,
-        always_on_top=settings.get("always_on_top", True),
+        always_on_top=settings.get("always_on_top", False),
     )
     _dbg("APP: TkPicker init done")
 
