@@ -50,6 +50,7 @@ python -m nuitka \
   --include-data-dir="$REPO_DIR/data/embeddings=data/embeddings" \
   --include-data-dir="$REPO_DIR/data/fonts=data/fonts" \
   --include-data-file="$REPO_DIR/data/app_assets.tar.gz=data/app_assets.tar.gz" \
+  --include-data-file="$REPO_DIR/LICENSE.txt=LICENSE.txt" \
   --include-data-file="$REPO_DIR/packaging/kitchensearch-icon.png=packaging/kitchensearch-icon.png" \
   --include-data-file="$REPO_DIR/packaging/kitchensearch.desktop=packaging/kitchensearch.desktop" \
   ${TRAY_ICON_ARG:+"$TRAY_ICON_ARG"} \
