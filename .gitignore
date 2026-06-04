@@ -23,6 +23,7 @@ tests/semantic_tests/results/
 # build artifacts and downloaded packages
 *.exe
 *.whl
+kitchensearch-linux-x86_64.tar.gz
 
 # SSH keys
 *id_ed25519*

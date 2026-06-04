@@ -76,6 +76,10 @@ else
   ln -sf emoji-split-daemon emoji-story
   ln -sf emoji-split-daemon kitchensearch-daemon
   cd "$REPO_DIR/nuitka-build"
+  echo "=== Scrubbing leaked build-machine paths ==="
+  python "$REPO_DIR/scripts/scrub_paths.py" "$REPO_DIR/nuitka-build/kitchensearch"
+  echo "=== Stripping debug symbols ==="
+  bash "$REPO_DIR/scripts/strip_dist.sh" "$REPO_DIR/nuitka-build/kitchensearch"
   tar -czf "$REPO_DIR/kitchensearch-linux-x86_64.tar.gz" kitchensearch/
   echo "=== Done: kitchensearch-linux-x86_64.tar.gz ==="
 fi

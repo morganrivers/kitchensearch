@@ -485,17 +485,18 @@ def query_daemon(query, limit=MAX_RESULTS):
         if conn is None:
             return "loading" if _daemon_alive() else None
     try:
-        conn.send_bytes(json.dumps({"query": query, "limit": limit}).encode())
-        results = json.loads(conn.recv_bytes().decode())
+        try:
+            conn.send_bytes(json.dumps({"query": query, "limit": limit}).encode())
+            results = json.loads(conn.recv_bytes().decode())
+        except Exception:
+            return "loading" if _daemon_alive() else None
         if isinstance(results, list):
             return [(r["rank"], r["alt"], r["url"], "") for r in results]
         if isinstance(results, dict) and "error" in results:
             raise RuntimeError(results["error"])
-    except Exception:
-        return "loading" if _daemon_alive() else None
+        return None
     finally:
         conn.close()
-    return None
 
 
 def load_index():

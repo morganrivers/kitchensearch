@@ -251,6 +251,7 @@ class TkPicker:
         self._pending_toast  = None
         self._toast_widget   = None
         self._toast_after_id = None
+        self._cancel_hook    = None
         self._build()
 
     def _build(self):
@@ -1024,6 +1025,13 @@ class TkPicker:
         self._result = None
         if self._mode == "loading":
             _kill_daemon()
+        if self._cancel_hook is not None:
+            hook = self._cancel_hook
+            self._cancel_hook = None
+            try:
+                hook()
+            except Exception as exc:
+                _dbg(f"cancel hook failed: {exc}")
         self.root.quit()
 
     def _on_return(self, e=None):
@@ -1412,6 +1420,7 @@ class TkPicker:
         self._dm_btn.place_forget()
         self._dismiss_toast()
         self._back_btn.place_forget()
+        self._cancel_hook = None
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -2599,6 +2608,7 @@ class TkPicker:
         self._reset()
         self._mode = "story_progress"
         self._set_prompt("Generating emoji story...")
+        self._show_back_btn()
         self._entry_row.pack_forget()
 
         self._prog_var.set(0)
@@ -2614,11 +2624,15 @@ class TkPicker:
             font=("Helvetica", 11), anchor="w", padx=14, pady=14,
         ).pack(fill="x")
 
-        total  = [0]
-        done   = [0]
-        error  = [None]
+        total     = [0]
+        done      = [0]
+        error     = [None]
+        proc_ref  = [None]
+        cancelled = [False]
 
         def _update():
+            if cancelled[0]:
+                return
             if total[0] > 0:
                 self._progbar.stop()
                 self._progbar.configure(mode="determinate", maximum=total[0])
@@ -2628,6 +2642,17 @@ class TkPicker:
         from picker_utils import CACHE_DIR as _CACHE_DIR
         log_path = _CACHE_DIR / "story.log"
 
+        def _on_back():
+            cancelled[0] = True
+            p = proc_ref[0]
+            if p is not None and p.poll() is None:
+                try:
+                    p.terminate()
+                except Exception as exc:
+                    _dbg(f"terminate story proc failed: {exc}")
+
+        self._cancel_hook = _on_back
+
         def _worker():
             captured = []
             try:
@@ -2636,6 +2661,7 @@ class TkPicker:
                 logf.write("$ " + " ".join(cmd) + "\n")
                 proc = subprocess.Popen(
                     cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                proc_ref[0] = proc
                 for line in proc.stdout:
                     logf.write(line)
                     logf.flush()
@@ -2650,12 +2676,14 @@ class TkPicker:
                 proc.wait()
                 logf.write(f"\n[exit {proc.returncode}]\n")
                 logf.close()
-                if proc.returncode != 0:
+                if proc.returncode != 0 and not cancelled[0]:
                     tail = "".join(captured[-15:]).rstrip()
                     error[0] = f"Story generation failed (exit {proc.returncode}). Log: {log_path}\n\n{tail}"
             except Exception as exc:
-                error[0] = f"{exc}\nLog: {log_path}"
-            self.root.after(0, self.root.quit)
+                if not cancelled[0]:
+                    error[0] = f"{exc}\nLog: {log_path}"
+            if not cancelled[0]:
+                self.root.after(0, self.root.quit)
 
         threading.Thread(target=_worker, daemon=True).start()
         self.root.mainloop()
@@ -2702,6 +2730,7 @@ class TkPicker:
         self._reset()
         self._mode = "showimage"
         self._set_prompt(prompt)
+        self._show_back_btn()
         self._entry_row.pack_forget()
 
         self.root.update_idletasks()

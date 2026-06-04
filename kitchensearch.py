@@ -384,23 +384,38 @@ def main():
 
             # ── search helpers ────────────────────────────────────────────
             def _run_semantic(q):
-                raw = query_daemon(q)
+                try:
+                    raw = query_daemon(q)
+                except Exception as exc:
+                    picker.message(f"Search error for '{q}':\n{exc}")
+                    return None
                 if raw is None:
                     picker.message(f"Search daemon failed to start.\nSee {DAEMON_LOG} for details.")
                     return None
                 if raw == "loading":
                     if not picker.show_model_loading_progress():
                         return None
-                    raw = query_daemon(q)
+                    try:
+                        raw = query_daemon(q)
+                    except Exception as exc:
+                        picker.message(f"Search error for '{q}':\n{exc}")
+                        return None
                     if raw is None:
                         picker.message(f"Search daemon failed to start.\nSee {DAEMON_LOG} for details.")
                         return None
+                if not raw:
+                    picker.message(f"No results for '{q}'")
+                    return None
                 _a2t = {alt: text for _, alt, text in entries}
                 return ([(rank, alt, url, _a2t.get(alt, "")) for rank, alt, url, _ in raw],
                         [], f"'{q}' (normal)")
 
             def _run_keyword(q):
-                r = search(entries, q)
+                try:
+                    r = search(entries, q)
+                except Exception as exc:
+                    picker.message(f"Search error for '{q}':\n{exc}")
+                    return None
                 if not r:
                     picker.message(f"No results for '{q}'")
                     return None
