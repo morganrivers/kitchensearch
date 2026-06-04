@@ -42,6 +42,10 @@ _SETTINGS_KEY_HOTKEY = "__hotkey__"
 
 SETTINGS_FILE = CONFIG_DIR / "picker-settings.json"
 
+def _is_tiling_wm():
+    return bool(os.environ.get("I3SOCK") or os.environ.get("SWAYSOCK"))
+
+
 _DEFAULT_SETTINGS = {
     "notify_on_copy":  True,
     "exit_on_select":  False,
@@ -50,7 +54,7 @@ _DEFAULT_SETTINGS = {
     "show_semantic":   True,
     "show_combo":      True,
     "show_story":      True,
-    "floating":        True,
+    "floating":        _is_tiling_wm(),
     "frameless":       False,
     "always_on_top":   False,
     "dark_mode":       False,
@@ -66,7 +70,6 @@ _BOOL_SETTINGS_ITEMS = [
     ("show_story",     "Show emoji story on front menu"),
     ("exit_on_select", "Exit app when emoji selected"),
     ("always_on_top",  "Always on top (takes effect on restart)"),
-    ("floating",       "Start as floating window (takes effect on restart)"),
 ]
 
 
@@ -163,10 +166,15 @@ def _open_hotkey_settings():
 
 def _run_settings(picker, settings):
     sel_idx = 0
+    tiling = _is_tiling_wm()
     while True:
         base = list(_BOOL_SETTINGS_ITEMS)
         if sys.platform != "win32":
-            base.append(("frameless", "Start frameless & no title bar (takes effect on restart)"))
+            if tiling:
+                base.append(("floating", "Float in tiling layout (takes effect on restart)"))
+                base.append(("frameless", "Remove title bar added by WM (takes effect on restart)"))
+            else:
+                base.append(("floating", "Remove window decorations (takes effect on restart)"))
 
         item_keys     = [key for key, _ in base]
         display_items = [f"{'[x]' if settings[key] else '[ ]'} {text}" for key, text in base]
