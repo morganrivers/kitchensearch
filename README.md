@@ -10,12 +10,14 @@ I found the existing Emoji Kitchen options missing essential features like a pro
 
 ## Usage
 
-There are a few options on the main menu. Once you find an image, you can click on it or hit enter to copy it to the clipboard.
+There are a few options on the main menu:
 
 * Normal search: just type in the search box, and the search function will find the emojikitchen images closest to that search. Some fun examples: "ski chicken", "those were fun times", or even just "volcano".
 * Combo search: this is for quickly finding two base emojis to combine. For example, "ballet" and "cow" gives you a dancing cow.
 * Story: type or paste in a story to make an image illustrating that story. For example, "I love to see stories about my favorite emojis :)".
 * Settings: customize your experience by choosing whether to have copy notifications, exit the app on copy, keybinding for the app (Windows only), etc.
+
+Once you find an image, you can click on it or hit enter to copy it to the clipboard.
 
 ## Easy install (tested on Ubuntu and Windows)
 ## Linux

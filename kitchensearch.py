@@ -21,7 +21,7 @@ from picker_utils import (
     query_daemon,
     _trim_thumb_cache, _spawn_daemon, _daemon_alive,
     get_buymeacoffee_url, get_banner_config, _next_tuesday_ts,
-    _banner_suppressed,
+    _banner_suppressed, _ab_reshow_after_dismiss,
 )
 from picker_ui import (
     TkPicker, pick_base_emoji,
@@ -183,7 +183,7 @@ def _run_settings(picker, settings):
             hotkey = settings.get("hotkey", "Ctrl+Alt+K")
             display_items.append(f"Keyboard shortcut: {hotkey}  (click to change)")
             item_keys.append(_SETTINGS_KEY_HOTKEY)
-        if "hide_ads" in settings and not (time.time() < settings.get("snooze_until", 0)):
+        if "hide_ads" in settings:
             display_items.append(f"{'[x]' if settings['hide_ads'] else '[ ]'} Don't show support banner")
             item_keys.append("hide_ads")
 
@@ -207,6 +207,8 @@ def _run_settings(picker, settings):
                 _dbg(f"re-read settings after hotkey change failed: {e}")
             continue
         settings[key] = not settings[key]
+        if key == "hide_ads":
+            settings["snooze_until"] = 0
         save_settings(settings)
 
 
@@ -246,11 +248,16 @@ def _ensure_desktop_integration():
     new = (template.read_text()
            .replace("__INSTALL_DIR__", install_dir)
            .replace("__EXEC_CMD__", exec_cmd))
-    current = open(dest).read() if os.path.exists(dest) else ""
+    if os.path.exists(dest):
+        with open(dest) as f:
+            current = f.read()
+    else:
+        current = ""
     if current == new:
         return
     os.makedirs(os.path.dirname(dest), exist_ok=True)
-    open(dest, "w").write(new)
+    with open(dest, "w") as f:
+        f.write(new)
     try:
         subprocess.run(["update-desktop-database",
                         os.path.expanduser("~/.local/share/applications")],
@@ -276,6 +283,9 @@ def main():
             elif _hotkey_py.exists():
                 _sp.Popen([_PYTHON, str(_hotkey_py)], creationflags=_flags)
     settings = load_settings()
+    if "install" not in settings:
+        settings["install"] = time.time()
+        save_settings(settings)
     _dbg("APP: TkPicker init start")
     def _on_dark_toggle(dark):
         settings["dark_mode"] = dark
@@ -357,7 +367,11 @@ def main():
                 save_settings(settings)
                 continue
             if mode == TkPicker.BMC_DISMISS_LABEL:
-                settings["hide_ads"] = True
+                if _ab_reshow_after_dismiss():
+                    settings["dismissed_at"] = time.time()
+                    picker.queue_toast("Banner returns in 7 days. Disable permanently in Settings.")
+                else:
+                    settings["hide_ads"] = True
                 save_settings(settings)
                 continue
 

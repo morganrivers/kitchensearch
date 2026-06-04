@@ -685,7 +685,18 @@ def get_thumb(url):
 
 _AB_BASE_URL      = "https://www.buymeacoffee.com/morganrivers"
 _AB_BUTTON_PATH   = _REPO / "data" / "ui_assets" / "buymeacoffee_button.png"
-_AB_TIMING_HOURS  = {"A": 36, "B": 48, "C": 72}
+_AB_TIMINGS                  = [36, 48, 72, 144]    # hours, bucket bits 0-1
+_AB_MIN_COPIES               = [7, 16]              # bucket bit 3
+_AB_DISMISSAL_RESHOW_SECONDS = 7 * 86400
+
+
+def _ab_install_ts():
+    try:
+        s = json.loads((CONFIG_DIR / "picker-settings.json").read_text(encoding="utf-8"))
+        ts = s.get("install")
+        return float(ts) if ts is not None else None
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return None
 
 
 def _next_tuesday_ts():
@@ -698,23 +709,27 @@ def _next_tuesday_ts():
     return _datetime(next_tue.year, next_tue.month, next_tue.day).timestamp()
 
 
-def _ab_mtime_ms():
-    """Return THUMB_DIR mtime as integer milliseconds, or None if not yet created."""
+def _ab_bucket():
     override = os.environ.get("KITCHENSEARCH_AB_MTIME_MS")
     if override:
         try:
-            return int(override)
+            return int(override) % 16
         except ValueError:
             pass
-    try:
-        return int(THUMB_DIR.stat().st_mtime * 1000)
-    except OSError:
-        return None
+    ts = _ab_install_ts()
+    return int(ts) % 16 if ts is not None else 0
 
 
-def _ab_bucket():
-    mt = _ab_mtime_ms()
-    return mt % 6 if mt is not None else 0
+def _ab_timing_hours():
+    return _AB_TIMINGS[_ab_bucket() & 0x3]
+
+
+def _ab_reshow_after_dismiss():
+    return bool((_ab_bucket() >> 2) & 1)
+
+
+def _ab_min_copies():
+    return _AB_MIN_COPIES[(_ab_bucket() >> 3) & 1]
 
 
 _AB_XOR_KEY = 0x5A3C9F2B7  # 36-bit obfuscation key
@@ -741,20 +756,21 @@ def _ab_version():
     copy_count = max(0, int(s.get("copy_count", 0)))
     log_copies = min(15, int(math.log2(copy_count)) if copy_count > 0 else 0)  # 4 bits
 
-    ts_bucket = int((time.time() - _AB_TS_EPOCH) // 900) & 0x7FFFF  # 19 bits, 15-min res (~15 years)
+    install_ts = _ab_install_ts()
+    if install_ts is None:
+        install_ts = time.time()
+    ts_bucket = int((install_ts - _AB_TS_EPOCH) // 900) & 0x3FFFF  # 18 bits, 15-min res (~7.5 years)
 
-    ab = _ab_bucket() & 0x7
+    ab = _ab_bucket() & 0xF
 
-    # [35:26]=settings  [25:22]=log_copies  [21:3]=ts_bucket  [2:0]=ab
-    payload = (settings_bits << 26) | (log_copies << 22) | (ts_bucket << 3) | ab
+    # [35:26]=settings  [25:22]=log_copies  [21:4]=ts_bucket  [3:0]=ab
+    payload = (settings_bits << 26) | (log_copies << 22) | (ts_bucket << 4) | ab
     return f"{payload ^ _AB_XOR_KEY:09x}"
 
 
 def _ab_hours_elapsed():
-    try:
-        return (time.time() - THUMB_DIR.stat().st_mtime) / 3600
-    except OSError:
-        return 0
+    ts = _ab_install_ts()
+    return (time.time() - ts) / 3600 if ts is not None else 0
 
 
 def get_buymeacoffee_url():
@@ -762,24 +778,33 @@ def get_buymeacoffee_url():
 
 
 def should_show_banner():
-    bucket   = _ab_bucket()
-    timing_v = ("A", "B", "C")[bucket % 3]
-    return _ab_hours_elapsed() >= _AB_TIMING_HOURS[timing_v]
+    if _ab_hours_elapsed() < _ab_timing_hours():
+        return False
+    try:
+        s = json.loads((CONFIG_DIR / "picker-settings.json").read_text(encoding="utf-8"))
+    except Exception:
+        s = {}
+    return int(s.get("copy_count", 0)) >= _ab_min_copies()
 
 
 def _banner_suppressed(settings, now):
-    return bool(settings.get("hide_ads")) or now < settings.get("snooze_until", 0)
+    if bool(settings.get("hide_ads")):
+        return True
+    if now < settings.get("snooze_until", 0):
+        return True
+    dismissed_at = settings.get("dismissed_at", 0)
+    if dismissed_at and now - dismissed_at < _AB_DISMISSAL_RESHOW_SECONDS:
+        return True
+    return False
 
 
 def get_banner_config():
     if not should_show_banner() and os.environ.get("KITCHENSEARCH_SHOW_BANNER") != "1":
         return None
-    copy_v = "indie" if _ab_bucket() >= 3 else "simple"
     return {
-        "headline": "🥹 Support an indie developer!" if copy_v == "indie" else None,
+        "headline": None,
         "image":    str(_AB_BUTTON_PATH) if _AB_BUTTON_PATH.exists() else None,
         "url":      get_buymeacoffee_url(),
-        "variant":  copy_v,
     }
 
 
