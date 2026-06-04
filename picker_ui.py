@@ -185,10 +185,20 @@ class TkPicker:
         self._dark            = dark
         self._on_dark_toggle  = on_dark_toggle
         self._apply_theme(self.DARK if dark else self.LIGHT)
-        root = tk.Tk()
+        root = tk.Tk(className="kitchensearch")
         root.withdraw()
         root.configure(bg=self.BG)
         root.title("Kitchen Search")
+        _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "packaging", "kitchensearch-icon.png")
+        if os.path.exists(_icon_path):
+            try:
+                _icon_img = Image.open(_icon_path).convert("RGBA")
+                _icon_photo = ImageTk.PhotoImage(_icon_img)
+                root.iconphoto(True, _icon_photo)
+                root._icon_photo_ref = _icon_photo
+            except Exception:
+                pass
         self._frameless = frameless
         self._floating  = self._setup_floating(root, floating=floating, frameless=frameless, always_on_top=always_on_top)
         mouse_x = root.winfo_pointerx()

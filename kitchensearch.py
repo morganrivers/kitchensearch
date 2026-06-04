@@ -219,7 +219,17 @@ def _hotkey_daemon_alive():
     return False
 
 
+def _set_process_name(name):
+    if sys.platform.startswith("linux"):
+        try:
+            import ctypes
+            ctypes.cdll.LoadLibrary("libc.so.6").prctl(15, name.encode(), 0, 0, 0)
+        except Exception:
+            pass
+
+
 def main():
+    _set_process_name("kitchensearch")
     _dbg("APP_START")
     if sys.platform == "win32":
         if not _daemon_alive():
