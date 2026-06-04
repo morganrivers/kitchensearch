@@ -228,8 +228,32 @@ def _set_process_name(name):
             pass
 
 
+def _ensure_desktop_integration():
+    if not sys.platform.startswith("linux"):
+        return
+    import subprocess
+    dest = os.path.expanduser("~/.local/share/applications/kitchensearch.desktop")
+    template = _REPO / "packaging" / "kitchensearch.desktop"
+    if not template.exists():
+        return
+    current = open(dest).read() if os.path.exists(dest) else ""
+    install_dir = str(_REPO)
+    new = open(template).read().replace("__INSTALL_DIR__", install_dir)
+    if current == new:
+        return
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    open(dest, "w").write(new)
+    try:
+        subprocess.run(["update-desktop-database",
+                        os.path.expanduser("~/.local/share/applications")],
+                       check=False, capture_output=True)
+    except FileNotFoundError:
+        pass
+
+
 def main():
     _set_process_name("kitchensearch")
+    _ensure_desktop_integration()
     _dbg("APP_START")
     if sys.platform == "win32":
         if not _daemon_alive():
