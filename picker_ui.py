@@ -720,8 +720,6 @@ class TkPicker:
             # Bypasses WM entirely — no title bar on any WM including i3.
             # focus_force + grab_set_global in _run() handle keyboard focus.
             # root.overrideredirect(True)
-            if not always_on_top:
-                root.attributes("-topmost", True)
             try:
                 root.wm_attributes("-type", "splash")
             except tk.TclError:
