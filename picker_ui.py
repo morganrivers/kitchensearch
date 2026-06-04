@@ -189,7 +189,7 @@ class TkPicker:
         root.withdraw()
         root.configure(bg=self.BG)
         root.title("Kitchen Search")
-        _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+        _icon_path = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),
                                   "packaging", "kitchensearch-icon.png")
         if os.path.exists(_icon_path):
             try:
