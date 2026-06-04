@@ -236,9 +236,17 @@ def _ensure_desktop_integration():
     template = _REPO / "packaging" / "kitchensearch.desktop"
     if not template.exists():
         return
-    current = open(dest).read() if os.path.exists(dest) else ""
     install_dir = str(_REPO)
-    new = open(template).read().replace("__INSTALL_DIR__", install_dir)
+    venv_python = _REPO / ".venv" / "bin" / "python"
+    script = _REPO / "kitchensearch.py"
+    if venv_python.exists() and script.exists():
+        exec_cmd = f"{venv_python} {script}"
+    else:
+        exec_cmd = os.path.realpath(sys.argv[0])
+    new = (template.read_text()
+           .replace("__INSTALL_DIR__", install_dir)
+           .replace("__EXEC_CMD__", exec_cmd))
+    current = open(dest).read() if os.path.exists(dest) else ""
     if current == new:
         return
     os.makedirs(os.path.dirname(dest), exist_ok=True)

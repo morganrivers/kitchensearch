@@ -2,7 +2,7 @@
 Type=Application
 Name=Kitchen Search
 Comment=Emoji kitchen picker
-Exec=__INSTALL_DIR__/.venv/bin/python __INSTALL_DIR__/kitchensearch.py
+Exec=__EXEC_CMD__
 Icon=__INSTALL_DIR__/packaging/kitchensearch-icon.png
 Terminal=false
 Categories=Utility;

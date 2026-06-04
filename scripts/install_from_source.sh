@@ -22,8 +22,11 @@ tar -xzf data/app_assets.tar.gz
 
 echo "Installing .desktop file..."
 INSTALL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+EXEC_CMD="$INSTALL_DIR/.venv/bin/python $INSTALL_DIR/kitchensearch.py"
 mkdir -p "$HOME/.local/share/applications"
-sed "s|__INSTALL_DIR__|$INSTALL_DIR|g" "$INSTALL_DIR/packaging/kitchensearch.desktop" \
+sed -e "s|__INSTALL_DIR__|$INSTALL_DIR|g" \
+    -e "s|__EXEC_CMD__|$EXEC_CMD|g" \
+    "$INSTALL_DIR/packaging/kitchensearch.desktop" \
     > "$HOME/.local/share/applications/kitchensearch.desktop"
 update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 
