@@ -242,7 +242,7 @@ def _ensure_desktop_integration():
     if venv_python.exists() and script.exists():
         exec_cmd = f"{venv_python} {script}"
     else:
-        exec_cmd = os.path.realpath(sys.argv[0])
+        exec_cmd = os.path.abspath(sys.argv[0])
     new = (template.read_text()
            .replace("__INSTALL_DIR__", install_dir)
            .replace("__EXEC_CMD__", exec_cmd))
