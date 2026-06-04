@@ -195,6 +195,7 @@ class TkPicker:
         if os.path.exists(_icon_path):
             try:
                 _icon_img = Image.open(_icon_path).convert("RGBA")
+                _icon_img = _icon_img.resize((128, 128), Image.LANCZOS)
                 _icon_photo = ImageTk.PhotoImage(_icon_img)
                 root.iconphoto(True, _icon_photo)
                 root._icon_photo_ref = _icon_photo
