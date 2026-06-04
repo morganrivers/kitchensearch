@@ -1,4 +1,4 @@
-import sys, os, re, json, hashlib, shutil, signal, subprocess, math
+import sys, os, re, json, hashlib, shutil, signal, subprocess
 import time, urllib.request, threading, random as _random, getpass
 from datetime import date, timedelta, datetime as _datetime
 from multiprocessing.connection import Client
@@ -685,14 +685,14 @@ def get_thumb(url):
 
 
 
-_AB_BASE_URL      = "https://www.buymeacoffee.com/morganrivers"
-_AB_BUTTON_PATH   = _REPO / "data" / "ui_assets" / "buymeacoffee_button.png"
-_AB_TIMINGS                  = [36, 48, 72, 144]    # hours, bucket bits 0-1
-_AB_MIN_COPIES               = [7, 16]              # bucket bit 3
-_AB_DISMISSAL_RESHOW_SECONDS = 7 * 86400
+_BMC_BASE_URL           = "https://www.buymeacoffee.com/morganrivers"
+_BMC_BUTTON_PATH        = _REPO / "data" / "ui_assets" / "buymeacoffee_button.png"
+_BANNER_MIN_HOURS       = 72
+_BANNER_MIN_COPIES      = 14
+_BANNER_DISMISSAL_SECS  = 7 * 86400
 
 
-def _ab_install_ts():
+def _banner_install_ts():
     try:
         s = json.loads((CONFIG_DIR / "picker-settings.json").read_text(encoding="utf-8"))
         ts = s.get("install")
@@ -702,91 +702,27 @@ def _ab_install_ts():
 
 
 def _next_tuesday_ts():
-    """Timestamp of midnight at the start of the next Tuesday (local time)."""
     today = date.today()
-    days  = (1 - today.weekday()) % 7  # days until Tuesday; 0 means today is Tuesday. 
+    days  = (1 - today.weekday()) % 7
     if days == 0:
         days = 7
     next_tue = today + timedelta(days=days)
     return _datetime(next_tue.year, next_tue.month, next_tue.day).timestamp()
 
 
-def _ab_bucket():
-    override = os.environ.get("KITCHENSEARCH_AB_MTIME_MS")
-    if override:
-        try:
-            return int(override) % 16
-        except ValueError:
-            pass
-    ts = _ab_install_ts()
-    return int(ts) % 16 if ts is not None else 0
-
-
-def _ab_timing_hours():
-    return _AB_TIMINGS[_ab_bucket() & 0x3]
-
-
-def _ab_reshow_after_dismiss():
-    return bool((_ab_bucket() >> 2) & 1)
-
-
-def _ab_min_copies():
-    return _AB_MIN_COPIES[(_ab_bucket() >> 3) & 1]
-
-
-_AB_XOR_KEY = 0x5A3C9F2B7  # 36-bit obfuscation key
-
-_AB_SETTINGS_KEYS = [
-    "notify_on_copy", "exit_on_select", "semantic_first",
-    "show_keyword", "show_semantic", "show_combo", "show_story",
-    "floating", "frameless", "dark_mode",
-]
-
-_AB_TS_EPOCH = 1704067200  # 2024-01-01 00:00:00 UTC
-
-
-def _ab_version():
-    try:
-        s = json.loads((CONFIG_DIR / "picker-settings.json").read_text(encoding="utf-8"))
-    except Exception:
-        s = {}
-
-    settings_bits = sum(
-        (1 << i) for i, k in enumerate(_AB_SETTINGS_KEYS) if s.get(k, False)
-    )
-
-    copy_count = max(0, int(s.get("copy_count", 0)))
-    log_copies = min(15, int(math.log2(copy_count)) if copy_count > 0 else 0)  # 4 bits
-
-    install_ts = _ab_install_ts()
-    if install_ts is None:
-        install_ts = time.time()
-    ts_bucket = int((install_ts - _AB_TS_EPOCH) // 900) & 0x3FFFF  # 18 bits, 15-min res (~7.5 years)
-
-    ab = _ab_bucket() & 0xF
-
-    # [35:26]=settings  [25:22]=log_copies  [21:4]=ts_bucket  [3:0]=ab
-    payload = (settings_bits << 26) | (log_copies << 22) | (ts_bucket << 4) | ab
-    return f"{payload ^ _AB_XOR_KEY:09x}"
-
-
-def _ab_hours_elapsed():
-    ts = _ab_install_ts()
-    return (time.time() - ts) / 3600 if ts is not None else 0
-
-
 def get_buymeacoffee_url():
-    return f"{_AB_BASE_URL}?version={_ab_version()}"
+    return _BMC_BASE_URL
 
 
 def should_show_banner():
-    if _ab_hours_elapsed() < _ab_timing_hours():
+    ts = _banner_install_ts()
+    if ts is None or (time.time() - ts) / 3600 < _BANNER_MIN_HOURS:
         return False
     try:
         s = json.loads((CONFIG_DIR / "picker-settings.json").read_text(encoding="utf-8"))
     except Exception:
         s = {}
-    return int(s.get("copy_count", 0)) >= _ab_min_copies()
+    return int(s.get("copy_count", 0)) >= _BANNER_MIN_COPIES
 
 
 def _banner_suppressed(settings, now):
@@ -795,7 +731,7 @@ def _banner_suppressed(settings, now):
     if now < settings.get("snooze_until", 0):
         return True
     dismissed_at = settings.get("dismissed_at", 0)
-    if dismissed_at and now - dismissed_at < _AB_DISMISSAL_RESHOW_SECONDS:
+    if dismissed_at and now - dismissed_at < _BANNER_DISMISSAL_SECS:
         return True
     return False
 
@@ -805,7 +741,7 @@ def get_banner_config():
         return None
     return {
         "headline": None,
-        "image":    str(_AB_BUTTON_PATH) if _AB_BUTTON_PATH.exists() else None,
+        "image":    str(_BMC_BUTTON_PATH) if _BMC_BUTTON_PATH.exists() else None,
         "url":      get_buymeacoffee_url(),
     }
 

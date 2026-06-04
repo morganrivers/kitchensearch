@@ -21,7 +21,7 @@ from picker_utils import (
     query_daemon,
     _trim_thumb_cache, _spawn_daemon, _daemon_alive,
     get_buymeacoffee_url, get_banner_config, _next_tuesday_ts,
-    _banner_suppressed, _ab_reshow_after_dismiss,
+    _banner_suppressed,
 )
 from picker_ui import (
     TkPicker, pick_base_emoji,
@@ -90,15 +90,6 @@ def save_settings(s):
         _dbg(f"save_settings failed: {e}")
 
 
-def _find_combo_url(entries, name1, name2):
-    for url, alt, _ in entries:
-        parts = alt.split("-", 1)
-        if len(parts) == 2:
-            if (parts[0] == name1 and parts[1] == name2) or \
-               (parts[0] == name2 and parts[1] == name1):
-                return url
-    return None
-
 
 _emoji_thumb_cache: dict = {}
 
@@ -136,20 +127,17 @@ def _menu_on_url(val):
     return _render_emoji_thumb(val)
 
 
-_MENU_FALLBACKS = {
-    ("tornado",               "mag_right"):             "🌪️🔍",
-    ("fire",                  "slot_machine"):           "🔥🎰",
-    ("sunrise_over_mountains","mag_right"):              "🌄🔍",
-    ("llama",                 "fire"):                   "🦙🔥",
-    ("computer",              "face_with_raised_eyebrow"): "💻🤨",
+_MENU_ICONS = {
+    ("tornado",               "mag_right"):              "\U0001f5dd",
+    ("fire",                  "slot_machine"):            "🎰",
+    ("sunrise_over_mountains","mag_right"):               "🔍",
+    ("llama",                 "fire"):                    "📖",
+    ("computer",              "face_with_raised_eyebrow"): "⚙️",
 }
 
 
-def _find_combo_url_or_emoji(entries, name1, name2):
-    url = _find_combo_url(entries, name1, name2)
-    if url is not None:
-        return url
-    return _MENU_FALLBACKS.get((name1, name2)) or _MENU_FALLBACKS.get((name2, name1))
+def _menu_icon(name1, name2):
+    return _MENU_ICONS.get((name1, name2)) or _MENU_ICONS.get((name2, name1))
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
@@ -313,9 +301,9 @@ def main():
             # build menu entries with combo thumbnail icons
             _dbg("MENU_BUILD_START")
             sem_spec = (_MODE_SEMANTIC, "normal search" + ("" if has_sem else _nd),
-                        _find_combo_url_or_emoji(entries, "sunrise_over_mountains", "mag_right"))
+                        _menu_icon("sunrise_over_mountains", "mag_right"))
             kw_spec  = (_MODE_KEYWORD,  "keyword search",
-                        _find_combo_url_or_emoji(entries, "tornado", "mag_right"))
+                        _menu_icon("tornado", "mag_right"))
             if settings.get("semantic_first", True):
                 first_spec, second_spec = sem_spec, kw_spec
                 show_first, show_second = settings["show_semantic"], settings["show_keyword"]
@@ -330,12 +318,12 @@ def main():
                 raw_menu.append(second_spec)
             if settings["show_combo"]:
                 raw_menu.append((_MODE_COMBO, "combine two emojis",
-                                 _find_combo_url_or_emoji(entries, "fire", "slot_machine")))
+                                 _menu_icon("fire", "slot_machine")))
             if settings["show_story"]:
                 raw_menu.append((_MODE_STORY, "emoji story" + ("" if has_data else _nd),
-                                 _find_combo_url_or_emoji(entries, "llama", "fire")))
+                                 _menu_icon("llama", "fire")))
             raw_menu.append((_MODE_SETTINGS, "settings",
-                             _find_combo_url_or_emoji(entries, "computer", "face_with_raised_eyebrow")))
+                             _menu_icon("computer", "face_with_raised_eyebrow")))
 
             menu_entries   = [(label, icon) for _, label, icon in raw_menu]
             _label_to_mode = {label: key for key, label, _ in raw_menu}
@@ -367,11 +355,8 @@ def main():
                 save_settings(settings)
                 continue
             if mode == TkPicker.BMC_DISMISS_LABEL:
-                if _ab_reshow_after_dismiss():
-                    settings["dismissed_at"] = time.time()
-                    picker.queue_toast("Banner returns in 7 days. Disable permanently in Settings.")
-                else:
-                    settings["hide_ads"] = True
+                settings["dismissed_at"] = time.time()
+                picker.queue_toast("Banner returns in 7 days. Disable permanently in Settings.")
                 save_settings(settings)
                 continue
 

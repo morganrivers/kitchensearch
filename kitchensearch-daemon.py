@@ -23,17 +23,14 @@ Usage
 """
 import ctypes
 import ctypes.wintypes
-import io
 import json
 import os
 import subprocess
 import sys
 import threading
-import urllib.request
 import winreg
 from pathlib import Path
 from _log import _dbg
-from _ssl_ctx import ssl_ctx
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 
@@ -50,10 +47,7 @@ _DAEMON_EXE = _HERE / "kitchensearch-daemon.exe"
 APP_NAME       = "KitchenSearch"
 DEFAULT_HOTKEY = "Ctrl+Alt+K"
 
-_TRAY_ICON_URL = (
-    "https://www.gstatic.com/android/keyboard/emojikitchen/20230418"
-    "/u1f37d-ufe0f/u1f37d-ufe0f_u1f50e.png"
-)
+_TRAY_ICON_PATH = _HERE / "data" / "ui_assets" / "tray-icon.png"
 
 # ── config ────────────────────────────────────────────────────────────────────
 # Shares picker-settings.json with the main app so all settings live in one file.
@@ -254,29 +248,9 @@ _wnd_proc_ref = None
 
 
 def _get_tray_hicon():
-    """Return a Windows HICON from the emoji-mashup PNG, with fallback."""
-    candidates = [
-        _HERE / "data" / "ui_assets" / "tray-icon.png",
-        CONFIG_DIR / "tray-icon.png",
-    ]
     try:
         from PIL import Image
-        img = None
-        for p in candidates:
-            if p.exists():
-                try:
-                    img = Image.open(str(p)).convert("RGBA")
-                    break
-                except Exception as e:
-                    _dbg(f"tray icon candidate load failed {p}: {e}")
-        if img is None:
-            req = urllib.request.Request(
-                _TRAY_ICON_URL, headers={"User-Agent": "kitchensearch/1.0"}
-            )
-            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx()) as resp:
-                img = Image.open(io.BytesIO(resp.read())).convert("RGBA")
-            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-            img.save(str(CONFIG_DIR / "tray-icon.png"))
+        img = Image.open(str(_TRAY_ICON_PATH)).convert("RGBA")
         img = img.resize((32, 32), Image.LANCZOS)
         import tempfile
         tmp = tempfile.NamedTemporaryFile(suffix=".ico", delete=False)
@@ -288,7 +262,7 @@ def _get_tray_hicon():
             return hicon
     except Exception as e:
         print(f"[{APP_NAME}] Icon load failed: {e}")
-    return ctypes.windll.user32.LoadIconW(None, 32512)   # IDI_APPLICATION fallback
+    return ctypes.windll.user32.LoadIconW(None, 32512)
 
 
 def _add_tray_icon(hwnd, hicon):

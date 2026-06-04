@@ -16,7 +16,7 @@ if str(_REPO_ROOT) not in sys.path:
 import picker_utils  # noqa: E402
 
 
-class _ThumbDirFixture(unittest.TestCase):
+class _CfgFixture(unittest.TestCase):
     def setUp(self):
         tmp = TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -28,102 +28,75 @@ class _ThumbDirFixture(unittest.TestCase):
         self.addCleanup(p.stop)
         os.environ.pop("KITCHENSEARCH_SHOW_BANNER", None)
 
-    def _set_thumb_age(self, hours, bucket, copy_count=100):
-        os.environ["KITCHENSEARCH_AB_MTIME_MS"] = str(bucket)
-        self.addCleanup(os.environ.pop, "KITCHENSEARCH_AB_MTIME_MS", None)
-        install_ts = int(time.time() - hours * 3600)
-        self._settings_path.write_text(
-            json.dumps({"install": install_ts, "copy_count": copy_count}),
-            encoding="utf-8")
+    def _write_settings(self, **kwargs):
+        self._settings_path.write_text(json.dumps(kwargs), encoding="utf-8")
+
+    def _set_age(self, hours, copy_count=100):
+        self._write_settings(
+            install=time.time() - hours * 3600,
+            copy_count=copy_count,
+        )
 
 
-class ShouldShowBannerTest(_ThumbDirFixture):
-    def test_threshold_per_timing_bits(self):
-        cases = [
-            (0b0000, 36), (0b0001, 48), (0b0010, 72), (0b0011, 144),
-            (0b0100, 36), (0b0101, 48), (0b0110, 72), (0b0111, 144),
-            (0b1000, 36), (0b1001, 48), (0b1010, 72), (0b1011, 144),
-        ]
-        for bucket, threshold in cases:
-            for hours, expected in ((threshold - 0.5, False),
-                                    (threshold + 0.5, True)):
-                with self.subTest(bucket=bucket, hours=hours):
-                    self._set_thumb_age(hours, bucket)
-                    self.assertEqual(picker_utils.should_show_banner(), expected)
-
-    def test_min_copies_low_gate_under(self):
-        self._set_thumb_age(200, bucket=0b0000, copy_count=6)
+class ShouldShowBannerTest(_CfgFixture):
+    def test_under_72h_returns_false(self):
+        self._set_age(71.5)
         self.assertFalse(picker_utils.should_show_banner())
 
-    def test_min_copies_low_gate_met(self):
-        self._set_thumb_age(200, bucket=0b0000, copy_count=7)
+    def test_over_72h_with_enough_copies_returns_true(self):
+        self._set_age(72.5)
         self.assertTrue(picker_utils.should_show_banner())
 
-    def test_min_copies_high_gate_under(self):
-        self._set_thumb_age(200, bucket=0b1000, copy_count=15)
+    def test_exactly_72h_boundary(self):
+        self._set_age(72 - 0.01)
         self.assertFalse(picker_utils.should_show_banner())
-
-    def test_min_copies_high_gate_met(self):
-        self._set_thumb_age(200, bucket=0b1000, copy_count=16)
+        self._set_age(72 + 0.01)
         self.assertTrue(picker_utils.should_show_banner())
 
-    def test_no_install_ts_returns_zero_hours(self):
-        os.environ["KITCHENSEARCH_AB_MTIME_MS"] = "0"
-        self.addCleanup(os.environ.pop, "KITCHENSEARCH_AB_MTIME_MS", None)
+    def test_under_14_copies_returns_false(self):
+        self._set_age(200, copy_count=13)
+        self.assertFalse(picker_utils.should_show_banner())
+
+    def test_exactly_14_copies_returns_true(self):
+        self._set_age(200, copy_count=14)
+        self.assertTrue(picker_utils.should_show_banner())
+
+    def test_no_install_ts_returns_false(self):
+        self._write_settings(copy_count=100)
+        self.assertFalse(picker_utils.should_show_banner())
+
+    def test_missing_settings_returns_false(self):
         self.assertFalse(picker_utils.should_show_banner())
 
 
-class BannerConfigTest(_ThumbDirFixture):
+class BannerConfigTest(_CfgFixture):
     def test_none_below_threshold(self):
-        self._set_thumb_age(1, bucket=0)
+        self._set_age(1)
         self.assertIsNone(picker_utils.get_banner_config())
 
+    def test_returns_config_above_threshold(self):
+        self._set_age(200)
+        cfg = picker_utils.get_banner_config()
+        self.assertIsNotNone(cfg)
+        self.assertIn("url", cfg)
+        self.assertEqual(cfg["url"], picker_utils._BMC_BASE_URL)
+
     def test_force_env_overrides_threshold(self):
-        self._set_thumb_age(1, bucket=0)
+        self._set_age(1)
         with mock.patch.dict(os.environ, {"KITCHENSEARCH_SHOW_BANNER": "1"}):
             cfg = picker_utils.get_banner_config()
         self.assertIsNotNone(cfg)
-        self.assertIn("url", cfg)
-        self.assertTrue(cfg["url"].startswith(picker_utils._AB_BASE_URL))
+        self.assertEqual(cfg["url"], picker_utils._BMC_BASE_URL)
 
     def test_no_headline(self):
-        self._set_thumb_age(1, bucket=0)
-        with mock.patch.dict(os.environ, {"KITCHENSEARCH_SHOW_BANNER": "1"}):
-            cfg = picker_utils.get_banner_config()
+        self._set_age(200)
+        cfg = picker_utils.get_banner_config()
         self.assertIsNone(cfg["headline"])
 
-
-class AbVariantHelpersTest(_ThumbDirFixture):
-    def _set_bucket(self, bucket):
-        os.environ["KITCHENSEARCH_AB_MTIME_MS"] = str(bucket)
-        self.addCleanup(os.environ.pop, "KITCHENSEARCH_AB_MTIME_MS", None)
-
-    def test_timing_hours_by_bucket(self):
-        for bucket, expected in [(0, 36), (1, 48), (2, 72), (3, 144),
-                                  (4, 36), (5, 48), (6, 72), (7, 144)]:
-            with self.subTest(bucket=bucket):
-                self._set_bucket(bucket)
-                self.assertEqual(picker_utils._ab_timing_hours(), expected)
-
-    def test_reshow_after_dismiss_by_bucket(self):
-        for bucket in (0, 1, 2, 3, 8, 9, 10, 11):
-            with self.subTest(bucket=bucket):
-                self._set_bucket(bucket)
-                self.assertFalse(picker_utils._ab_reshow_after_dismiss())
-        for bucket in (4, 5, 6, 7, 12, 13, 14, 15):
-            with self.subTest(bucket=bucket):
-                self._set_bucket(bucket)
-                self.assertTrue(picker_utils._ab_reshow_after_dismiss())
-
-    def test_min_copies_by_bucket(self):
-        for bucket in range(8):
-            with self.subTest(bucket=bucket):
-                self._set_bucket(bucket)
-                self.assertEqual(picker_utils._ab_min_copies(), 7)
-        for bucket in range(8, 16):
-            with self.subTest(bucket=bucket):
-                self._set_bucket(bucket)
-                self.assertEqual(picker_utils._ab_min_copies(), 16)
+    def test_url_has_no_version_param(self):
+        url = picker_utils.get_buymeacoffee_url()
+        self.assertNotIn("version=", url)
+        self.assertEqual(url, picker_utils._BMC_BASE_URL)
 
 
 class NextTuesdayTest(unittest.TestCase):
@@ -198,6 +171,12 @@ class BannerSuppressionTest(unittest.TestCase):
             day_start = datetime(today.year, today.month, today.day).timestamp()
             with self.subTest(today=today.isoformat()):
                 self.assertGreaterEqual(ts - day_start, 24 * 3600)
+
+    def test_dismiss_suppresses_for_7_days(self):
+        now = 1_000_000
+        settings = {"dismissed_at": now}
+        self.assertTrue(picker_utils._banner_suppressed(settings, now + 6 * 86400))
+        self.assertFalse(picker_utils._banner_suppressed(settings, now + 8 * 86400))
 
 
 if __name__ == "__main__":

@@ -114,7 +114,7 @@ def run(h):
     h.key("BackSpace")
     h.screenshot("34_BackSpace")
     h.wait(0.44)
-    h.key("Return")
+    h.key("ctrl+Return")
     h.screenshot("35_Return")
     h.screenshot("36_step")
     h.wait(3.0)
