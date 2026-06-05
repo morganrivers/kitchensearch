@@ -154,7 +154,7 @@ def run(h):
     h.screenshot("40_Down")
     h.key("Down")
     h.wait(0.42)
-    h.key("Return")
+    h.key("ctrl+Return")
     h.screenshot("41_Down")
     h.wait(0.39)
     h.key("ctrl+v")

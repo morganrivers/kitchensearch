@@ -1,4 +1,6 @@
 #!/bin/bash
+# run with: ./scripts/build_nuitka.sh ;mv kitchensearch-linux-x86_64.tar.gz ~; cd ~; tar -xvf kitchensearch-linux-x86_64.tar.gz ; cd kitchensearch; ./kitchensearch
+
 set -e
 REPO_DIR=$(pwd)
 VERSION=$(git -C "$REPO_DIR" describe --tags --abbrev=0 2>/dev/null || echo "dev")
