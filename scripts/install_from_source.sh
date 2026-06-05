@@ -18,7 +18,7 @@ echo "Installing Python dependencies..."
 "$VENV/bin/pip" install -r "requirements.txt"
 
 echo "Extracting data assets..."
-tar -xzf data/app_assets.tar.gz
+tar -xzf ksapp/data/app_assets.tar.gz -C ksapp
 
 echo "Installing .desktop file..."
 INSTALL_DIR="$(cd "$(dirname "$0")/.." && pwd)"

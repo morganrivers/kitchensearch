@@ -7,10 +7,11 @@ Bind in i3 config:
   bindsym $mod+shift+e exec --no-startup-id python3 ~/.local/bin/kitchensearch.py
 """
 import os, sys, re, json, hashlib, webbrowser, time
+from pathlib import Path
 from PIL import Image
-from picker_utils import (
+from ksapp.picker_utils import (
     DATA_DIR, UI_ASSETS_DIR, CACHE_DIR, CONFIG_DIR, THUMB_DIR,
-    SEARCH_INDEX, _REPO, _PYTHON,
+    SEARCH_INDEX, _PYTHON,
     STORY_OUT, STORY_PY, STORY_BIN,
     DAEMON_LOG,
     BATCH_SIZE, LOAD_MORE, MAX_RESULTS, HEADER_MARKER,
@@ -23,9 +24,11 @@ from picker_utils import (
     get_buymeacoffee_url, get_banner_config, _next_tuesday_ts,
     _banner_suppressed,
 )
-from picker_ui import (
+from ksapp.picker_ui import (
     TkPicker, pick_base_emoji,
 )
+
+_REPO = Path(__file__).resolve().parent
 
 
 # ── menu mode keys ───────────────────────────────────────────────────────────
@@ -144,8 +147,8 @@ def _menu_icon(name1, name2):
 
 def _open_hotkey_settings():
     import subprocess
-    daemon_exe = _REPO / "kitchensearch-daemon.exe"
-    daemon_py  = _REPO / "kitchensearch-daemon.py"
+    daemon_exe = _REPO / "kitchensearch_daemon.exe"
+    daemon_py  = _REPO / "kitchensearch_daemon.py"
     if daemon_exe.exists():
         subprocess.run([str(daemon_exe), "--settings"])
     elif daemon_py.exists():
@@ -264,8 +267,8 @@ def main():
         if not _hotkey_daemon_alive():
             import subprocess as _sp
             _flags = _sp.CREATE_NO_WINDOW | _sp.CREATE_NEW_PROCESS_GROUP
-            _hotkey_exe = _REPO / "kitchensearch-daemon.exe"
-            _hotkey_py  = _REPO / "kitchensearch-daemon.py"
+            _hotkey_exe = _REPO / "kitchensearch_daemon.exe"
+            _hotkey_py  = _REPO / "kitchensearch_daemon.py"
             if _hotkey_exe.exists():
                 _sp.Popen([str(_hotkey_exe)], creationflags=_flags)
             elif _hotkey_py.exists():
@@ -479,7 +482,7 @@ def main():
                 patterns    = [re.compile(re.escape(term1)), re.compile(re.escape(term2))]
                 query_label = f"'{term1}+{term2}'"
 
-                _ui_assets = _REPO / "data" / "ui_assets"
+                _ui_assets = UI_ASSETS_DIR
                 _match_img    = str(_ui_assets / "face_holding_back_tears_turtle.png")
                 _no_match_img = str(_ui_assets / "cry_turtle.png")
                 all_combo = exact + rest

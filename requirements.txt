@@ -1,3 +1,5 @@
+# NOTE: keep this list in sync with pyproject.toml at repo root.
+# Two sources of truth is intentional (this file drives install_from_source.sh).
 Pillow
 customtkinter
 numpy

@@ -23,14 +23,13 @@ from multiprocessing.connection import Listener
 from pathlib import Path
 
 import numpy as np
-import _minilm_text
+from ksapp import minilm_text as _minilm_text
 
 from platformdirs import user_cache_dir
-from _log import _dbg
+from ksapp.log import _dbg
+from ksapp.data_assets import ensure_data, _REPO, UI_ASSETS_DIR
 
-_REPO         = Path(sys.argv[0]).resolve().parent
 DATA_DIR      = _REPO / "data" / "embeddings"
-UI_ASSETS_DIR = _REPO / "data" / "ui_assets"
 CACHE_DIR     = Path(user_cache_dir("kitchensearch"))
 
 
@@ -206,6 +205,7 @@ def _idle_watchdog():
 
 
 def main():
+    ensure_data()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     STATUS_PATH.unlink(missing_ok=True)
     if not IS_NAMED_PIPE:

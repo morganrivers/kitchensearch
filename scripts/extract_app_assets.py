@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract data/app_assets.tar.gz into data/ for the build.
+"""Extract ksapp/data/app_assets.tar.gz into ksapp/ for the build.
 
 Cross-platform replacement for `tar -xzf` so the build works on Windows
 without needing tar on PATH.
@@ -10,9 +10,9 @@ import sys
 import tarfile
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent
-ARCHIVE = REPO / "data" / "app_assets.tar.gz"
-DEST = REPO
+REPO = Path(__file__).resolve().parent.parent
+ARCHIVE = REPO / "ksapp" / "data" / "app_assets.tar.gz"
+DEST = REPO / "ksapp"
 
 
 def main() -> int:

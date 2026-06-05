@@ -5,13 +5,22 @@ __pycache__
 emoji-story.png
 nuitka-build/
 test/
-# runtime cache and extracted data — see data/ui_assets.tar.gz
+# runtime cache and extracted data — see ksapp/data/app_assets.tar.gz
 dataold/
-data/cache/
-data/ui_assets/
-data/fonts/
-data/models/*.bin
-data/models/*.pt
+ksapp/data/cache/
+ksapp/data/ui_assets/
+ksapp/data/fonts/
+ksapp/data/models/*.bin
+ksapp/data/models/*.pt
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+
+# Nuitka build directories
+*.build/
+*.dist/
 tests/runs/
 tests/baseline_runs/
 tests/baseline_unapproved/
@@ -27,3 +36,6 @@ kitchensearch-linux-x86_64.tar.gz
 
 # SSH keys
 *id_ed25519*
+
+# Claude Code local state
+.claude/

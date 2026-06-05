@@ -3,9 +3,9 @@
 Turn text into a phrase-per-row PNG with one emoji kitchen image per phrase.
 
 Usage:
-  emoji-story.py "the sky shines down. We love it."
-  emoji-story.py --output out.png "your text here"
-  echo "some text" | emoji-story.py
+  emoji_story "the sky shines down. We love it."
+  emoji_story --output out.png "your text here"
+  echo "some text" | emoji_story
 """
 
 import sys
@@ -22,16 +22,18 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 from platformdirs import user_cache_dir
-from _log import _dbg
-from _ssl_ctx import ssl_ctx
+from ksapp.log import _dbg
+from ksapp.ssl_ctx import ssl_ctx
 
 _REPO      = Path(__file__).resolve().parent
-if not (_REPO / "data").exists():
-    _REPO = Path(sys.executable).resolve().parent
 CACHE_DIR  = Path(user_cache_dir("kitchensearch"))
 THUMB_DIR  = CACHE_DIR / "thumbs"
-DAEMON_PY  = _REPO / "emoji-split-daemon.py"
-DAEMON_BIN = _REPO / ("emoji-split-daemon.exe" if sys.platform == "win32" else "emoji-split-daemon")
+DAEMON_PY  = _REPO / "emoji_split_daemon.py"
+DAEMON_BIN = (
+    _REPO / ("emoji_split_daemon.exe" if sys.platform == "win32" else "emoji_split_daemon")
+    if (_REPO / "emoji_split_daemon").exists() or sys.platform == "win32"
+    else Path(shutil.which("emoji_split_daemon") or "emoji_split_daemon")
+)
 
 
 def _ipc_address() -> str:

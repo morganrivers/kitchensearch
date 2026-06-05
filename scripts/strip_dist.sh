@@ -16,7 +16,7 @@ fi
 before_h=$(du -sh "$DIST" | cut -f1)
 
 echo "Stripping debug symbols from .so files in $DIST ..."
-# Only .so files. Do NOT strip the main Nuitka binary (emoji-split-daemon):
+# Only .so files. Do NOT strip the main Nuitka binary (emoji_split_daemon):
 # --strip-unneeded removes the section Nuitka uses for embedded Python
 # constants, causing 'Error, corrupted constants object' at startup.
 stripped=0

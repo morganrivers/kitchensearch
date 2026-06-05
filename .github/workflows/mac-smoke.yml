@@ -1,0 +1,49 @@
+name: macOS x86_64 install smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  install-and-smoke:
+    runs-on: macos-13            # x86_64 runner; macos-14+ is arm64
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Install brew Python with Tk
+        run: brew install python-tk@3.12
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Add uv to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Install kitchensearch from working tree (use brew Python with Tk)
+        run: uv tool install --python "$(brew --prefix)/bin/python3.12" .
+      - name: Verify entry points exist
+        run: |
+          which kitchensearch
+          which emoji_story
+          which emoji_split_daemon
+      - name: Verify tkinter import inside the tool's Python
+        run: |
+          uv tool run --from kitchensearch python -c "import tkinter; print(tkinter.TkVersion)"
+      - name: Smoke-launch the search daemon
+        run: |
+          emoji_split_daemon &
+          DAEMON_PID=$!
+          sleep 10  # allow model load
+          python3 -c "
+          import json, pathlib
+          from multiprocessing.connection import Client
+          from platformdirs import user_cache_dir
+          sock_path = pathlib.Path(user_cache_dir('kitchensearch')) / 'split-daemon.sock'
+          conn = Client(str(sock_path))
+          conn.send_bytes(json.dumps({'query': 'cat', 'limit': 3}).encode())
+          resp = json.loads(conn.recv_bytes().decode())
+          conn.close()
+          print(resp)
+          assert isinstance(resp, list) and resp, 'expected non-empty JSON array'
+          " || (kill $DAEMON_PID; exit 1)
+          kill $DAEMON_PID || true

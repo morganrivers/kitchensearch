@@ -19,7 +19,7 @@ There are a few options on the main menu:
 
 Once you find an image, you can click on it or hit enter to copy it to the clipboard.
 
-## Easy install (tested on Ubuntu and Windows)
+## Easy install (tested on Ubuntu, macOS and Windows)
 ## Linux
 
 Check your system is compatible (should print `x86_64`, then a non-empty `$DISPLAY` like `:0` (means X11 or XWayland is reachable), then glibc 2.15 or newer):
@@ -42,6 +42,29 @@ tar -xzf kitchensearch-linux-x86_64.tar.gz
 cd kitchensearch
 ./kitchensearch # launch the app
 ```
+## macOS (Apple Silicon and Intel)
+
+Install prerequisites — a Python with Tk, and [uv](https://github.com/astral-sh/uv):
+
+```bash
+brew install python-tk@3.12
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Install KitchenSearch:
+
+```bash
+uv tool install --python "$(brew --prefix)/bin/python3.12" git+https://github.com/morganrivers/kitchensearch.git
+```
+
+Launch:
+
+```bash
+kitchensearch
+```
+
+To set a global hotkey on macOS, use Raycast, Alfred, or System Settings → Keyboard → Keyboard Shortcuts → Services to bind a key combo to the `kitchensearch` command.
+
 ## Windows (10 or later)
 
 * Go to the [releases](https://github.com/morganrivers/kitchensearch/releases) page
@@ -51,7 +74,7 @@ cd kitchensearch
 ## Installing from source (tested on Ubuntu)
 
 - Linux with X11 or Wayland (not sure which? run `echo $XDG_SESSION_TYPE`)
-- **Python 3.8+**
+- **Python 3.10+**
 - Tkinter (e.g. `sudo apt install python3-tk`)
 ```bash
 git clone https://github.com/morganrivers/kitchensearch.git

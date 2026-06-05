@@ -47,7 +47,7 @@ Source: "{#BuildDir}\*"; \
 
 [Icons]
 Name: "{group}\{#AppName}";                Filename: "{app}\kitchensearch.exe"
-Name: "{group}\{#AppName} Settings";       Filename: "{app}\kitchensearch-daemon.exe"; Parameters: "--settings"
+Name: "{group}\{#AppName} Settings";       Filename: "{app}\kitchensearch_daemon.exe"; Parameters: "--settings"
 Name: "{group}\Uninstall {#AppName}";      Filename: "{uninstallexe}"
 Name: "{userdesktop}\{#AppName}";          Filename: "{app}\kitchensearch.exe"; Tasks: desktopicon
 
@@ -56,21 +56,21 @@ Name: "{userdesktop}\{#AppName}";          Filename: "{app}\kitchensearch.exe"; 
 Root: HKCU; \
   Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
   ValueType: string; ValueName: "{#AppName}"; \
-  ValueData: """{app}\kitchensearch-daemon.exe"""; \
+  ValueData: """{app}\kitchensearch_daemon.exe"""; \
   Tasks: startup; \
   Flags: uninsdeletevalue
 
 [UninstallRun]
 ; Clean up any startup entry the daemon may have written itself (e.g. via
 ; --setup), regardless of whether the installer checkbox was ticked.
-Filename: "{app}\kitchensearch-daemon.exe"; \
+Filename: "{app}\kitchensearch_daemon.exe"; \
   Parameters: "--uninstall"; \
   Flags: runhidden; \
   RunOnceId: "RemoveStartupEntry"
 
 [Run]
 ; Start the hotkey daemon unconditionally after install.
-Filename: "{app}\kitchensearch-daemon.exe"; \
+Filename: "{app}\kitchensearch_daemon.exe"; \
   Flags: nowait runhidden
 ; Optionally launch the picker (user-visible checkbox on finish page).
 Filename: "{app}\kitchensearch.exe"; \
@@ -100,11 +100,11 @@ var
   ResultCode: Integer;
   I: Integer;
 begin
-  Exec('taskkill.exe', '/F /IM kitchensearch-daemon.exe', '', SW_HIDE,
+  Exec('taskkill.exe', '/F /IM kitchensearch_daemon.exe', '', SW_HIDE,
        ewWaitUntilTerminated, ResultCode);
   Exec('taskkill.exe', '/F /IM kitchensearch.exe', '', SW_HIDE,
        ewWaitUntilTerminated, ResultCode);
-  Exec('taskkill.exe', '/F /IM emoji-split-daemon.exe', '', SW_HIDE,
+  Exec('taskkill.exe', '/F /IM emoji_split_daemon.exe', '', SW_HIDE,
        ewWaitUntilTerminated, ResultCode);
   { taskkill returns before the OS fully releases file handles;
     poll until processes are gone (up to ~3 s) to avoid Error 5. }
@@ -149,9 +149,9 @@ var
 begin
   if CurUninstallStep = usAppMutexCheck then
   begin
-    Exec('taskkill.exe', '/F /IM kitchensearch-daemon.exe', '', SW_HIDE,
+    Exec('taskkill.exe', '/F /IM kitchensearch_daemon.exe', '', SW_HIDE,
          ewWaitUntilTerminated, ResultCode);
-    Exec('taskkill.exe', '/F /IM emoji-split-daemon.exe', '', SW_HIDE,
+    Exec('taskkill.exe', '/F /IM emoji_split_daemon.exe', '', SW_HIDE,
          ewWaitUntilTerminated, ResultCode);
     Exec('taskkill.exe', '/F /IM kitchensearch.exe', '', SW_HIDE,
          ewWaitUntilTerminated, ResultCode);

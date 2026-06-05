@@ -10,16 +10,16 @@ login session.
 Usage
 -----
   First run (interactive, sets up auto-start):
-    python kitchensearch-daemon.py
+    python kitchensearch_daemon.py
 
   Open the settings window to change the hotkey:
-    python kitchensearch-daemon.py --settings
+    python kitchensearch_daemon.py --settings
 
   Remove auto-start and exit:
-    python kitchensearch-daemon.py --uninstall
+    python kitchensearch_daemon.py --uninstall
 
   Refresh auto-start path without waiting for hotkey:
-    python kitchensearch-daemon.py --setup
+    python kitchensearch_daemon.py --setup
 """
 import ctypes
 import ctypes.wintypes
@@ -30,7 +30,7 @@ import sys
 import threading
 import winreg
 from pathlib import Path
-from _log import _dbg
+from ksapp.log import _dbg
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 
@@ -42,12 +42,12 @@ _PYTHONW = _PYTHON.parent / "pythonw.exe"
 
 _PICKER_EXE = _HERE / "kitchensearch.exe"
 _PICKER_PY  = _HERE / "kitchensearch.py"
-_DAEMON_EXE = _HERE / "kitchensearch-daemon.exe"
+_DAEMON_EXE = _HERE / "kitchensearch_daemon.exe"
 
 APP_NAME       = "KitchenSearch"
 DEFAULT_HOTKEY = "Ctrl+Alt+K"
 
-_TRAY_ICON_PATH = _HERE / "data" / "ui_assets" / "tray-icon.png"
+_TRAY_ICON_PATH = _HERE / "ksapp" / "data" / "ui_assets" / "tray-icon.png"
 
 # ── config ────────────────────────────────────────────────────────────────────
 # Shares picker-settings.json with the main app so all settings live in one file.

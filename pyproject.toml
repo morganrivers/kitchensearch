@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kitchensearch"
+version = "1.0.0"
+description = "Desktop search for Google Emoji Kitchen combos"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE.txt"]
+requires-python = ">=3.10"
+authors = [{ name = "Morgan Rivers" }]
+# NOTE: keep this list in sync with requirements.txt at repo root.
+# Two sources of truth is intentional (requirements.txt drives install_from_source.sh).
+dependencies = [
+    "Pillow",
+    "customtkinter",
+    "numpy",
+    "platformdirs",
+    "onnxruntime",
+    "tokenizers",
+    "screeninfo",
+    "certifi",
+    "python-xlib; sys_platform == 'linux'",
+]
+
+[project.scripts]
+kitchensearch       = "kitchensearch:main"
+emoji_story         = "ksapp.emoji_story:main"
+emoji_split_daemon  = "ksapp.emoji_split_daemon:main"
+
+[tool.setuptools]
+py-modules = ["kitchensearch"]
+packages = ["ksapp"]
+
+[tool.setuptools.package-data]
+ksapp = [
+    "data/**/*",
+    "data/**/.*",
+]

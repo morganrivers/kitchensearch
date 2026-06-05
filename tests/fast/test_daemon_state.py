@@ -9,11 +9,10 @@ from tempfile import TemporaryDirectory
 from unittest import mock
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.argv[0] = str(_REPO_ROOT / "emoji-picker-tk.py")
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-import picker_utils  # noqa: E402
+from ksapp import picker_utils  # noqa: E402
 
 
 _PID_MAX = 4194304

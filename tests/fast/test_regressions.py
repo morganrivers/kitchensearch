@@ -20,22 +20,21 @@ from tempfile import TemporaryDirectory
 from unittest import mock
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.argv[0] = str(_REPO_ROOT / "emoji-picker-tk.py")
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-import picker_utils  # noqa: E402
+from ksapp import picker_utils  # noqa: E402
 
 
 class PickerUiImportTest(unittest.TestCase):
     def test_kill_daemon_is_resolvable_in_picker_ui(self):
-        import picker_ui
+        from ksapp import picker_ui
         self.assertTrue(callable(getattr(picker_ui, "_kill_daemon", None)),
                         "picker_ui calls _kill_daemon but never imported it; "
                         "the Cancel button on the loading dialog crashes with NameError")
 
     def test_every_underscore_call_in_picker_ui_is_bound(self):
-        src = (_REPO_ROOT / "picker_ui.py").read_text(encoding="utf-8")
+        src = (_REPO_ROOT / "ksapp" / "picker_ui.py").read_text(encoding="utf-8")
         tree = ast.parse(src)
         defined = set(dir(builtins))
         for node in ast.walk(tree):
@@ -120,7 +119,7 @@ class DaemonReadyOrderingTest(unittest.TestCase):
     (catches future implementations that still race).
     """
 
-    DAEMON_SRC = _REPO_ROOT / "emoji-split-daemon.py"
+    DAEMON_SRC = _REPO_ROOT / "ksapp" / "emoji_split_daemon.py"
 
     def test_listener_bind_precedes_ready_status_in_source(self):
         tree = ast.parse(self.DAEMON_SRC.read_text(encoding="utf-8"))
@@ -160,7 +159,8 @@ class DaemonReadyOrderingTest(unittest.TestCase):
             sock_path   = daemon_cache / "split-daemon.sock"
             log_path    = daemon_cache / "daemon.log"
 
-            env = {**os.environ, "XDG_CACHE_HOME": str(cache_root)}
+            env = {**os.environ, "XDG_CACHE_HOME": str(cache_root),
+                   "PYTHONPATH": str(_REPO_ROOT)}
             with open(log_path, "wb") as log:
                 proc = subprocess.Popen(
                     [sys.executable, str(self.DAEMON_SRC)],

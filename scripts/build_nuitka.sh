@@ -5,13 +5,13 @@ set -e
 REPO_DIR=$(pwd)
 VERSION=$(git -C "$REPO_DIR" describe --tags --abbrev=0 2>/dev/null || echo "dev")
 
-if [ ! -d "$REPO_DIR/data/fonts" ]; then
+if [ ! -d "$REPO_DIR/ksapp/data/fonts" ]; then
   echo "=== Extracting app assets ==="
   python "$REPO_DIR/scripts/extract_app_assets.py"
 fi
 
 if [ "$OS" = "Windows_NT" ]; then
-  TRAY_ICON_ARG="--include-data-file=$REPO_DIR/data/ui_assets/tray-icon.png=data/ui_assets/tray-icon.png"
+  TRAY_ICON_ARG="--include-data-file=$REPO_DIR/ksapp/data/ui_assets/tray-icon.png=ksapp/data/ui_assets/tray-icon.png"
 else
   TRAY_ICON_ARG=""
 fi
@@ -19,10 +19,10 @@ fi
 echo "=== Building multidist (all four binaries, shared packages) ==="
 python -m nuitka \
   --standalone \
-  --main=emoji-split-daemon.py \
-  --main=emoji-story.py \
+  --main=ksapp/emoji_split_daemon.py \
+  --main=ksapp/emoji_story.py \
   --main=kitchensearch.py \
-  --main=kitchensearch-daemon.py \
+  --main=kitchensearch_daemon.py \
   --enable-plugin=numpy \
   --enable-plugin=tk-inter \
   --include-package=platformdirs \
@@ -48,10 +48,10 @@ python -m nuitka \
   --nofollow-import-to=PIL.ImageQt \
   --nofollow-import-to=PIL.ImageWin \
   --windows-console-mode=disable \
---include-data-dir="$REPO_DIR/data/models/all-MiniLM-L6-v2-onnx=data/models/all-MiniLM-L6-v2-onnx" \
-  --include-data-dir="$REPO_DIR/data/embeddings=data/embeddings" \
-  --include-data-dir="$REPO_DIR/data/fonts=data/fonts" \
-  --include-data-file="$REPO_DIR/data/app_assets.tar.gz=data/app_assets.tar.gz" \
+--include-data-dir="$REPO_DIR/ksapp/data/models/all-MiniLM-L6-v2-onnx=ksapp/data/models/all-MiniLM-L6-v2-onnx" \
+  --include-data-dir="$REPO_DIR/ksapp/data/embeddings=ksapp/data/embeddings" \
+  --include-data-dir="$REPO_DIR/ksapp/data/fonts=ksapp/data/fonts" \
+  --include-data-file="$REPO_DIR/ksapp/data/app_assets.tar.gz=ksapp/data/app_assets.tar.gz" \
   --include-data-file="$REPO_DIR/LICENSE.txt=LICENSE.txt" \
   --include-data-file="$REPO_DIR/packaging/kitchensearch-icon.png=packaging/kitchensearch-icon.png" \
   --include-data-file="$REPO_DIR/packaging/kitchensearch.desktop=packaging/kitchensearch.desktop" \
@@ -61,23 +61,23 @@ echo "=== build done ==="
 
 cd "$REPO_DIR/nuitka-build"
 rm -rf kitchensearch
-mv emoji-split-daemon.dist kitchensearch
+mv emoji_split_daemon.dist kitchensearch
 cd kitchensearch
 
 if [ "$OS" = "Windows_NT" ]; then
   echo "Windows build — separate .exe per entry point, no symlinks or tar"
-  cp emoji-split-daemon.exe kitchensearch.exe
-  cp emoji-split-daemon.exe emoji-story.exe
-  cp emoji-split-daemon.exe kitchensearch-daemon.exe
+  cp emoji_split_daemon.exe kitchensearch.exe
+  cp emoji_split_daemon.exe emoji_story.exe
+  cp emoji_split_daemon.exe kitchensearch_daemon.exe
 
   ls -1 *.exe
 else
   # Rename primary binary (strip .bin if present)
-  [ -f emoji-split-daemon.bin ] && mv emoji-split-daemon.bin emoji-split-daemon
+  [ -f emoji_split_daemon.bin ] && mv emoji_split_daemon.bin emoji_split_daemon
   # Multidist: single binary dispatches on argv[0] — create symlinks for other entry points
-  ln -sf emoji-split-daemon kitchensearch
-  ln -sf emoji-split-daemon emoji-story
-  ln -sf emoji-split-daemon kitchensearch-daemon
+  ln -sf emoji_split_daemon kitchensearch
+  ln -sf emoji_split_daemon emoji_story
+  ln -sf emoji_split_daemon kitchensearch_daemon
   cd "$REPO_DIR/nuitka-build"
   echo "=== Scrubbing leaked build-machine paths ==="
   python "$REPO_DIR/scripts/scrub_paths.py" "$REPO_DIR/nuitka-build/kitchensearch"

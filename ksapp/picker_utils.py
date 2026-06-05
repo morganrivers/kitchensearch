@@ -12,15 +12,14 @@ except ImportError:
 from PIL import Image, ImageDraw, ImageFont as _ImageFont                                                                                                                           
 
 
-from _log import _dbg
-from _ssl_ctx import ssl_ctx
+from ksapp.log import _dbg
+from ksapp.ssl_ctx import ssl_ctx
+from ksapp.data_assets import ensure_data as _ensure_data, _REPO, UI_ASSETS_DIR
 
 
 from platformdirs import user_cache_dir, user_config_dir
 
-_REPO         = Path(sys.argv[0]).resolve().parent
 DATA_DIR      = _REPO / "data" / "embeddings"
-UI_ASSETS_DIR = _REPO / "data" / "ui_assets"
 CACHE_DIR     = Path(user_cache_dir("kitchensearch"))
 CONFIG_DIR    = Path(user_config_dir("kitchensearch"))
 _VENV_PY = (
@@ -46,21 +45,14 @@ def _ipc_address() -> str:
 IPC_ADDRESS    = _ipc_address()
 IS_NAMED_PIPE  = IPC_ADDRESS.startswith(r"\\.\pipe")
 DAEMON_STATUS  = CACHE_DIR / "split-daemon-loading.json"
-DAEMON_PY      = _REPO / "emoji-split-daemon.py"
-DAEMON_BIN     = _REPO / ("emoji-split-daemon.exe" if sys.platform == "win32" else "emoji-split-daemon")
+DAEMON_PY      = _REPO / "emoji_split_daemon.py"
+DAEMON_BIN     = (
+    _REPO / ("emoji_split_daemon.exe" if sys.platform == "win32" else "emoji_split_daemon")
+    if (_REPO / "emoji_split_daemon").exists() or sys.platform == "win32"
+    else Path(shutil.which("emoji_split_daemon") or "emoji_split_daemon")
+)
 DAEMON_PID     = CACHE_DIR / "split-daemon.pid"
 DAEMON_LOG     = CACHE_DIR / "split-daemon.log"
-
-def _ensure_data():
-    if SEARCH_INDEX.exists():
-        return
-    tarball = _REPO / "data" / "app_assets.tar.gz"
-    if not tarball.exists():
-        sys.exit(f"Data files missing and {tarball} not found. Please re-download the app.")
-    import tarfile
-    UI_ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(tarball) as tf:
-        tf.extractall(_REPO)
 
 _ensure_data()
 
@@ -70,8 +62,12 @@ SHOW_BROKEN_THUMBS = False
 BATCH_SIZE     = 20
 LOAD_MORE      = "⬇  load more results..."
 HEADER_MARKER  = "__HEADER__"
-STORY_PY    = _REPO / "emoji-story.py"
-STORY_BIN   = _REPO / ("emoji-story.exe" if sys.platform == "win32" else "emoji-story")
+STORY_PY    = _REPO / "emoji_story.py"
+STORY_BIN   = (
+    _REPO / ("emoji_story.exe" if sys.platform == "win32" else "emoji_story")
+    if (_REPO / "emoji_story").exists() or sys.platform == "win32"
+    else Path(shutil.which("emoji_story") or "emoji_story")
+)
 STORY_OUT   = CACHE_DIR / "emoji-story.png"
 
 PRIORITY_EMOJIS = frozenset({

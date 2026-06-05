@@ -101,7 +101,7 @@ class NiceScrollbar(tk.Canvas):
         self._dragging = False
 
 from PIL import Image, ImageDraw, ImageFont as _ImageFont, ImageTk
-from picker_utils import (
+from ksapp.picker_utils import (
     _dbg,
     _get_monitors,
     _REPO,
@@ -1195,7 +1195,7 @@ class TkPicker:
 
     def _dump_top_copies(self, e=None):
         import sys
-        from picker_utils import top_copied
+        from ksapp.picker_utils import top_copied
         rows = top_copied(10)
         sys.stdout.write("\n=== TOP 10 MOST COPIED EMOJIS ===\n")
         if not rows:
@@ -2640,7 +2640,7 @@ class TkPicker:
                 self._prog_var.set(done[0])
                 desc_var.set(f"Fetched {done[0]} / {total[0]} emojis")
 
-        from picker_utils import CACHE_DIR as _CACHE_DIR
+        from ksapp.picker_utils import CACHE_DIR as _CACHE_DIR
         log_path = _CACHE_DIR / "story.log"
 
         def _on_back():

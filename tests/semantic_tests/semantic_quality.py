@@ -17,7 +17,7 @@ import numpy as np
 from pathlib import Path
 
 REPO         = Path(__file__).resolve().parent.parent.parent
-DATA         = REPO / "data"
+DATA         = REPO / "ksapp" / "data"
 EMB_DIR      = DATA / "embeddings"
 ASSETS       = DATA / "ui_assets"
 SEARCH_INDEX = ASSETS / "search-index.tsv"
@@ -70,7 +70,7 @@ def rank_of(ranked_alts, target):
 
 def load_minilm():
     sys.path.insert(0, str(REPO))
-    import _minilm_text
+    from ksapp import minilm_text as _minilm_text
     print("Loading MiniLM ONNX model...", flush=True)
     model = _minilm_text.load()
     model.embed(["warmup"])
