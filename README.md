@@ -135,10 +135,10 @@ I traveled a long way to arrive at MiniLM. At first I tried CLIP, but even the h
 
 
 ### Packaging
-I used a few tricks to reduce the size of the embedded model. I used Nuitka and TKinter to save on space, and used a slightly slower numpy matrix multiplication levaing out the BLAS and MKL math libraries in numpy to save on RAM and disk storage. Still, python was a frustratingly heavy thing to package up for this project. 
+I used a few tricks to reduce the size of the embedded model. I used Nuitka and TKinter to save on space, and used a slightly slower numpy matrix multiplication leaving out the BLAS and MKL math libraries in numpy to save on RAM and disk storage. Still, Python had frustratingly heavy packaging for this project. 
 
 ### Rendering
-A lot of work was required to get the rendering, in particular fixing a nasty bug where 16 bit representation of the x11 canvas meant I had to pack rows to at maximum 200 search result sliding window on the canvas, so that I didn't exceed the 32k pixel height threshold. I also set up a doom scrolling feature where more emojis just load forever, instead of having to click a button once you reach the bottom. This really helped with latency issues and reduces total image downloads and the wait for search results to load. 
+A lot of work was required to get nice search results rendering, in particular fixing a nasty bug where 16 bit representation of the x11 canvas meant I had to pack rows to at maximum 200 search result sliding window on the canvas, so that I didn't exceed the 32k pixel height threshold. I also set up a doom scrolling feature where more emojis just load forever, instead of having to click a button once you reach the bottom. This really helped with latency issues and reduces total image downloads and the wait for search results to load. 
 
 ### Regression Testing
 I used a lot of AI to speed up development. I found AI speeds things up, especially cross-platform support and debugging, but also breaks things more frequently. I vibe coded a visual regression testing interface to help me figure out when something had degraded with the app. I also had some fast tests that broke before I fixed the bugs, and work after I fixed them.
