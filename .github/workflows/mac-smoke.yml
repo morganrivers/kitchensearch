@@ -1,4 +1,4 @@
-name: macOS x86_64 install smoke test
+name: macOS x86_64 tests
 
 on:
   push:
@@ -6,35 +6,42 @@ on:
   pull_request:
 
 jobs:
-  install-and-smoke:
+  mac-tests:
     runs-on: macos-13            # x86_64 runner; macos-14+ is arm64
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: false
+
       - name: Install brew Python with Tk
         run: brew install python-tk@3.12
+
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
       - name: Add uv to PATH
         run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Install kitchensearch from working tree (use brew Python with Tk)
         run: uv tool install --python "$(brew --prefix)/bin/python3.12" .
+
       - name: Verify entry points exist
         run: |
           which kitchensearch
           which emoji_story
           which emoji_split_daemon
+
       - name: Verify tkinter import inside the tool's Python
         run: |
           uv tool run --from kitchensearch python -c "import tkinter; print(tkinter.TkVersion)"
-      - name: Smoke-launch the search daemon
+
+      - name: Smoke-launch the search daemon (also primes the model for the visual test)
         run: |
           emoji_split_daemon &
-          DAEMON_PID=$!
-          sleep 10  # allow model load
-          python3 -c "
+          echo $! > /tmp/daemon.pid
+          sleep 12  # allow model load
+          uv tool run --from kitchensearch python -c "
           import json, pathlib
           from multiprocessing.connection import Client
           from platformdirs import user_cache_dir
@@ -45,5 +52,30 @@ jobs:
           conn.close()
           print(resp)
           assert isinstance(resp, list) and resp, 'expected non-empty JSON array'
-          " || (kill $DAEMON_PID; exit 1)
-          kill $DAEMON_PID || true
+          "
+
+      - name: Fast unit tests
+        run: |
+          uv tool run --from kitchensearch python -m unittest discover -s tests/fast -t .
+
+      - name: Visual replay (test_34_macsimple) → GIF + clipboard
+        env:
+          KITCHENSEARCH_BIN: kitchensearch
+        run: |
+          uv tool run --from kitchensearch python tests/mac_run.py \
+              test_34_macsimple --require-clipboard
+
+      - name: Stop daemon
+        if: always()
+        run: |
+          if [ -f /tmp/daemon.pid ]; then
+            kill "$(cat /tmp/daemon.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload visual test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-visual-test-run
+          path: tests/test_run/
+          if-no-files-found: warn
