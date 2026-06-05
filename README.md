@@ -35,7 +35,7 @@ Manual install:
 * Extract the ZIP file
 * Run `kitchensearch`
 
-Or, on the terminal (zsh/bash/fish) just run:
+Or, on the terminal (bash) just run:
 ```bash
 wget https://github.com/morganrivers/kitchensearch/releases/download/v1.0.0/kitchensearch-linux-x86_64.tar.gz
 tar -xzf kitchensearch-linux-x86_64.tar.gz
