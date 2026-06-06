@@ -1,4 +1,4 @@
-name: macOS x86_64 tests
+name: macOS tests
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   mac-tests:
-    runs-on: macos-13            # x86_64 runner; macos-14+ is arm64
+    runs-on: macos-latest        # arm64 (Apple Silicon)
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
