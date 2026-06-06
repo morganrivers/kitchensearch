@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Open tmate SSH session before visual replay'
+        type: boolean
+        default: false
 
 jobs:
   mac-tests:
@@ -63,6 +69,13 @@ jobs:
       - name: Fast unit tests
         run: |
           "$TOOL_PY" -m unittest discover -s tests/fast -t .
+
+      - name: Tmate (interactive) - only when manually triggered
+        if: github.event_name == 'workflow_dispatch' && inputs.debug
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: false
+          limit-access-to-actor: true
 
       - name: Visual replay (test_34_macsimple) → GIF + clipboard
         env:
