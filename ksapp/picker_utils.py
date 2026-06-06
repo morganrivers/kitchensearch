@@ -335,6 +335,24 @@ def _proc_start_time(pid):
         if not ok:
             return None
         return (creation.dwHighDateTime << 32) | creation.dwLowDateTime
+    if sys.platform == "darwin":
+        try:
+            out = subprocess.check_output(
+                ["ps", "-p", str(pid), "-o", "lstart="],
+                stderr=subprocess.DEVNULL, text=True,
+            ).strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+        if not out:
+            return None
+        try:
+            # ps -o lstart= yields "Thu Jun  6 01:11:45 2026" — collapse runs
+            # of whitespace so a single-digit day parses with %d.
+            normalised = " ".join(out.split())
+            return int(_datetime.strptime(
+                normalised, "%a %b %d %H:%M:%S %Y").timestamp())
+        except ValueError:
+            return None
     try:
         data = Path(f"/proc/{pid}/stat").read_bytes()
     except OSError:
