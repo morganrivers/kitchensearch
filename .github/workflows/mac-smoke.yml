@@ -32,16 +32,22 @@ jobs:
           which emoji_story
           which emoji_split_daemon
 
+      - name: Resolve the tool's Python interpreter
+        run: |
+          TOOL_PY="$(uv tool dir)/kitchensearch/bin/python"
+          test -x "$TOOL_PY"
+          echo "TOOL_PY=$TOOL_PY" >> "$GITHUB_ENV"
+
       - name: Verify tkinter import inside the tool's Python
         run: |
-          uv tool run --from kitchensearch python -c "import tkinter; print(tkinter.TkVersion)"
+          "$TOOL_PY" -c "import tkinter; print(tkinter.TkVersion)"
 
       - name: Smoke-launch the search daemon (also primes the model for the visual test)
         run: |
           emoji_split_daemon &
           echo $! > /tmp/daemon.pid
           sleep 12  # allow model load
-          uv tool run --from kitchensearch python -c "
+          "$TOOL_PY" -c "
           import json, pathlib
           from multiprocessing.connection import Client
           from platformdirs import user_cache_dir
@@ -56,14 +62,13 @@ jobs:
 
       - name: Fast unit tests
         run: |
-          uv tool run --from kitchensearch python -m unittest discover -s tests/fast -t .
+          "$TOOL_PY" -m unittest discover -s tests/fast -t .
 
       - name: Visual replay (test_34_macsimple) → GIF + clipboard
         env:
           KITCHENSEARCH_BIN: kitchensearch
         run: |
-          uv tool run --from kitchensearch python tests/mac_run.py \
-              test_34_macsimple --require-clipboard
+          "$TOOL_PY" tests/mac_run.py test_34_macsimple --require-clipboard
 
       - name: Stop daemon
         if: always()
