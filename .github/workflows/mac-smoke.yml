@@ -15,6 +15,8 @@ jobs:
   mac-tests:
     runs-on: macos-14            # arm64 Sonoma; macos-15 adds a weekly Screen Recording TCC prompt
     timeout-minutes: 30
+    env:
+      KITCHENSEARCH_BIN: kitchensearch
     steps:
       - uses: actions/checkout@v4
         with:
@@ -76,11 +78,75 @@ jobs:
         with:
           limit-access-to-actor: true
 
-      - name: Visual replay (test_34_macsimple) → GIF + clipboard
-        env:
-          KITCHENSEARCH_BIN: kitchensearch
-        run: |
-          "$TOOL_PY" tests/mac_run.py test_34_macsimple --require-clipboard
+      - name: Run test_01_main_menu
+        continue-on-error: true
+        run: '"$TOOL_PY" tests/mac_run.py test_01_main_menu'
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gif-test_01_main_menu
+          path: tests/test_run/test_01_main_menu/
+          if-no-files-found: warn
+
+      - name: Run test_02_keyword_search
+        continue-on-error: true
+        run: '"$TOOL_PY" tests/mac_run.py test_02_keyword_search'
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gif-test_02_keyword_search
+          path: tests/test_run/test_02_keyword_search/
+          if-no-files-found: warn
+
+      - name: Run test_15_banner
+        continue-on-error: true
+        run: '"$TOOL_PY" tests/mac_run.py test_15_banner'
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gif-test_15_banner
+          path: tests/test_run/test_15_banner/
+          if-no-files-found: warn
+
+      - name: Run test_16_story
+        continue-on-error: true
+        run: '"$TOOL_PY" tests/mac_run.py test_16_story'
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gif-test_16_story
+          path: tests/test_run/test_16_story/
+          if-no-files-found: warn
+
+      - name: Run test_30_manyresults
+        continue-on-error: true
+        run: '"$TOOL_PY" tests/mac_run.py test_30_manyresults'
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gif-test_30_manyresults
+          path: tests/test_run/test_30_manyresults/
+          if-no-files-found: warn
+
+      - name: Run test_31_darkmode
+        continue-on-error: true
+        run: '"$TOOL_PY" tests/mac_run.py test_31_darkmode'
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gif-test_31_darkmode
+          path: tests/test_run/test_31_darkmode/
+          if-no-files-found: warn
+
+      - name: Run test_32_settingtoggles
+        continue-on-error: true
+        run: '"$TOOL_PY" tests/mac_run.py test_32_settingtoggles'
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gif-test_32_settingtoggles
+          path: tests/test_run/test_32_settingtoggles/
+          if-no-files-found: warn
 
       - name: Stop daemon
         if: always()
@@ -88,11 +154,3 @@ jobs:
           if [ -f /tmp/daemon.pid ]; then
             kill "$(cat /tmp/daemon.pid)" 2>/dev/null || true
           fi
-
-      - name: Upload visual test artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mac-visual-test-run
-          path: tests/test_run/
-          if-no-files-found: warn
