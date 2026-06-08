@@ -72,7 +72,7 @@ jobs:
 
       - name: Upterm (interactive) - only when manually triggered
         if: github.event_name == 'workflow_dispatch' && inputs.debug
-        uses: lhotari/action-upterm@v1
+        uses: owenthereal/action-upterm@v1
         with:
           limit-access-to-actor: true
 
