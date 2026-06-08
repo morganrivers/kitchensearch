@@ -165,12 +165,15 @@ def _maybe_show_tip_modal(picker, settings):
         return
     if "hide_ads" not in settings:
         settings["hide_ads"] = False
-    action = picker.show_tip_modal(_TIP_MODAL_TEXT, get_tip_modal_button_path())
-    settings["dismissed_at"]          = time.time()
-    settings["dismissed_copy_count"]  = int(settings.get("copy_count", 0))
-    save_settings(settings)
-    if action == TkPicker.TIP_RESULT_TIP:
-        webbrowser.open(get_buymeacoffee_url())
+
+    def _on_tip_result(action):
+        settings["dismissed_at"]         = time.time()
+        settings["dismissed_copy_count"] = int(settings.get("copy_count", 0))
+        save_settings(settings)
+        if action == TkPicker.TIP_RESULT_TIP:
+            webbrowser.open(get_buymeacoffee_url())
+
+    picker.queue_tip_overlay(_TIP_MODAL_TEXT, get_tip_modal_button_path(), _on_tip_result)
 
 
 def _run_settings(picker, settings):

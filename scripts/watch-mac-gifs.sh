@@ -43,9 +43,14 @@ if [ -z "$RUN" ]; then
   [ -n "$RUN" ] || { echo "no macOS tests run found" >&2; exit 4; }
 fi
 
-mkdir -p "$OUT"
-echo "[watch] repo=$REPO run=$RUN out=$OUT play=$PLAY poll=${POLL}s"
+RUN_OUT="$OUT/run-$RUN"
+mkdir -p "$RUN_OUT"
+LATEST="$OUT/latest"
+ln -sfn "run-$RUN" "$LATEST"
+
+echo "[watch] repo=$REPO run=$RUN out=$RUN_OUT play=$PLAY poll=${POLL}s"
 echo "[watch] run url: https://github.com/$REPO/actions/runs/$RUN"
+echo "[watch] symlink: $LATEST -> run-$RUN"
 
 declare -A SEEN=()
 
@@ -68,8 +73,14 @@ while :; do
   for name in "${names[@]}"; do
     [ -n "$name" ] || continue
     [ "${SEEN[$name]:-0}" = 1 ] && continue
-    target="$OUT/$name"
-    if gh run download "$RUN" --repo "$REPO" -n "$name" -D "$target" 2>/dev/null; then
+    target="$RUN_OUT/$name"
+    if [ -d "$target" ] && [ -n "$(ls -A "$target" 2>/dev/null)" ]; then
+      SEEN[$name]=1
+      continue
+    fi
+    err="$(gh run download "$RUN" --repo "$REPO" -n "$name" -D "$target" 2>&1)"
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
       SEEN[$name]=1
       ts="$(date +%H:%M:%S)"
       echo "[$ts] downloaded $name"
@@ -77,11 +88,13 @@ while :; do
         echo "[$ts]   playing $gif"
         play_gif "$gif"
       done < <(find "$target" -maxdepth 3 -type f -name '*.gif' 2>/dev/null)
+    else
+      echo "[$(date +%H:%M:%S)] WARN $name download failed (rc=$rc): $err" >&2
     fi
   done
 
   if [ "$status" = "completed" ]; then
-    echo "[watch] run completed; ${#SEEN[@]} artifact(s) downloaded"
+    echo "[watch] run completed; ${#SEEN[@]}/${#names[@]} artifact(s) in $RUN_OUT"
     exit 0
   fi
 
