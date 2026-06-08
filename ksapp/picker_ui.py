@@ -251,6 +251,7 @@ class TkPicker:
         self._toast_widget   = None
         self._toast_after_id = None
         self._cancel_hook    = None
+        self._pending_tip_overlay = None
         self._build()
 
     def _build(self):
@@ -551,12 +552,14 @@ class TkPicker:
         self._back_btn.place(in_=self._content_frame, x=6, y=y)
         self.root.tk.call('raise', self._back_btn._w)
 
-    @staticmethod
-    def _norm_color(color):
-        """Normalise to lowercase 6-digit hex; X11 cget returns 12-digit."""
-        if isinstance(color, str) and color.startswith("#") and len(color) == 13:
-            return "#" + color[1:3] + color[5:7] + color[9:11]
-        return color
+    def _norm_color(self, color):
+        if not isinstance(color, str) or not color:
+            return color
+        try:
+            r, g, b = self.root.winfo_rgb(color)
+        except (tk.TclError, ValueError):
+            return color
+        return f"#{r // 256:02x}{g // 256:02x}{b // 256:02x}"
 
     def _walk_retheme(self, widget, color_map):
         for attr in ("background", "foreground"):
@@ -1932,34 +1935,79 @@ class TkPicker:
     TIP_RESULT_TIP     = "tip"
     TIP_RESULT_DISMISS = "dismiss"
 
-    def show_tip_modal(self, text, button_image_path):
-        """Show a tip prompt with a clickable Buy Me a Coffee button.
-
-        text is split on '\\n' for multi-line rendering. Returns TIP_RESULT_TIP
-        if the button was clicked, TIP_RESULT_DISMISS for Esc / "Not now".
-        """
+    def queue_tip_overlay(self, text, button_image_path, on_result):
+        """Schedule the tip overlay to be shown over the next pick_with_images window.
+        on_result(action) is invoked with TIP_RESULT_TIP or TIP_RESULT_DISMISS."""
         assert isinstance(text, str) and text, "text must be a non-empty string"
-        self._reset()
-        self._mode = "tip_modal"
-        self._entry_row.pack_forget()
-        self._set_prompt("")
-        self._prompt_frame.pack_forget()
+        assert callable(on_result), "on_result must be callable"
+        self._pending_tip_overlay = (text, button_image_path, on_result)
 
-        outer = tk.Frame(self._inner, bg=self.BG)
-        outer.pack(fill="both", expand=True, padx=20, pady=24)
+    def _flush_pending_tip_overlay(self):
+        if not self._pending_tip_overlay:
+            return
+        text, btn_path, on_result = self._pending_tip_overlay
+        self._pending_tip_overlay = None
+        action = self._show_tip_overlay(text, btn_path)
+        on_result(action)
 
+    def _show_tip_overlay(self, text, button_image_path):
+        """Modal popup over the main window. Returns TIP_RESULT_TIP / TIP_RESULT_DISMISS."""
+        self.root.update_idletasks()
+        rw = max(self.root.winfo_width(),  400)
+        rh = max(self.root.winfo_height(), 300)
+        rx = self.root.winfo_rootx()
+        ry = self.root.winfo_rooty()
+        tw = max(int(rw * 0.85), 360)
+        th = max(int(rh * 0.85), 260)
+        tx = rx + (rw - tw) // 2
+        ty = ry + (rh - th) // 2
+
+        top = tk.Toplevel(self.root, bg=self.ACCENT)
+        top.transient(self.root)
+        top.overrideredirect(True)
+        top.geometry(f"{tw}x{th}+{tx}+{ty}")
+        top.lift()
+        try:
+            top.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+
+        inner = tk.Frame(top, bg=self.BG, bd=0, highlightthickness=0)
+        inner.pack(fill="both", expand=True, padx=3, pady=3)
+
+        result = [self.TIP_RESULT_DISMISS]
+
+        def _close(r):
+            result[0] = r
+            try: top.grab_release()
+            except Exception: pass
+            try: top.destroy()
+            except Exception: pass
+
+        close_btn = tk.Label(inner, text="×", bg=self.BG, fg=self.FG_DIM,
+                             font=("Helvetica", 22, "bold"),
+                             cursor="hand2", padx=12, pady=2)
+        close_btn.place(relx=1.0, rely=0.0, anchor="ne", x=-2, y=2)
+        close_btn.bind("<Button-1>", lambda e: _close(self.TIP_RESULT_DISMISS))
+        close_btn.bind("<Enter>",    lambda e: close_btn.configure(fg=self.FG))
+        close_btn.bind("<Leave>",    lambda e: close_btn.configure(fg=self.FG_DIM))
+
+        body = tk.Frame(inner, bg=self.BG)
+        body.place(relx=0.5, rely=0.5, anchor="center")
+
+        wrap_px = max(int(tw * 0.8), 280)
         lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
         if lines:
-            tk.Label(outer, text=lines[0],
+            tk.Label(body, text=lines[0],
                      bg=self.BG, fg=self.ACCENT,
                      font=("Helvetica", 15, "bold"),
-                     wraplength=420, justify="center"
+                     wraplength=wrap_px, justify="center"
                      ).pack(fill="x", pady=(0, 10))
         for ln in lines[1:]:
-            tk.Label(outer, text=ln,
+            tk.Label(body, text=ln,
                      bg=self.BG, fg=self.FG,
                      font=("Helvetica", 12),
-                     wraplength=420, justify="center"
+                     wraplength=wrap_px, justify="center"
                      ).pack(fill="x", pady=(0, 8))
 
         btn = None
@@ -1972,37 +2020,62 @@ class TkPicker:
                                      Image.LANCZOS)
                 photo = ImageTk.PhotoImage(img)
                 self._img_refs.append(photo)
-                btn = tk.Label(outer, image=photo, bg=self.BG, cursor="hand2")
+                btn = tk.Label(body, image=photo, bg=self.BG, cursor="hand2")
                 btn.pack(pady=(16, 12))
             except Exception as e:
-                _dbg(f"tip modal button image load failed: {e}")
+                _dbg(f"tip overlay button image load failed: {e}")
         if btn is None:
-            btn = tk.Label(outer, text="❤  Buy me a coffee",
+            btn = tk.Label(body, text="❤  Buy me a coffee",
                            bg="#587180", fg="#ffffff", cursor="hand2",
                            font=("Helvetica", 13, "bold"), padx=18, pady=8)
             btn.pack(pady=(16, 12))
 
-        def _on_tip(e=None):
-            self._result = self.TIP_RESULT_TIP
-            self.root.quit()
-            return "break"
-        btn.bind("<Button-1>", _on_tip)
+        btn.bind("<Button-1>", lambda e: _close(self.TIP_RESULT_TIP))
 
-        dismiss = tk.Label(outer, text="Not now",
+        url = get_buymeacoffee_url()
+
+        def _show_btn_menu(e):
+            menu = tk.Menu(top, tearoff=0)
+            menu.add_command(label="Open in browser",
+                             command=lambda: _close(self.TIP_RESULT_TIP))
+            menu.add_command(label="Copy link address",
+                             command=lambda: (
+                                 self.root.clipboard_clear(),
+                                 self.root.clipboard_append(url)))
+            try:
+                menu.tk_popup(e.x_root, e.y_root)
+            finally:
+                menu.grab_release()
+        btn.bind("<Button-3>", _show_btn_menu)
+
+        dismiss = tk.Label(body, text="Not now",
                            bg=self.BG, fg=self.FG_DIM, cursor="hand2",
                            font=("Helvetica", 11, "underline"))
         dismiss.pack(pady=(4, 0))
-
-        def _on_dismiss(e=None):
-            self._result = self.TIP_RESULT_DISMISS
-            self.root.quit()
-            return "break"
-        dismiss.bind("<Button-1>", _on_dismiss)
+        dismiss.bind("<Button-1>", lambda e: _close(self.TIP_RESULT_DISMISS))
         dismiss.bind("<Enter>",    lambda e: dismiss.configure(fg=self.FG))
         dismiss.bind("<Leave>",    lambda e: dismiss.configure(fg=self.FG_DIM))
 
-        result = self._run()
-        return result if result in (self.TIP_RESULT_TIP, self.TIP_RESULT_DISMISS) else self.TIP_RESULT_DISMISS
+        top.bind("<Escape>", lambda e: _close(self.TIP_RESULT_DISMISS))
+
+        try: self.root.grab_release()
+        except Exception: pass
+        try: top.grab_set()
+        except Exception: pass
+        top.focus_force()
+
+        self.root.wait_window(top)
+
+        try:
+            if not os.environ.get("KITCHENSEARCH_NO_GRAB"):
+                if self._frameless:
+                    self.root.grab_set_global()
+                else:
+                    self.root.grab_set()
+        except Exception:
+            pass
+
+        return result[0]
 
     def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_research_cb=False, prompt_fn=None):
         thumb = thumb_size if thumb_size is not None else self.THUMB
@@ -2315,6 +2388,8 @@ class TkPicker:
                         self._select(0)
             self._trace_id = self._entry_var.trace_add("write", _no_filter_cb)
         self._show_ph(_ph_to_show)
+        if self._pending_tip_overlay:
+            self.root.after(150, self._flush_pending_tip_overlay)
         result = self._run()
         _dbg(f"PICK_WITH_IMAGES: _run done gen={gen} result={result!r}")
         return result
