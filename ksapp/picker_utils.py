@@ -770,7 +770,7 @@ def _find_emoji_ttf():
     return None
 
 
-_EMOJI_FONT_SIZE_DARWIN = 137
+_EMOJI_FONT_SIZE_DARWIN = 128
 _EMOJI_FONT_SIZE_OTHER  = 109
 _EMOJI_CANVAS_PX        = 300
 
