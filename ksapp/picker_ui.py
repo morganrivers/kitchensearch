@@ -141,7 +141,6 @@ class TkPicker:
         "SB_BTN":       "#888888",
         "SB_HOVER":     "#555555",
         "ENTRY_BORDER": "#dddddd",
-        "BANNER_FG":    "#a05000",
     }
     DARK = {
         "BG":           "#1c1b2e",
@@ -155,7 +154,6 @@ class TkPicker:
         "SB_BTN":       "#555566",
         "SB_HOVER":     "#888899",
         "ENTRY_BORDER": "#444455",
-        "BANNER_FG":    "#ffaa44",
     }
 
     THUMB         = 96
@@ -1931,182 +1929,82 @@ class TkPicker:
             self._select(min(initial_sel, len(self._rows) - 1))
         return self._run()
 
-    BMC_BANNER_LABEL  = "__BMC_BANNER__"
-    BMC_DISMISS_LABEL = "__BMC_DISMISS__"
-    BMC_SNOOZE_LABEL  = "__BMC_SNOOZE__"
-    BMC_BORDER_COLOR  = "#ff9999"
+    TIP_RESULT_TIP     = "tip"
+    TIP_RESULT_DISMISS = "dismiss"
 
-    def _make_snooze_btn(self, parent, row_bg):
-        BLUE       = "#4a90d9"
-        BLUE_HOVER = "#2270c0"
-        PURPLE     = "#7744cc"
-        W, H, R, OW = 104, 28, 8, 2
+    def show_tip_modal(self, text, button_image_path):
+        """Show a tip prompt with a clickable Buy Me a Coffee button.
 
-        cv = tk.Canvas(parent, width=W, height=H,
-                       bg=row_bg, highlightthickness=0, bd=0, cursor="hand2")
+        text is split on '\\n' for multi-line rendering. Returns TIP_RESULT_TIP
+        if the button was clicked, TIP_RESULT_DISMISS for Esc / "Not now".
+        """
+        assert isinstance(text, str) and text, "text must be a non-empty string"
+        self._reset()
+        self._mode = "tip_modal"
+        self._entry_row.pack_forget()
+        self._set_prompt("")
+        self._prompt_frame.pack_forget()
 
-        from PIL import ImageTk as _ITK
-        _em_pil   = render_emoji_pil("💤", size=13)
-        _em_photo = _ITK.PhotoImage(_em_pil) if _em_pil else None
-        _EM_W     = _em_photo.width() if _em_photo else 0
-        GAP       = 3
-        TEXT_PX   = 42  # approx width of "snooze" at Helvetica 10 bold
-        _TOTAL    = _EM_W + GAP + TEXT_PX
-        _START    = (W - _TOTAL) // 2
-        _EM_X     = _START + _EM_W // 2
-        _TEXT_X   = _START + _EM_W + GAP
+        outer = tk.Frame(self._inner, bg=self.BG)
+        outer.pack(fill="both", expand=True, padx=20, pady=24)
 
-        def _draw(fill):
-            cv.delete("all")
-            x1, y1, x2, y2 = OW, OW, W - OW, H - OW
-            cv.create_arc(x1,      y1,      x1+2*R, y1+2*R, start=90,  extent=90, fill=fill,   outline=fill,   style="pieslice")
-            cv.create_arc(x2-2*R,  y1,      x2,     y1+2*R, start=0,   extent=90, fill=fill,   outline=fill,   style="pieslice")
-            cv.create_arc(x1,      y2-2*R,  x1+2*R, y2,     start=180, extent=90, fill=fill,   outline=fill,   style="pieslice")
-            cv.create_arc(x2-2*R,  y2-2*R,  x2,     y2,     start=270, extent=90, fill=fill,   outline=fill,   style="pieslice")
-            cv.create_rectangle(x1+R, y1, x2-R, y2, fill=fill, outline=fill)
-            cv.create_rectangle(x1, y1+R, x2, y2-R, fill=fill, outline=fill)
-            cv.create_arc(x1,      y1,      x1+2*R, y1+2*R, start=90,  extent=90, outline=PURPLE, width=OW, style="arc")
-            cv.create_arc(x2-2*R,  y1,      x2,     y1+2*R, start=0,   extent=90, outline=PURPLE, width=OW, style="arc")
-            cv.create_arc(x1,      y2-2*R,  x1+2*R, y2,     start=180, extent=90, outline=PURPLE, width=OW, style="arc")
-            cv.create_arc(x2-2*R,  y2-2*R,  x2,     y2,     start=270, extent=90, outline=PURPLE, width=OW, style="arc")
-            cv.create_line(x1+R, y1, x2-R, y1, fill=PURPLE, width=OW)
-            cv.create_line(x2,   y1+R, x2,   y2-R, fill=PURPLE, width=OW)
-            cv.create_line(x1+R, y2, x2-R, y2, fill=PURPLE, width=OW)
-            cv.create_line(x1,   y1+R, x1,   y2-R, fill=PURPLE, width=OW)
-            if _em_photo:
-                cv.create_image(_EM_X, H // 2, image=_em_photo, anchor="center")
-                cv.create_text(_TEXT_X, H // 2, text="snooze",
-                               fill="#ffffff", font=("Helvetica", 10, "bold"), anchor="w")
-            else:
-                cv.create_text(W // 2, H // 2, text="💤 snooze",
-                               fill="#ffffff", font=("Helvetica", 10, "bold"))
+        lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+        if lines:
+            tk.Label(outer, text=lines[0],
+                     bg=self.BG, fg=self.ACCENT,
+                     font=("Helvetica", 15, "bold"),
+                     wraplength=420, justify="center"
+                     ).pack(fill="x", pady=(0, 10))
+        for ln in lines[1:]:
+            tk.Label(outer, text=ln,
+                     bg=self.BG, fg=self.FG,
+                     font=("Helvetica", 12),
+                     wraplength=420, justify="center"
+                     ).pack(fill="x", pady=(0, 8))
 
-        _draw(BLUE)
-        cv.bind("<Enter>", lambda e: _draw(BLUE_HOVER))
-        cv.bind("<Leave>", lambda e: _draw(BLUE))
-        return cv
-
-    def _append_bmc_banner(self, banner):
-        outer = tk.Frame(self._inner, bg=self.BMC_BORDER_COLOR,
-                         bd=0, highlightthickness=0)
-        outer.pack(side="top", fill="x", padx=4, pady=(8, 4))
-
-        row = tk.Frame(outer, bg=self.BG, cursor="hand2",
-                       bd=0, highlightthickness=0)
-        row.pack(fill="x", padx=2, pady=2)
-
-        stripe = tk.Frame(row, width=8, bg=self.BG, bd=0, highlightthickness=0)
-        stripe.pack(side="left", fill="y")
-        stripe.pack_propagate(False)
-        for c in self.RAINBOW_VIVID:
-            tk.Frame(stripe, bg=c, bd=0, highlightthickness=0).pack(
-                side="top", fill="both", expand=True)
-
-        dismiss = tk.Label(row, text="x  no thanks",
-                           bg=self.BG, fg=self.FG_DIM, cursor="hand2",
-                           font=("Helvetica", 9), padx=8)
-        dismiss.pack(side="right", padx=(4, 8))
-
-        snooze = self._make_snooze_btn(row, self.BG)
-        snooze.pack(side="right", padx=(0, 4), pady=4)
-
-        body = tk.Frame(row, bg=self.BG)
-        body.pack(side="left", fill="both", expand=True, padx=(10, 4), pady=6)
-
-        if banner.get("headline"):
-            tk.Label(body, text=banner["headline"], bg=self.BG,
-                     fg=self._theme["BANNER_FG"],
-                     font=("Helvetica", 11, "bold"), anchor="w").pack(fill="x")
-
-        img_path = banner.get("image")
-        img_lbl  = None
-        if img_path:
+        btn = None
+        if button_image_path and os.path.exists(button_image_path):
             try:
-                img = Image.open(img_path).convert("RGBA")
-                max_w = 200
+                img = Image.open(button_image_path).convert("RGBA")
+                max_w = 220
                 if img.width > max_w:
                     img = img.resize((max_w, int(img.height * max_w / img.width)),
                                      Image.LANCZOS)
                 photo = ImageTk.PhotoImage(img)
                 self._img_refs.append(photo)
-                img_lbl = tk.Label(body, image=photo, bg=self.BG, cursor="hand2")
-                img_lbl.pack(anchor="w")
+                btn = tk.Label(outer, image=photo, bg=self.BG, cursor="hand2")
+                btn.pack(pady=(16, 12))
             except Exception as e:
-                _dbg(f"banner image load failed: {e}")
-        if img_lbl is None:
-            img_lbl = tk.Label(body, text="❤  Buy me a coffee",
-                               bg="#587180", fg="#ffffff", cursor="hand2",
-                               font=("Helvetica", 12, "bold"), padx=14, pady=6)
-            img_lbl.pack(anchor="w")
+                _dbg(f"tip modal button image load failed: {e}")
+        if btn is None:
+            btn = tk.Label(outer, text="❤  Buy me a coffee",
+                           bg="#587180", fg="#ffffff", cursor="hand2",
+                           font=("Helvetica", 13, "bold"), padx=18, pady=8)
+            btn.pack(pady=(16, 12))
 
-        idx = len(self._rows)
-        action_widgets = [row, body, img_lbl]
-        self._rows.append({"frame": row, "label": self.BMC_BANNER_LABEL,
-                            "row_bg": self.BG, "all_widgets": action_widgets})
-        url = banner["url"]
+        def _on_tip(e=None):
+            self._result = self.TIP_RESULT_TIP
+            self.root.quit()
+            return "break"
+        btn.bind("<Button-1>", _on_tip)
 
-        def _show_banner_menu(e):
-            self._dismiss_popup()
-            menu = tk.Menu(self.root, tearoff=0)
-            menu.add_command(label="Open in browser",
-                             command=lambda: self._click_row(idx))
-            menu.add_command(label="Copy link address",
-                             command=lambda: (
-                                 self.root.clipboard_clear(),
-                                 self.root.clipboard_append(url)))
-            try:
-                menu.tk_popup(e.x_root, e.y_root)
-            finally:
-                menu.grab_release()
-
-            # Delay binding dismiss handlers so that any FocusOut/ButtonPress
-            # events queued during tk_popup have already fired before we listen.
-            def _setup_dismiss():
-                bid_root = [None]
-                bid_key  = [None]
-
-                def _close(*_):
-                    try:
-                        menu.unpost()
-                    except Exception:
-                        pass
-                    try:
-                        self.root.unbind("<ButtonPress-1>", bid_root[0])
-                    except Exception:
-                        pass
-                    try:
-                        self._entry.unbind("<Key>", bid_key[0])
-                    except Exception:
-                        pass
-
-                bid_root[0] = self.root.bind("<ButtonPress-1>", lambda e: _close(), add="+")
-                bid_key[0]  = self._entry.bind("<Key>", lambda e: _close(), add="+")
-                menu.bind("<Unmap>", _close)
-
-            self.root.after(50, _setup_dismiss)
-
-        for w in action_widgets:
-            w.bind("<Button-1>",   lambda e, i=idx: self._click_row(i))
-            w.bind("<Button-3>",   _show_banner_menu)
-            w.bind("<MouseWheel>", self._on_scroll)
-            w.bind("<Button-4>",   self._on_scroll)
-            w.bind("<Button-5>",   self._on_scroll)
+        dismiss = tk.Label(outer, text="Not now",
+                           bg=self.BG, fg=self.FG_DIM, cursor="hand2",
+                           font=("Helvetica", 11, "underline"))
+        dismiss.pack(pady=(4, 0))
 
         def _on_dismiss(e=None):
-            self._result = self.BMC_DISMISS_LABEL
+            self._result = self.TIP_RESULT_DISMISS
             self.root.quit()
             return "break"
         dismiss.bind("<Button-1>", _on_dismiss)
         dismiss.bind("<Enter>",    lambda e: dismiss.configure(fg=self.FG))
         dismiss.bind("<Leave>",    lambda e: dismiss.configure(fg=self.FG_DIM))
 
-        def _on_snooze(e=None):
-            self._result = self.BMC_SNOOZE_LABEL
-            self.root.quit()
-            return "break"
-        snooze.bind("<Button-1>", _on_snooze)
+        result = self._run()
+        return result if result in (self.TIP_RESULT_TIP, self.TIP_RESULT_DISMISS) else self.TIP_RESULT_DISMISS
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, banner=None, show_dark_btn=False, show_research_cb=False, prompt_fn=None):
+    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_research_cb=False, prompt_fn=None):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
         if show_dark_btn:
@@ -2124,14 +2022,6 @@ class TkPicker:
 
         next_rank       = [0]
         pending         = {}
-        banner_appended = [False]
-        total_entries   = len(entries)
-
-        def _maybe_append_banner():
-            if banner and not banner_appended[0] and next_rank[0] >= total_entries:
-                self._append_bmc_banner(banner)
-                banner_appended[0] = True
-                self._dm_btn.place_forget()
 
         def _append_header_row(text, color, image_path=None):
             hr = tk.Frame(self._inner, bg=self.BG, bd=0, highlightthickness=0)
@@ -2291,7 +2181,6 @@ class TkPicker:
                     _append_header_row(item[1], item[2], item[3] if len(item) > 3 else None)
                 else:
                     _append_row(*item)
-            _maybe_append_banner()
 
         def _on_image_ready(rank, label, path, score):
             if self._destroyed:
@@ -2360,7 +2249,6 @@ class TkPicker:
         _dispatch_next_batch()
 
         if preload:
-            _maybe_append_banner()
             self.root.update_idletasks()
             self._sb.pack_forget()
 

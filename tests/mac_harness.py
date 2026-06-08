@@ -14,9 +14,11 @@ edits here cannot regress the Linux harness, and vice-versa.
 """
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -105,9 +107,9 @@ class MacTestHarness:
         if app_cmd is not None:
             self._app_cmd = list(app_cmd)
         elif env_bin:
-            self._app_cmd = [env_bin]
+            self._app_cmd = [env_bin, "--logging"]
         else:
-            self._app_cmd = [sys.executable, str(_REPO / "kitchensearch.py")]
+            self._app_cmd = [sys.executable, str(_REPO / "kitchensearch.py"), "--logging"]
         self._proc                  = None
         self._shots: list[tuple[str, Path]] = []
         self.effective_settings: dict       = {}
@@ -115,6 +117,10 @@ class MacTestHarness:
         self.stderr_output:      str        = ""
         self._stderr_buf:   list[bytes]              = []
         self._stderr_thread: threading.Thread | None = None
+        self._stderr_log_path: Path = self.run_dir / "stderr.log"
+        self._stderr_log_fh = None
+        self._debug_log_src: Path = Path(tempfile.gettempdir()) / "kitchensearch-debug.log"
+        self._debug_log_dst: Path = self.run_dir / "debug.log"
 
     # ── lifecycle ────────────────────────────────────────────────────────────
 
@@ -147,7 +153,14 @@ class MacTestHarness:
         # something" from "stale clipboard content".
         subprocess.run(["pbcopy"], input=b"", check=False)
 
+        try:
+            if self._debug_log_src.exists():
+                self._debug_log_src.unlink()
+        except OSError:
+            pass
+
         self._stderr_buf = []
+        self._stderr_log_fh = open(self._stderr_log_path, "wb")
         self._proc = subprocess.Popen(
             self._app_cmd, env=env, cwd=str(_REPO),
             stderr=subprocess.PIPE,
@@ -178,6 +191,18 @@ class MacTestHarness:
         try:
             for line in self._proc.stderr:
                 self._stderr_buf.append(line)
+                fh = self._stderr_log_fh
+                if fh is not None:
+                    try:
+                        fh.write(line)
+                        fh.flush()
+                    except Exception:
+                        pass
+                try:
+                    sys.stderr.write("    [app] " + line.decode(errors="replace"))
+                    sys.stderr.flush()
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -203,7 +228,19 @@ class MacTestHarness:
                     pass
         if self._stderr_thread:
             self._stderr_thread.join(timeout=3)
+        if self._stderr_log_fh is not None:
+            try:
+                self._stderr_log_fh.close()
+            except Exception:
+                pass
+            self._stderr_log_fh = None
         self.stderr_output = b"".join(self._stderr_buf).decode(errors="replace")
+        if self._debug_log_src.exists():
+            try:
+                shutil.copyfile(self._debug_log_src, self._debug_log_dst)
+                print(f"    [dbg] debug log → {self._debug_log_dst}", flush=True)
+            except OSError as e:
+                print(f"    [dbg] failed to copy debug log: {e}", flush=True)
 
     @property
     def meaningful_stderr(self) -> str:

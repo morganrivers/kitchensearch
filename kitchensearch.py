@@ -21,8 +21,7 @@ from ksapp.picker_utils import (
     copy_image_to_clipboard, record_copy,
     query_daemon,
     _trim_thumb_cache, _spawn_daemon, _daemon_alive,
-    get_buymeacoffee_url, get_banner_config, _next_tuesday_ts,
-    _banner_suppressed,
+    get_buymeacoffee_url, get_tip_modal_button_path, should_show_tip_modal,
 )
 from ksapp.picker_ui import (
     TkPicker, pick_base_emoji,
@@ -155,6 +154,25 @@ def _open_hotkey_settings():
         subprocess.run([_PYTHON, str(daemon_py), "--settings"])
 
 
+_TIP_MODAL_TEXT = (
+    "Thanks for using the app! This app is pay what you want.\n"
+    "The suggested price is $2, which helps me build more apps like this."
+)
+
+
+def _maybe_show_tip_modal(picker, settings):
+    if not should_show_tip_modal(settings, time.time()):
+        return
+    if "hide_ads" not in settings:
+        settings["hide_ads"] = False
+    action = picker.show_tip_modal(_TIP_MODAL_TEXT, get_tip_modal_button_path())
+    settings["dismissed_at"]          = time.time()
+    settings["dismissed_copy_count"]  = int(settings.get("copy_count", 0))
+    save_settings(settings)
+    if action == TkPicker.TIP_RESULT_TIP:
+        webbrowser.open(get_buymeacoffee_url())
+
+
 def _run_settings(picker, settings):
     sel_idx = 0
     tiling = _is_tiling_wm()
@@ -175,7 +193,7 @@ def _run_settings(picker, settings):
             display_items.append(f"Keyboard shortcut: {hotkey}  (click to change)")
             item_keys.append(_SETTINGS_KEY_HOTKEY)
         if "hide_ads" in settings:
-            display_items.append(f"{'[x]' if settings['hide_ads'] else '[ ]'} Don't show support banner")
+            display_items.append(f"{'[x]' if settings['hide_ads'] else '[ ]'} Don't show support modal")
             item_keys.append("hide_ads")
 
         assert len(item_keys) == len(display_items)
@@ -296,6 +314,7 @@ def main():
         entries     = load_index()
         _dbg(f"APP: load_index done n_entries={len(entries)}")
         base_index  = build_base_emoji_index(entries)
+        _maybe_show_tip_modal(picker, settings)
         while True:
             has_sem  = _has_semantic_models()
             has_data = SEARCH_INDEX.exists()
@@ -333,35 +352,15 @@ def main():
             _dbg(f"MENU_BUILD_DONE n={len(menu_entries)}")
 
             _dbg("MENU_SHOW_START")
-            force_banner = os.environ.get("KITCHENSEARCH_SHOW_BANNER") == "1"
-            banner = None if _banner_suppressed(settings, time.time()) and not force_banner else get_banner_config()
-            if banner is not None and "hide_ads" not in settings:
-                settings["hide_ads"] = False
-                save_settings(settings)
             _menu_prompt = "Use the emojikitchen image search directly or select an option below." if settings.get("semantic_first", True) else "Use emojikitchen keyword search directly or select an option below."
             mode = picker.pick_with_images(_menu_prompt, menu_entries, _menu_on_url,
                                            thumb_size=48, preload=True,
                                            placeholder="type to search..." if settings.get("semantic_first", True) else "type to keyword search...",
-                                           filter=False, banner=banner,
+                                           filter=False,
                                            show_dark_btn=True)
             _dbg(f"MENU_SHOW_DONE mode={mode!r}")
             if not mode:
                 sys.exit(0)
-
-            if mode == TkPicker.BMC_BANNER_LABEL:
-                settings["hide_ads"] = True
-                save_settings(settings)
-                webbrowser.open(get_buymeacoffee_url())
-                continue
-            if mode == TkPicker.BMC_SNOOZE_LABEL:
-                settings["snooze_until"] = _next_tuesday_ts()
-                save_settings(settings)
-                continue
-            if mode == TkPicker.BMC_DISMISS_LABEL:
-                settings["dismissed_at"] = time.time()
-                picker.queue_toast("Banner returns in 7 days. Disable permanently in Settings.")
-                save_settings(settings)
-                continue
 
             mode_key = _label_to_mode.get(mode)
 

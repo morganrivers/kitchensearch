@@ -1,6 +1,6 @@
 import sys, os, re, json, hashlib, shutil, signal, subprocess
 import time, urllib.request, threading, random as _random, getpass
-from datetime import date, timedelta, datetime as _datetime
+from datetime import datetime as _datetime
 from multiprocessing.connection import Client
 from pathlib import Path                                                                                                                                                                     
                                                                                                                                                                                              
@@ -699,65 +699,46 @@ def get_thumb(url):
 
 
 
-_BMC_BASE_URL           = "https://www.buymeacoffee.com/morganrivers"
-_BMC_BUTTON_PATH        = _REPO / "data" / "ui_assets" / "buymeacoffee_button.png"
-_BANNER_MIN_HOURS       = 72
-_BANNER_MIN_COPIES      = 14
-_BANNER_DISMISSAL_SECS  = 7 * 86400
-
-
-def _banner_install_ts():
-    try:
-        s = json.loads((CONFIG_DIR / "picker-settings.json").read_text(encoding="utf-8"))
-        ts = s.get("install")
-        return float(ts) if ts is not None else None
-    except (OSError, ValueError, TypeError, json.JSONDecodeError):
-        return None
-
-
-def _next_tuesday_ts():
-    today = date.today()
-    days  = (1 - today.weekday()) % 7
-    if days == 0:
-        days = 7
-    next_tue = today + timedelta(days=days)
-    return _datetime(next_tue.year, next_tue.month, next_tue.day).timestamp()
+_BMC_BASE_URL                     = "https://www.buymeacoffee.com/morganrivers"
+_BMC_BUTTON_PATH                  = _REPO / "data" / "ui_assets" / "buymeacoffee_button.png"
+_TIP_MODAL_MIN_HOURS              = 72
+_TIP_MODAL_MIN_COPIES             = 14
+_TIP_MODAL_DISMISSAL_SECS         = 3 * 86400
+_TIP_MODAL_DISMISSAL_MIN_COPIES   = 6
 
 
 def get_buymeacoffee_url():
     return _BMC_BASE_URL
 
 
-def should_show_banner():
-    ts = _banner_install_ts()
-    if ts is None or (time.time() - ts) / 3600 < _BANNER_MIN_HOURS:
-        return False
-    try:
-        s = json.loads((CONFIG_DIR / "picker-settings.json").read_text(encoding="utf-8"))
-    except Exception:
-        s = {}
-    return int(s.get("copy_count", 0)) >= _BANNER_MIN_COPIES
+def get_tip_modal_button_path():
+    return str(_BMC_BUTTON_PATH) if _BMC_BUTTON_PATH.exists() else None
 
 
-def _banner_suppressed(settings, now):
+def should_show_tip_modal(settings, now):
+    assert isinstance(settings, dict), "settings must be a dict"
+    if os.environ.get("KITCHENSEARCH_SHOW_BANNER") == "1":
+        return True
     if bool(settings.get("hide_ads")):
-        return True
+        return False
     if now < settings.get("snooze_until", 0):
-        return True
+        return False
+    install = settings.get("install")
+    if install is None:
+        return False
+    if (now - float(install)) / 3600 < _TIP_MODAL_MIN_HOURS:
+        return False
+    copy_count = int(settings.get("copy_count", 0))
+    if copy_count < _TIP_MODAL_MIN_COPIES:
+        return False
     dismissed_at = settings.get("dismissed_at", 0)
-    if dismissed_at and now - dismissed_at < _BANNER_DISMISSAL_SECS:
-        return True
-    return False
-
-
-def get_banner_config():
-    if not should_show_banner() and os.environ.get("KITCHENSEARCH_SHOW_BANNER") != "1":
-        return None
-    return {
-        "headline": None,
-        "image":    str(_BMC_BUTTON_PATH) if _BMC_BUTTON_PATH.exists() else None,
-        "url":      get_buymeacoffee_url(),
-    }
+    if dismissed_at:
+        if (now - dismissed_at) < _TIP_MODAL_DISMISSAL_SECS:
+            return False
+        dismissed_cc = int(settings.get("dismissed_copy_count", 0))
+        if (copy_count - dismissed_cc) < _TIP_MODAL_DISMISSAL_MIN_COPIES:
+            return False
+    return True
 
 
 
@@ -789,6 +770,11 @@ def _find_emoji_ttf():
     return None
 
 
+_EMOJI_FONT_SIZE_DARWIN = 137
+_EMOJI_FONT_SIZE_OTHER  = 109
+_EMOJI_CANVAS_PX        = 300
+
+
 def _get_pil_emoji_font():
     global _PIL_EMOJI_FONT
     if _PIL_EMOJI_FONT is not None:
@@ -796,12 +782,15 @@ def _get_pil_emoji_font():
     from PIL import ImageFont
     ttf = _find_emoji_ttf()
     if not ttf:
+        _dbg("_get_pil_emoji_font: no emoji ttf found on this system")
         return None
+    pt = _EMOJI_FONT_SIZE_DARWIN if sys.platform == "darwin" else _EMOJI_FONT_SIZE_OTHER
     try:
-        _PIL_EMOJI_FONT = ImageFont.truetype(ttf, 109)
+        _PIL_EMOJI_FONT = ImageFont.truetype(ttf, pt)
     except Exception as e:
-        _dbg(f"_get_pil_emoji_font truetype load failed: {e}")
+        _dbg(f"_get_pil_emoji_font truetype load failed ttf={ttf!r} pt={pt}: {e}")
         return None
+    _dbg(f"_get_pil_emoji_font loaded ttf={ttf!r} pt={pt}")
     return _PIL_EMOJI_FONT
 
 
@@ -811,14 +800,16 @@ def render_emoji_pil(char, size=20):
         return _PIL_EMOJI_CACHE[char]
     font = _get_pil_emoji_font()
     if not font:
+        _dbg(f"render_emoji_pil: no font available; returning None for char={char!r}")
         _PIL_EMOJI_CACHE[char] = None
         return None
     try:
         from PIL import Image, ImageDraw
-        canvas = Image.new("RGBA", (150, 150), (0, 0, 0, 0))
+        canvas = Image.new("RGBA", (_EMOJI_CANVAS_PX, _EMOJI_CANVAS_PX), (0, 0, 0, 0))
         ImageDraw.Draw(canvas).text((10, 10), char, font=font, embedded_color=True)
         bbox = canvas.getbbox()
         if not bbox:
+            _dbg(f"render_emoji_pil: empty bbox for char={char!r} — font rendered nothing")
             _PIL_EMOJI_CACHE[char] = None
             return None
         img = canvas.crop(bbox).resize((size, size), Image.LANCZOS)
