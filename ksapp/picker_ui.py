@@ -2196,9 +2196,13 @@ class TkPicker:
                     img   = Image.open(path).convert("RGBA")
                     img   = img.resize((thumb, thumb), Image.LANCZOS)
                     photo = ImageTk.PhotoImage(img)
-                except Exception:
-                    pass
-            pending[rank] = None if photo is None else (label, photo, score)
+                except Exception as e:
+                    _dbg(f"ON_IMAGE_READY: PhotoImage failed path={path!r}: {e}")
+            if photo is None:
+                _dbg(f"ON_IMAGE_READY: using blank placeholder rank={rank} label={label[:50]!r}")
+                photo = ImageTk.PhotoImage(Image.new("RGBA", (thumb, thumb), (0, 0, 0, 0)))
+                self._img_refs.append(photo)
+            pending[rank] = (label, photo, score)
             _flush()
 
         dispatched = [0]

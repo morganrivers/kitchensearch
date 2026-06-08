@@ -770,9 +770,9 @@ def _find_emoji_ttf():
     return None
 
 
-_EMOJI_FONT_SIZE_DARWIN = 128
-_EMOJI_FONT_SIZE_OTHER  = 109
-_EMOJI_CANVAS_PX        = 300
+_EMOJI_CANVAS_PX = 300
+_EMOJI_SIZES_DARWIN = (160, 128, 96, 64, 48, 40, 32, 20)
+_EMOJI_SIZES_OTHER  = (109,)
 
 
 def _get_pil_emoji_font():
@@ -784,14 +784,18 @@ def _get_pil_emoji_font():
     if not ttf:
         _dbg("_get_pil_emoji_font: no emoji ttf found on this system")
         return None
-    pt = _EMOJI_FONT_SIZE_DARWIN if sys.platform == "darwin" else _EMOJI_FONT_SIZE_OTHER
-    try:
-        _PIL_EMOJI_FONT = ImageFont.truetype(ttf, pt)
-    except Exception as e:
-        _dbg(f"_get_pil_emoji_font truetype load failed ttf={ttf!r} pt={pt}: {e}")
-        return None
-    _dbg(f"_get_pil_emoji_font loaded ttf={ttf!r} pt={pt}")
-    return _PIL_EMOJI_FONT
+    sizes = _EMOJI_SIZES_DARWIN if sys.platform == "darwin" else _EMOJI_SIZES_OTHER
+    last_err = None
+    for pt in sizes:
+        try:
+            _PIL_EMOJI_FONT = ImageFont.truetype(ttf, pt)
+            _dbg(f"_get_pil_emoji_font loaded ttf={ttf!r} pt={pt}")
+            return _PIL_EMOJI_FONT
+        except Exception as e:
+            last_err = e
+            _dbg(f"_get_pil_emoji_font tried pt={pt}: {e}")
+    _dbg(f"_get_pil_emoji_font: all sizes failed last_err={last_err}")
+    return None
 
 
 def render_emoji_pil(char, size=20):
