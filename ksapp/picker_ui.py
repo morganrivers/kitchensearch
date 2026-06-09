@@ -116,6 +116,7 @@ from ksapp.picker_utils import (
     _kill_daemon,
     _cleanup_incomplete_data,
     get_buymeacoffee_url,
+    copy_text_to_clipboard,
 )                                                                                                                                                                      
 
 
@@ -561,17 +562,26 @@ class TkPicker:
             return color
         return f"#{r // 256:02x}{g // 256:02x}{b // 256:02x}"
 
-    def _walk_retheme(self, widget, color_map):
+    def _walk_retheme(self, widget, color_map, _stats=None):
         for attr in ("background", "foreground"):
             try:
-                old = self._norm_color(widget.cget(attr))
+                raw = widget.cget(attr)
+                old = self._norm_color(raw)
                 new = color_map.get(old)
+                if _stats is not None:
+                    _stats["seen"] += 1
+                    if new:
+                        _stats["hits"] += 1
+                    else:
+                        cls = widget.__class__.__name__
+                        bucket = _stats["misses"].setdefault((cls, attr), {})
+                        bucket[(raw, old)] = bucket.get((raw, old), 0) + 1
                 if new:
                     widget.configure(**{attr: new})
             except (tk.TclError, ValueError):
                 pass
         for child in widget.winfo_children():
-            self._walk_retheme(child, color_map)
+            self._walk_retheme(child, color_map, _stats)
 
     def _toggle_dark_mode(self):
         old_theme = self.DARK if self._dark else self.LIGHT
@@ -590,8 +600,18 @@ class TkPicker:
         self._dark = not self._dark
         self._apply_theme(new_theme)
 
+        _dbg(f"TOGGLE_DARK entering: dark_now={self._dark} virt_mode={self._virt_mode} "
+             f"nrows={len(self._rows)} color_map_keys={sorted(color_map.keys())}")
+
         self.root.configure(bg=self.BG)
-        self._walk_retheme(self.root, color_map)
+        _stats = {"seen": 0, "hits": 0, "misses": {}}
+        self._walk_retheme(self.root, color_map, _stats)
+        miss_summary = sorted(
+            ((cls, attr, sum(v.values()), list(v.items())[:3])
+             for (cls, attr), v in _stats["misses"].items()),
+            key=lambda x: -x[2])[:8]
+        _dbg(f"TOGGLE_DARK walk: seen={_stats['seen']} hits={_stats['hits']} "
+             f"top_misses={miss_summary}")
 
         # Entry-specific attrs not caught by the widget walk
         self._entry.configure(
@@ -643,16 +663,26 @@ class TkPicker:
             for i, rd in enumerate(self._rows):
                 rd["row_bg"] = self.ROW_COLORS[i % 2]
         else:
+            row_hits = 0
+            row_misses = 0
+            cfg_fail = []
             for i, rd in enumerate(self._rows):
                 old_bg = rd.get("row_bg")
                 new_bg = color_map.get(old_bg) if old_bg else None
                 if new_bg:
+                    row_hits += 1
                     rd["row_bg"] = new_bg
                     for w in rd.get("bg_widgets", rd.get("all_widgets", [])):
                         try:
                             w.configure(bg=new_bg)
-                        except tk.TclError:
-                            pass
+                        except tk.TclError as e:
+                            cfg_fail.append(f"{w.__class__.__name__}:{e}")
+                else:
+                    row_misses += 1
+                    if row_misses <= 3:
+                        keys = list(rd.keys())
+                        wcount = len(rd.get("all_widgets", []))
+                        _dbg(f"TOGGLE_DARK row_miss i={i} old_bg={old_bg!r} keys={keys} all_widgets_n={wcount}")
                 # Foreground on every Label in the row
                 for w in rd.get("all_widgets", []):
                     if isinstance(w, tk.Label):
@@ -663,6 +693,8 @@ class TkPicker:
                                 w.configure(fg=new_fg)
                         except tk.TclError:
                             pass
+            _dbg(f"TOGGLE_DARK rows loop: hits={row_hits} misses={row_misses} "
+                 f"cfg_failures={cfg_fail[:5]}")
 
         # tk.Text tag foreground (not a widget attr, not caught by walk)
         def _fix_text_tags(w):
@@ -2034,18 +2066,41 @@ class TkPicker:
 
         url = get_buymeacoffee_url()
 
+        copy_status = tk.Label(body, text="", bg=self.BG, fg="#1a8a1a",
+                               font=("Helvetica", 10, "bold"))
+        copy_status.pack(pady=(2, 0))
+
+        def _do_copy_url():
+            ok = copy_text_to_clipboard(url)
+            try:
+                self.root.clipboard_clear()
+                self.root.clipboard_append(url)
+                self.root.update()
+            except Exception as e:
+                _dbg(f"tk clipboard fallback failed: {e}")
+            try:
+                if copy_status.winfo_exists():
+                    copy_status.configure(
+                        text="Link copied to clipboard" if ok
+                        else "Link copied (only while app is running)")
+            except Exception: pass
+
         def _show_btn_menu(e):
-            menu = tk.Menu(top, tearoff=0)
+            try: top.grab_release()
+            except Exception: pass
+            menu = tk.Menu(self.root, tearoff=0)
             menu.add_command(label="Open in browser",
                              command=lambda: _close(self.TIP_RESULT_TIP))
             menu.add_command(label="Copy link address",
-                             command=lambda: (
-                                 self.root.clipboard_clear(),
-                                 self.root.clipboard_append(url)))
+                             command=_do_copy_url)
             try:
                 menu.tk_popup(e.x_root, e.y_root)
             finally:
                 menu.grab_release()
+                try:
+                    if top.winfo_exists():
+                        top.grab_set()
+                except Exception: pass
         btn.bind("<Button-3>", _show_btn_menu)
 
         dismiss = tk.Label(body, text="Not now",
