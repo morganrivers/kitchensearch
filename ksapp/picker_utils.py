@@ -278,6 +278,69 @@ def copy_image_to_clipboard(path):
         subprocess.run(cmd, stdin=f, check=True)
 
 
+def copy_text_to_clipboard(text):
+    """Persistently copy text to the system clipboard using OS-native tools.
+    Returns True on success."""
+    assert isinstance(text, str), "text must be a string"
+    data = text.encode("utf-8")
+
+    if sys.platform == "darwin":
+        try:
+            subprocess.run(["pbcopy"], input=data, check=True)
+            return True
+        except Exception as e:
+            _dbg(f"pbcopy failed: {e}")
+            return False
+
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            CF_UNICODETEXT = 13
+            u32 = ctypes.windll.user32
+            k32 = ctypes.windll.kernel32
+            k32.GlobalAlloc.restype = ctypes.c_void_p
+            k32.GlobalLock.restype  = ctypes.c_void_p
+            k32.GlobalLock.argtypes = [ctypes.c_void_p]
+            k32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+            u32.SetClipboardData.restype = ctypes.c_void_p
+            u32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+            buf = (text + "\0").encode("utf-16le")
+            h = k32.GlobalAlloc(0x0002, len(buf))
+            p = k32.GlobalLock(h)
+            ctypes.memmove(p, buf, len(buf))
+            k32.GlobalUnlock(h)
+            if not u32.OpenClipboard(None):
+                k32.GlobalFree(h)
+                return False
+            try:
+                u32.EmptyClipboard()
+                if not u32.SetClipboardData(CF_UNICODETEXT, h):
+                    k32.GlobalFree(h)
+                    return False
+            finally:
+                u32.CloseClipboard()
+            return True
+        except Exception as e:
+            _dbg(f"win32 clipboard text failed: {e}")
+            return False
+
+    if os.environ.get("WAYLAND_DISPLAY") and shutil.which("wl-copy"):
+        cmd = ["wl-copy"]
+    elif shutil.which("xclip"):
+        cmd = ["xclip", "-selection", "clipboard"]
+    elif shutil.which("xsel"):
+        cmd = ["xsel", "--clipboard", "--input"]
+    else:
+        _dbg("copy_text_to_clipboard: no xclip/xsel/wl-copy available")
+        return False
+    try:
+        subprocess.run(cmd, input=data, check=True)
+        return True
+    except Exception as e:
+        _dbg(f"clipboard text copy failed: {e}")
+        return False
+
+
 def _cleanup_incomplete_data():
     """Remove any partially extracted npy files so the next download starts clean."""
     if _has_semantic_models():

@@ -298,6 +298,11 @@ def main():
     if "install" not in settings:
         settings["install"] = time.time()
         save_settings(settings)
+    if (sys.platform != "win32"
+            and settings.get("semantic_first", True)
+            and _has_semantic_models()
+            and not _daemon_alive()):
+        _spawn_daemon()
     _dbg("APP: TkPicker init start")
     def _on_dark_toggle(dark):
         settings["dark_mode"] = dark
@@ -412,8 +417,17 @@ def main():
                 pats = [re.compile(r'\b' + re.escape(w) + r'\b') for w in q.lower().split()]
                 return r, pats, f"'{q}'"
 
+            # A click on a menu row must resolve to a known mode; only typed
+            # text is allowed to bypass _label_to_mode and fall through to a
+            # search. The legacy `or mode_key is None` fallback hid label
+            # mismatches as silent searches (the suspected old-Windows bug).
+            assert picker.result_typed or mode_key is not None, (
+                f"clicked menu label {mode!r} did not map to a known mode; "
+                f"known labels: {list(_label_to_mode.keys())!r}"
+            )
+
             # ── typed text → default search ───────────────────────────────
-            if picker.result_typed or mode_key is None:
+            if picker.result_typed:
                 query = mode
                 if settings.get("semantic_first", True) and has_sem:
                     if not _daemon_alive():
