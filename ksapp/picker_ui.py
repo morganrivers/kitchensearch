@@ -571,7 +571,10 @@ class TkPicker:
     def _walk_retheme(self, widget, color_map, _stats=None):
         for attr in ("background", "foreground"):
             try:
-                raw = widget.cget(attr)
+                # str() handles Aqua returning _tkinter.Tcl_Obj from cget so
+                # raw is hashable everywhere it gets used downstream (norm,
+                # diagnostic miss-bucket key).
+                raw = str(widget.cget(attr))
                 old = self._norm_color(raw)
                 new = color_map.get(old)
                 if _stats is not None:
