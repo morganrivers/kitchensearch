@@ -92,25 +92,6 @@ cd kitchensearch
 ./kitchensearch # launch the app
 ```
 
-### Installing from source (tested on Ubuntu)
-
-- Linux with X11 or Wayland (not sure which? run `echo $XDG_SESSION_TYPE`)
-- **Python 3.10+**
-- Tkinter (e.g. `sudo apt install python3-tk`)
-```bash
-git clone https://github.com/morganrivers/kitchensearch.git
-sudo apt install python3-tk # install tkinter (python UI)
-./scripts/install_from_source.sh # installs a venv and unzips app assets
-.venv/bin/python3 kitchensearch.py # launch the app
-```
-
-
-#### Disk usage
-
-The base install uses ~400 MB (scripts + embedding data + Python packages).
-
-Thumbnail images are cached as you browse (~10 KB each) in `~/.cache/kitchensearch/thumbs/`. The cache grows gradually with use but is automatically pruned to stay under 200 MB. Copied emojis can always be rediscovered offline as well.
-
 ### Setting a Keyboard Shortcut
 
 Launching the picker with a hotkey makes it instant to use from any app.
@@ -152,6 +133,28 @@ rm -rf kitchensearch
 rm -rf ~/.cache/kitchensearch
 rm -rf ~/.config/kitchensearch
 ```
+
+</details>
+
+<details>
+<summary><b>Installing from source (tested on Ubuntu)</b></summary>
+
+- Linux with X11 or Wayland (not sure which? run `echo $XDG_SESSION_TYPE`)
+- **Python 3.10+**
+- Tkinter (e.g. `sudo apt install python3-tk`)
+```bash
+git clone https://github.com/morganrivers/kitchensearch.git
+sudo apt install python3-tk # install tkinter (python UI)
+./scripts/install_from_source.sh # installs a venv and unzips app assets
+.venv/bin/python3 kitchensearch.py # launch the app
+```
+
+
+### Disk usage
+
+The base install uses ~400 MB (scripts + embedding data + Python packages).
+
+Thumbnail images are cached as you browse (~10 KB each) in `~/.cache/kitchensearch/thumbs/`. The cache grows gradually with use but is automatically pruned to stay under 200 MB. Copied emojis can always be rediscovered offline as well.
 
 </details>
 
