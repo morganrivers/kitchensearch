@@ -588,6 +588,11 @@ def _main_darwin():
     class _TrayApp(rumps.App):
         def __init__(self):
             super().__init__(APP_NAME, icon=icon, template=False, quit_button=None)
+            if icon:
+                import AppKit
+                ns_img = AppKit.NSImage.alloc().initWithContentsOfFile_(icon)
+                if ns_img:
+                    AppKit.NSApp.setApplicationIconImage_(ns_img)
             self.menu = [
                 rumps.MenuItem("Open Kitchen Search", callback=self._open),
                 None,  # separator
