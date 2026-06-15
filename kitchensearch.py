@@ -233,6 +233,43 @@ def _hotkey_daemon_alive():
     return False
 
 
+_TRAY_DAEMON_PID = CONFIG_DIR / "daemon.pid"
+
+
+def _tray_daemon_alive_darwin():
+    if not _TRAY_DAEMON_PID.exists():
+        return False
+    try:
+        pid = int(_TRAY_DAEMON_PID.read_text().strip())
+    except (ValueError, OSError):
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        _TRAY_DAEMON_PID.unlink(missing_ok=True)
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _spawn_tray_daemon_darwin():
+    import shutil, subprocess
+    cmd = shutil.which("kitchensearch_daemon")
+    if cmd:
+        argv = [cmd]
+    else:
+        daemon_py = _REPO / "kitchensearch_daemon.py"
+        assert daemon_py.exists(), (
+            f"cannot find 'kitchensearch_daemon' on PATH or {daemon_py}"
+        )
+        argv = [_PYTHON, str(daemon_py)]
+    subprocess.Popen(
+        argv, start_new_session=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+
 def _set_process_name(name):
     if sys.platform.startswith("linux"):
         try:
@@ -256,7 +293,12 @@ def _ensure_desktop_integration():
     if venv_python.exists() and script.exists():
         exec_cmd = f"{venv_python} {script}"
     else:
-        exec_cmd = os.path.abspath(sys.argv[0])
+        ui_entry = _REPO / "kitchensearch"
+        assert ui_entry.exists(), (
+            f"kitchensearch UI entry point not found at {ui_entry}; "
+            "Nuitka multidist binary would dispatch to a non-UI mode"
+        )
+        exec_cmd = str(ui_entry)
     new = (template.read_text()
            .replace("__INSTALL_DIR__", install_dir)
            .replace("__EXEC_CMD__", exec_cmd))
@@ -294,6 +336,9 @@ def main():
                 _sp.Popen([str(_hotkey_exe)], creationflags=_flags)
             elif _hotkey_py.exists():
                 _sp.Popen([_PYTHON, str(_hotkey_py)], creationflags=_flags)
+    elif sys.platform == "darwin":
+        if not _tray_daemon_alive_darwin():
+            _spawn_tray_daemon_darwin()
     settings = load_settings()
     if "install" not in settings:
         settings["install"] = time.time()

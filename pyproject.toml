@@ -23,15 +23,17 @@ dependencies = [
     "screeninfo",
     "certifi",
     "python-xlib; sys_platform == 'linux'",
+    "rumps; sys_platform == 'darwin'",
 ]
 
 [project.scripts]
-kitchensearch       = "kitchensearch:main"
-emoji_story         = "ksapp.emoji_story:main"
-emoji_split_daemon  = "ksapp.emoji_split_daemon:main"
+kitchensearch        = "kitchensearch:main"
+kitchensearch_daemon = "kitchensearch_daemon:main"
+emoji_story          = "ksapp.emoji_story:main"
+emoji_split_daemon   = "ksapp.emoji_split_daemon:main"
 
 [tool.setuptools]
-py-modules = ["kitchensearch"]
+py-modules = ["kitchensearch", "kitchensearch_daemon"]
 packages = ["ksapp"]
 
 [tool.setuptools.package-data]

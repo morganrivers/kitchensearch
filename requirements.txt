@@ -9,4 +9,5 @@ tokenizers
 screeninfo
 certifi
 python-xlib; sys_platform == "linux"
+rumps; sys_platform == "darwin"
 

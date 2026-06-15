@@ -1,36 +1,29 @@
 #!/usr/bin/env python3
 """
-KitchenSearch Windows daemon.
+KitchenSearch background daemon.
 
-Registers a global hotkey (default Ctrl+Alt+K) and spawns the picker each
-time it fires.  Runs as a Windows system-tray application.  On first run it
-writes itself to the Windows registry so it restarts automatically with your
-login session.
+Windows: registers a global hotkey (default Ctrl+Alt+K), hosts a system-tray
+icon, and adds itself to the registry for login auto-start.
 
-Usage
------
-  First run (interactive, sets up auto-start):
-    python kitchensearch_daemon.py
-
-  Open the settings window to change the hotkey:
-    python kitchensearch_daemon.py --settings
-
-  Remove auto-start and exit:
-    python kitchensearch_daemon.py --uninstall
-
-  Refresh auto-start path without waiting for hotkey:
-    python kitchensearch_daemon.py --setup
+macOS: hosts a status-bar (menu-bar) icon via rumps. No global hotkey — users
+bind one through Raycast/Alfred/System Settings against the `kitchensearch`
+command. Menu items spawn the picker as a subprocess.
 """
 import ctypes
 import ctypes.wintypes
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
-import winreg
 from pathlib import Path
 from ksapp.log import _dbg
+
+if sys.platform == "win32":
+    import winreg
+else:
+    winreg = None  # never read on non-Windows
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 
@@ -197,7 +190,10 @@ _HOTKEY_ID    = 1
 
 # On 64-bit Windows WPARAM/LPARAM/LRESULT are pointer-sized (LONG_PTR / UINT_PTR),
 # but ctypes.wintypes defines them as 32-bit.  Use c_ssize_t / c_size_t instead.
-_WNDPROCTYPE = ctypes.WINFUNCTYPE(
+# WINFUNCTYPE only exists on Windows; fall back to CFUNCTYPE off-Windows so the
+# module can be imported on macOS (where only the rumps branch runs).
+_FUNCTYPE = ctypes.WINFUNCTYPE if sys.platform == "win32" else ctypes.CFUNCTYPE
+_WNDPROCTYPE = _FUNCTYPE(
     ctypes.c_ssize_t,        # LRESULT
     ctypes.wintypes.HWND,
     ctypes.wintypes.UINT,
@@ -533,16 +529,79 @@ def _restart_daemon():
     else:
         print(f"[{APP_NAME}] WARNING: could not find tray window to signal")
 
-# ── entry point ───────────────────────────────────────────────────────────────
+# ── macOS status-bar implementation ───────────────────────────────────────────
 
-def main():
-    if sys.platform != "win32":
-        sys.exit(
-            "This daemon is Windows-only.\n"
-            "On Linux/macOS assign a shortcut in your DE or WM settings;\n"
-            "the .desktop file (Linux) or app bundle (macOS) is the entry point."
-        )
+def _picker_cmd_darwin():
+    """Command for spawning the picker subprocess from the status-bar menu."""
+    sh = shutil.which("kitchensearch")
+    if sh:
+        return [sh]
+    picker_py = _HERE / "kitchensearch.py"
+    assert picker_py.exists(), (
+        f"cannot find 'kitchensearch' on PATH or {picker_py}; "
+        "did the package install correctly?"
+    )
+    return [sys.executable, str(picker_py)]
 
+
+def _pid_alive_darwin():
+    """True if a daemon pid file points to a live process."""
+    if not _PID_FILE.exists():
+        return False
+    try:
+        pid = int(_PID_FILE.read_text().strip())
+    except (ValueError, OSError):
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        _PID_FILE.unlink(missing_ok=True)
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _main_darwin():
+    if _pid_alive_darwin():
+        print(f"[{APP_NAME}] tray daemon already running, exiting")
+        return
+
+    # Import first so a missing rumps doesn't leave a stale pid file.
+    import rumps
+
+    picker_cmd = _picker_cmd_darwin()
+    icon = str(_TRAY_ICON_PATH) if _TRAY_ICON_PATH.exists() else None
+
+    class _TrayApp(rumps.App):
+        def __init__(self):
+            # template=True lets macOS auto-invert the icon for light/dark menu bars.
+            super().__init__(APP_NAME, icon=icon, template=True, quit_button=None)
+            self.menu = [
+                rumps.MenuItem("Open Kitchen Search", callback=self._open),
+                None,  # separator
+                rumps.MenuItem("Quit", callback=self._quit),
+            ]
+
+        def _open(self, _):
+            subprocess.Popen(
+                picker_cmd, start_new_session=True,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+
+        def _quit(self, _):
+            rumps.quit_application()
+
+    _write_pid()
+    try:
+        _TrayApp().run()
+    finally:
+        _PID_FILE.unlink(missing_ok=True)
+
+
+# ── Windows implementation ────────────────────────────────────────────────────
+
+def _main_win():
     args = set(sys.argv[1:])
 
     if "--uninstall" in args:
@@ -575,6 +634,20 @@ def main():
         _run()
     finally:
         ctypes.windll.kernel32.CloseHandle(_mutex)
+
+
+# ── entry point ───────────────────────────────────────────────────────────────
+
+def main():
+    if sys.platform == "win32":
+        _main_win()
+    elif sys.platform == "darwin":
+        _main_darwin()
+    else:
+        sys.exit(
+            f"[{APP_NAME}] daemon supports only win32 and darwin; "
+            f"on Linux assign a shortcut via your DE/WM and use the .desktop file."
+        )
 
 
 if __name__ == "__main__":
