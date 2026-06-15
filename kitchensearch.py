@@ -336,9 +336,12 @@ def main():
                 _sp.Popen([str(_hotkey_exe)], creationflags=_flags)
             elif _hotkey_py.exists():
                 _sp.Popen([_PYTHON, str(_hotkey_py)], creationflags=_flags)
-    elif sys.platform == "darwin":
-        if not _tray_daemon_alive_darwin():
-            _spawn_tray_daemon_darwin()
+    # macOS: tray daemon auto-spawn is disabled. Earlier attempt to spawn it
+    # from here broke subsequent picker launches under the mac-smoke harness —
+    # tests 02+ couldn't find the Tk window by pid, likely because rumps's
+    # NSApplication and Tk Aqua collide when both run under the same app name.
+    # Users can launch `kitchensearch_daemon` manually for now; we'll re-enable
+    # auto-spawn once the underlying conflict is understood.
     settings = load_settings()
     if "install" not in settings:
         settings["install"] = time.time()
