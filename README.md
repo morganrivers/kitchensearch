@@ -139,6 +139,8 @@ rm -rf ~/.config/kitchensearch
 <details>
 <summary><b>Installing from source (tested on Ubuntu)</b></summary>
 
+macOS users should use the uv install method above instead.
+
 - Linux with X11 or Wayland (not sure which? run `echo $XDG_SESSION_TYPE`)
 - **Python 3.10+**
 - Tkinter (e.g. `sudo apt install python3-tk`)
