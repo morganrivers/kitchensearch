@@ -554,12 +554,18 @@ class TkPicker:
         self.root.tk.call('raise', self._back_btn._w)
 
     def _norm_color(self, color):
-        if not isinstance(color, str) or not color:
-            return color
+        # cget() on Aqua can return _tkinter.Tcl_Obj (unhashable) instead of
+        # str; coerce so the result is always a hashable string and safe to
+        # use as a dict key.
+        if color is None:
+            return None
+        s = str(color)
+        if not s:
+            return s
         try:
-            r, g, b = self.root.winfo_rgb(color)
+            r, g, b = self.root.winfo_rgb(s)
         except (tk.TclError, ValueError):
-            return color
+            return s
         return f"#{r // 256:02x}{g // 256:02x}{b // 256:02x}"
 
     def _walk_retheme(self, widget, color_map, _stats=None):
