@@ -40,7 +40,19 @@ _DAEMON_EXE = _HERE / "kitchensearch_daemon.exe"
 APP_NAME       = "KitchenSearch"
 DEFAULT_HOTKEY = "Ctrl+Alt+K"
 
-_TRAY_ICON_PATH = _HERE / "ksapp" / "data" / "ui_assets" / "tray-icon.png"
+
+def _find_tray_icon() -> Path:
+    try:
+        import importlib.resources as _ir
+        p = Path(str(_ir.files("ksapp").joinpath("data/ui_assets/tray-icon.png")))
+        if p.exists():
+            return p
+    except Exception:
+        pass
+    return _HERE / "ksapp" / "data" / "ui_assets" / "tray-icon.png"
+
+
+_TRAY_ICON_PATH = _find_tray_icon()
 
 # ── config ────────────────────────────────────────────────────────────────────
 # Shares picker-settings.json with the main app so all settings live in one file.
@@ -575,8 +587,7 @@ def _main_darwin():
 
     class _TrayApp(rumps.App):
         def __init__(self):
-            # template=True lets macOS auto-invert the icon for light/dark menu bars.
-            super().__init__(APP_NAME, icon=icon, template=True, quit_button=None)
+            super().__init__(APP_NAME, icon=icon, template=False, quit_button=None)
             self.menu = [
                 rumps.MenuItem("Open Kitchen Search", callback=self._open),
                 None,  # separator
