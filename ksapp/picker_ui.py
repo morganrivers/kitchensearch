@@ -1464,6 +1464,7 @@ class TkPicker:
         self._dismiss_toast()
         self._back_btn.place_forget()
         self._cancel_hook = None
+        self._on_favorite = None
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -1673,6 +1674,16 @@ class TkPicker:
         except ValueError:
             return
         self._click_row(idx)
+
+    def _favorite_image_row(self, rd):
+        """Right-click handler: hand the row's label to the on_favorite
+        callback (which toggles favorite state). No-op if none is set."""
+        if not self._on_favorite:
+            return
+        try:
+            self._on_favorite(rd["label"])
+        except Exception as e:
+            _dbg(f"on_favorite callback failed: {e}")
 
     @staticmethod
     def _is_emoji_char(ch):
@@ -2141,9 +2152,10 @@ class TkPicker:
 
         return result[0]
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_research_cb=False, prompt_fn=None):
+    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_research_cb=False, prompt_fn=None, on_favorite=None):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
+        self._on_favorite = on_favorite
         if show_dark_btn:
             self._dm_btn.place(relx=1.0, rely=1.0, anchor="se", x=-6, y=-6)
             self.root.tk.call('raise', self._dm_btn._w)
@@ -2304,6 +2316,8 @@ class TkPicker:
                 w.bind("<MouseWheel>", self._on_scroll)
                 w.bind("<Button-4>",   self._on_scroll)
                 w.bind("<Button-5>",   self._on_scroll)
+                if self._on_favorite:
+                    w.bind("<Button-3>", lambda e, _rd=rd: self._favorite_image_row(_rd))
             if len(self._rows) == 1:
                 self._select(0)
 
