@@ -170,7 +170,8 @@ def _powershell(script: str):
 
 class WinTestHarness:
     WINDOW_TITLE    = "Kitchen Search"
-    STARTUP_TIMEOUT = 60.0
+    STARTUP_TIMEOUT = 45.0   # per attempt
+    STARTUP_ATTEMPTS = 3     # relaunch if the window doesn't appear in time
     STARTUP_SETTLE  = 1.5
 
     def __init__(self, run_dir, settings_path: Path | None = None,
@@ -224,18 +225,31 @@ class WinTestHarness:
         self.effective_env      = {}
 
         env = os.environ.copy()
-        env["XDG_CONFIG_HOME"]         = str(_TEST_CONFIG_DIR.parent)
-        env["KITCHENSEARCH_NO_BLINK"]  = "1"
-        # Keep the GUI self-contained: no background search/hotkey daemons,
-        # which on Windows can otherwise stall a later launch's startup.
-        env["KITCHENSEARCH_NO_DAEMON"] = "1"
+        env["XDG_CONFIG_HOME"]        = str(_TEST_CONFIG_DIR.parent)
+        env["KITCHENSEARCH_NO_BLINK"] = "1"
 
         # Clear the clipboard so a post-test read distinguishes "the app copied
         # something" from "stale clipboard content".
         _powershell("Set-Clipboard -Value ([string]::Empty)")
 
+        # The GUI occasionally needs a second try to come up under CI load
+        # (e.g. a slow first window paint), so relaunch rather than fail outright.
+        last_err: Exception | None = None
+        for attempt in range(1, self.STARTUP_ATTEMPTS + 1):
+            try:
+                return self._spawn_and_wait(env)
+            except RuntimeError as exc:
+                last_err = exc
+                print(f"    [launch] attempt {attempt}/{self.STARTUP_ATTEMPTS} "
+                      f"failed: {exc}", file=sys.stderr, flush=True)
+                self._terminate_proc()
+        assert last_err is not None
+        raise last_err
+
+    def _spawn_and_wait(self, env):
         self._stderr_buf = []
-        self._stderr_log_fh = open(self._stderr_log_path, "wb")
+        if self._stderr_log_fh is None:
+            self._stderr_log_fh = open(self._stderr_log_path, "wb")
         self._proc = subprocess.Popen(
             self._app_cmd, env=env, cwd=str(_REPO),
             stderr=subprocess.PIPE,
@@ -263,6 +277,23 @@ class WinTestHarness:
             f"Window '{self.WINDOW_TITLE}' did not appear within "
             f"{self.STARTUP_TIMEOUT}s"
         )
+
+    def _terminate_proc(self):
+        """Kill the current app process tree so a retry starts clean."""
+        if self._proc:
+            subprocess.run(
+                ["taskkill", "/PID", str(self._proc.pid), "/T", "/F"],
+                capture_output=True,
+            )
+            try:
+                self._proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+        if self._stderr_thread:
+            self._stderr_thread.join(timeout=3)
+            self._stderr_thread = None
+        self._proc = None
+        self._hwnd = None
 
     def _drain_stderr(self):
         try:

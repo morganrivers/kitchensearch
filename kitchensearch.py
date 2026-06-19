@@ -402,10 +402,7 @@ def main():
     _set_process_name("kitchensearch")
     _ensure_desktop_integration()
     _dbg("APP_START")
-    # KITCHENSEARCH_NO_DAEMON keeps the GUI self-contained (used by the test
-    # harnesses): no background search/hotkey daemons are spawned.
-    _no_daemon = bool(os.environ.get("KITCHENSEARCH_NO_DAEMON"))
-    if sys.platform == "win32" and not _no_daemon:
+    if sys.platform == "win32":
         if not _daemon_alive():
             _spawn_daemon()
         if not _hotkey_daemon_alive():
@@ -430,7 +427,6 @@ def main():
     lic = LicenseManager()
     lic.refresh_async()
     if (sys.platform != "win32"
-            and not _no_daemon
             and settings.get("semantic_first", True)
             and _has_semantic_models()
             and not _daemon_alive()):
