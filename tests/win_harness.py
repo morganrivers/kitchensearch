@@ -308,6 +308,9 @@ class WinTestHarness:
     # ── window helpers ───────────────────────────────────────────────────────
 
     def _find_window(self):
+        # Only match the title window owned by the app *we* launched, so a stray
+        # window left over from a previous (e.g. timed-out) test can't be picked up.
+        want_pid = self._proc.pid if self._proc else None
         matches: list[int] = []
 
         def _cb(hwnd, _lparam):
@@ -318,8 +321,14 @@ class WinTestHarness:
                 return True
             buf = ctypes.create_unicode_buffer(length + 1)
             user32.GetWindowTextW(hwnd, buf, length + 1)
-            if self.WINDOW_TITLE in buf.value:
-                matches.append(hwnd)
+            if self.WINDOW_TITLE not in buf.value:
+                return True
+            if want_pid is not None:
+                pid = wintypes.DWORD(0)
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                if pid.value != want_pid:
+                    return True
+            matches.append(hwnd)
             return True
 
         user32.EnumWindows(_WNDENUMPROC(_cb), 0)

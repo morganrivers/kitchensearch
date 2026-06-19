@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Cancel an in-progress run on the same ref when a newer commit is pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   linux-tests:
     runs-on: ubuntu-latest
@@ -49,6 +54,7 @@ jobs:
       # is uploaded as an artifact you can download from the run summary.
       - name: Run test_01_main_menu
         continue-on-error: true
+        timeout-minutes: 6
         run: .venv/bin/python tests/linux_run.py test_01_main_menu
       - if: always()
         uses: actions/upload-artifact@v4
@@ -59,6 +65,7 @@ jobs:
 
       - name: Run test_02_keyword_search
         continue-on-error: true
+        timeout-minutes: 6
         run: .venv/bin/python tests/linux_run.py test_02_keyword_search
       - if: always()
         uses: actions/upload-artifact@v4
@@ -69,6 +76,7 @@ jobs:
 
       - name: Run test_15_banner
         continue-on-error: true
+        timeout-minutes: 6
         run: .venv/bin/python tests/linux_run.py test_15_banner
       - if: always()
         uses: actions/upload-artifact@v4
@@ -79,6 +87,7 @@ jobs:
 
       - name: Run test_16_story
         continue-on-error: true
+        timeout-minutes: 6
         run: .venv/bin/python tests/linux_run.py test_16_story
       - if: always()
         uses: actions/upload-artifact@v4
@@ -89,6 +98,7 @@ jobs:
 
       - name: Run test_30_manyresults
         continue-on-error: true
+        timeout-minutes: 6
         run: .venv/bin/python tests/linux_run.py test_30_manyresults
       - if: always()
         uses: actions/upload-artifact@v4
@@ -99,6 +109,7 @@ jobs:
 
       - name: Run test_31_darkmode
         continue-on-error: true
+        timeout-minutes: 6
         run: .venv/bin/python tests/linux_run.py test_31_darkmode
       - if: always()
         uses: actions/upload-artifact@v4
@@ -109,6 +120,7 @@ jobs:
 
       - name: Run test_32_settingtoggles
         continue-on-error: true
+        timeout-minutes: 6
         run: .venv/bin/python tests/linux_run.py test_32_settingtoggles
       - if: always()
         uses: actions/upload-artifact@v4
