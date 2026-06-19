@@ -716,6 +716,63 @@ def top_copied(n=10):
     return items[:n]
 
 
+# ── favorites ──────────────────────────────────────────────────────────────
+# Favorites are user data (not a regenerable cache), so they live in CONFIG_DIR
+# and survive cache trims. Stored as a list of {"alt", "url", "text"} dicts,
+# most-recently-added first, deduplicated by url.
+FAVORITES_PATH = CONFIG_DIR / "favorites.json"
+_favorites_lock = threading.Lock()
+
+
+def load_favorites():
+    try:
+        data = json.loads(FAVORITES_PATH.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _save_favorites(items):
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = FAVORITES_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(items, indent=2), encoding="utf-8")
+        tmp.replace(FAVORITES_PATH)
+    except Exception as e:
+        print(f"[favorites save fail] err={e}", flush=True)
+
+
+def is_favorite(url):
+    return any(f.get("url") == url for f in load_favorites())
+
+
+def add_favorite(alt, url, text=""):
+    with _favorites_lock:
+        items = [f for f in load_favorites() if f.get("url") != url]
+        items.insert(0, {"alt": alt, "url": url, "text": text or ""})
+        _save_favorites(items)
+
+
+def remove_favorite(url):
+    with _favorites_lock:
+        items = [f for f in load_favorites() if f.get("url") != url]
+        _save_favorites(items)
+
+
+def toggle_favorite(alt, url, text=""):
+    """Add the emoji if absent, remove it if present. Returns the new state
+    (True = now a favorite)."""
+    with _favorites_lock:
+        items = load_favorites()
+        if any(f.get("url") == url for f in items):
+            items = [f for f in items if f.get("url") != url]
+            _save_favorites(items)
+            return False
+        items.insert(0, {"alt": alt, "url": url, "text": text or ""})
+        _save_favorites(items)
+        return True
+
+
 def _trim_thumb_cache():
     counts = _load_copy_counts()
     entries, total = [], 0

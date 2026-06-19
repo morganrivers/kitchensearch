@@ -22,23 +22,28 @@ from ksapp.picker_utils import (
     query_daemon,
     _trim_thumb_cache, _spawn_daemon, _daemon_alive,
     get_buymeacoffee_url, get_tip_modal_button_path, should_show_tip_modal,
+    load_favorites, add_favorite, remove_favorite, toggle_favorite,
 )
 from ksapp.picker_ui import (
     TkPicker, pick_base_emoji,
 )
+from ksapp.license import LicenseManager
 
 _REPO = Path(__file__).resolve().parent
 
 
 # ── menu mode keys ───────────────────────────────────────────────────────────
 
-_MODE_SEMANTIC = "semantic"
-_MODE_KEYWORD  = "keyword"
-_MODE_COMBO    = "combo"
-_MODE_STORY    = "story"
-_MODE_SETTINGS = "settings"
+_MODE_SEMANTIC  = "semantic"
+_MODE_KEYWORD   = "keyword"
+_MODE_COMBO     = "combo"
+_MODE_STORY     = "story"
+_MODE_FAVORITES = "favorites"
+_MODE_SETTINGS  = "settings"
 
-_SETTINGS_KEY_HOTKEY = "__hotkey__"
+_SETTINGS_KEY_HOTKEY             = "__hotkey__"
+_SETTINGS_KEY_LICENSE            = "__license__"
+_SETTINGS_KEY_LICENSE_DEACTIVATE = "__license_deactivate__"
 
 # ── settings ──────────────────────────────────────────────────────────────────
 
@@ -176,7 +181,7 @@ def _maybe_show_tip_modal(picker, settings):
     picker.queue_tip_overlay(_TIP_MODAL_TEXT, get_tip_modal_button_path(), _on_tip_result)
 
 
-def _run_settings(picker, settings):
+def _run_settings(picker, settings, lic):
     sel_idx = 0
     tiling = _is_tiling_wm()
     while True:
@@ -199,6 +204,15 @@ def _run_settings(picker, settings):
             display_items.append(f"{'[x]' if settings['hide_ads'] else '[ ]'} Don't show support modal")
             item_keys.append("hide_ads")
 
+        if lic.configured():
+            licensed = lic.is_licensed()
+            verb = "manage" if licensed else "enter key"
+            display_items.append(f"License: {lic.status_summary()}  (click to {verb})")
+            item_keys.append(_SETTINGS_KEY_LICENSE)
+            if licensed:
+                display_items.append("Deactivate license on this device")
+                item_keys.append(_SETTINGS_KEY_LICENSE_DEACTIVATE)
+
         assert len(item_keys) == len(display_items)
 
         choice = picker.pick_settings("Settings", display_items, initial_sel=sel_idx)
@@ -218,10 +232,74 @@ def _run_settings(picker, settings):
             except Exception as e:
                 _dbg(f"re-read settings after hotkey change failed: {e}")
             continue
+        if key == _SETTINGS_KEY_LICENSE:
+            if lic.is_licensed():
+                picker.message(
+                    f"License is {lic.status_summary()}.\n\n"
+                    "Unlocks the Favorites menu and the dark-mode toggle.\n"
+                    "Use 'Deactivate license on this device' to free this "
+                    "activation for another machine.")
+            else:
+                entered = picker.ask("Paste your license key, then press Enter:",
+                                     placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX")
+                if entered:
+                    ok, msg = lic.activate(entered)
+                    picker.message(msg)
+            continue
+        if key == _SETTINGS_KEY_LICENSE_DEACTIVATE:
+            ok, msg = lic.deactivate()
+            picker.message(msg)
+            continue
         settings[key] = not settings[key]
         if key == "hide_ads":
             settings["snooze_until"] = 0
         save_settings(settings)
+
+
+def _run_favorites(picker, settings):
+    favs = load_favorites()
+    if not favs:
+        picker.message("No favorites yet.\n\n"
+                       "Right-click any search or combo result to add it here.")
+        return
+
+    fav_entries = [(format_label(f["alt"], f["url"], f.get("text", "")), f["url"], i)
+                   for i, f in enumerate(favs)]
+
+    def _resolve(label, _favs=favs):
+        m = re.match(r'^\S+', label)
+        sel_alt = m.group(0) if m else label
+        for f in _favs:
+            if f["alt"] == sel_alt:
+                return f
+        return None
+
+    def _copy_fav(label):
+        f = _resolve(label)
+        if not f:
+            return
+        path = get_thumb(f["url"])
+        if path:
+            copy_image_to_clipboard(path)
+            record_copy(f["url"], f["alt"])
+            settings["copy_count"] = settings.get("copy_count", 0) + 1
+            save_settings(settings)
+            if settings["notify_on_copy"]:
+                _notify("Copied to clipboard")
+
+    def _remove_fav(label):
+        f = _resolve(label)
+        if not f:
+            return
+        remove_favorite(f["url"])
+        picker.queue_toast("removed from favorites (reopen to refresh)")
+
+    on_sel = None if settings["exit_on_select"] else _copy_fav
+    result = picker.pick_with_images(
+        "Favorites  (right-click to remove):", fav_entries, get_thumb,
+        on_select=on_sel, on_favorite=_remove_fav)
+    if result and settings["exit_on_select"]:
+        _copy_fav(result)
 
 
 def _hotkey_daemon_alive():
@@ -346,6 +424,8 @@ def main():
     if "install" not in settings:
         settings["install"] = time.time()
         save_settings(settings)
+    lic = LicenseManager()
+    lic.refresh_async()
     if (sys.platform != "win32"
             and settings.get("semantic_first", True)
             and _has_semantic_models()
@@ -400,6 +480,11 @@ def main():
             if settings["show_story"]:
                 raw_menu.append((_MODE_STORY, "emoji story" + ("" if has_data else _nd),
                                  _menu_icon("llama", "fire")))
+            # Favorites is a paid feature: only surface it once a license is
+            # active. Kept fully hidden (not greyed out) when unlicensed.
+            _licensed = lic.is_licensed()
+            if _licensed:
+                raw_menu.append((_MODE_FAVORITES, "favorites", "⭐"))
             raw_menu.append((_MODE_SETTINGS, "settings",
                              _menu_icon("computer", "face_with_raised_eyebrow")))
 
@@ -413,7 +498,7 @@ def main():
                                            thumb_size=48, preload=True,
                                            placeholder="type to search..." if settings.get("semantic_first", True) else "type to keyword search...",
                                            filter=False,
-                                           show_dark_btn=True)
+                                           show_dark_btn=_licensed)
             _dbg(f"MENU_SHOW_DONE mode={mode!r}")
             if not mode:
                 sys.exit(0)
@@ -422,7 +507,13 @@ def main():
 
             # ── settings ─────────────────────────────────────────────────
             if mode_key == _MODE_SETTINGS:
-                _run_settings(picker, settings)
+                _run_settings(picker, settings, lic)
+                continue
+
+            # ── favorites (paid) ─────────────────────────────────────────
+            if mode_key == _MODE_FAVORITES:
+                if lic.is_licensed():
+                    _run_favorites(picker, settings)
                 continue
 
             # ── search helpers ────────────────────────────────────────────
@@ -566,7 +657,18 @@ def main():
                                     _notify("Copied to clipboard")
                             break
 
+                def _toggle_fav_combo(label, _all=all_combo):
+                    m = re.match(r'^\S+', label)
+                    sel_alt = m.group(0) if m else label
+                    for _, alt, url, text in _all:
+                        if alt == sel_alt:
+                            now_fav = toggle_favorite(alt, url, text)
+                            picker.queue_toast("added to favorites" if now_fav
+                                               else "removed from favorites")
+                            break
+
                 on_sel_combo = None if settings["exit_on_select"] else _copy_combo
+                on_fav_combo = _toggle_fav_combo if lic.is_licensed() else None
                 rest_entries = [(format_label(alt, url, text), url, ts)
                                 for ts, alt, url, text in rest]
                 if exact:
@@ -599,7 +701,7 @@ def main():
                 result = picker.pick_with_images(
                     f"{query_label} {count}:", combo_entries, get_thumb,
                     on_select=on_sel_combo, patterns=patterns,
-                    prompt_fn=_combo_prompt)
+                    prompt_fn=_combo_prompt, on_favorite=on_fav_combo)
                 _dbg(f"COMBO: pick_with_images done result={result!r}")
                 if result and settings["exit_on_select"]:
                     _copy_combo(result)
@@ -661,14 +763,25 @@ def main():
                                     _notify("Copied to clipboard")
                             break
 
+                def _toggle_fav_result(label, _results=results):
+                    m = re.match(r'^\S+', label)
+                    sel_alt = m.group(0) if m else label
+                    for _, alt, url, text in _results:
+                        if alt == sel_alt:
+                            now_fav = toggle_favorite(alt, url, text)
+                            picker.queue_toast("added to favorites" if now_fav
+                                               else "removed from favorites")
+                            break
+
                 on_sel = None if settings["exit_on_select"] else _copy_selected
+                on_fav = _toggle_fav_result if lic.is_licensed() else None
                 _ql = query_label
                 def _make_prompt(loaded, total, _ql=_ql):
                     return f"{_ql} (1-{loaded} of {total}):"
                 result = picker.pick_with_images(
                     f"{query_label} {count}:", icon_entries, get_thumb,
                     on_select=on_sel, patterns=patterns, show_research_cb=True,
-                    prompt_fn=_make_prompt)
+                    prompt_fn=_make_prompt, on_favorite=on_fav)
 
                 if picker.result_typed and result:
                     query = result
