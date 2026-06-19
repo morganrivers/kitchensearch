@@ -170,7 +170,7 @@ def _powershell(script: str):
 
 class WinTestHarness:
     WINDOW_TITLE    = "Kitchen Search"
-    STARTUP_TIMEOUT = 45.0
+    STARTUP_TIMEOUT = 60.0
     STARTUP_SETTLE  = 1.5
 
     def __init__(self, run_dir, settings_path: Path | None = None,
@@ -224,8 +224,11 @@ class WinTestHarness:
         self.effective_env      = {}
 
         env = os.environ.copy()
-        env["XDG_CONFIG_HOME"]        = str(_TEST_CONFIG_DIR.parent)
-        env["KITCHENSEARCH_NO_BLINK"] = "1"
+        env["XDG_CONFIG_HOME"]         = str(_TEST_CONFIG_DIR.parent)
+        env["KITCHENSEARCH_NO_BLINK"]  = "1"
+        # Keep the GUI self-contained: no background search/hotkey daemons,
+        # which on Windows can otherwise stall a later launch's startup.
+        env["KITCHENSEARCH_NO_DAEMON"] = "1"
 
         # Clear the clipboard so a post-test read distinguishes "the app copied
         # something" from "stale clipboard content".
