@@ -1,0 +1,113 @@
+name: Windows tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows-tests:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      # The python.org / setup-python Windows builds bundle Tcl/Tk, so tkinter
+      # works out of the box — no extra system package needed.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: python -m pip install --upgrade uv
+
+      - name: Create venv from this Python (so tkinter is available)
+        run: uv venv --python python .venv
+
+      - name: Install kitchensearch into the venv from the working tree
+        run: uv pip install --python .venv\Scripts\python.exe .
+
+      - name: Verify tkinter import inside the venv's Python
+        run: .venv\Scripts\python.exe -c "import tkinter; print(tkinter.TkVersion)"
+
+      - name: Fast unit tests
+        continue-on-error: true
+        run: .venv\Scripts\python.exe -m unittest discover -s tests/fast -t .
+
+      # Each test drives the Tk window through the Win32 harness and writes a
+      # per-test folder (with the GIF), uploaded as a downloadable artifact.
+      - name: Run test_01_main_menu
+        continue-on-error: true
+        run: .venv\Scripts\python.exe tests\win_run.py test_01_main_menu
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-gif-test_01_main_menu
+          path: tests/test_run/test_01_main_menu/
+          if-no-files-found: warn
+
+      - name: Run test_02_keyword_search
+        continue-on-error: true
+        run: .venv\Scripts\python.exe tests\win_run.py test_02_keyword_search
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-gif-test_02_keyword_search
+          path: tests/test_run/test_02_keyword_search/
+          if-no-files-found: warn
+
+      - name: Run test_15_banner
+        continue-on-error: true
+        run: .venv\Scripts\python.exe tests\win_run.py test_15_banner
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-gif-test_15_banner
+          path: tests/test_run/test_15_banner/
+          if-no-files-found: warn
+
+      - name: Run test_16_story
+        continue-on-error: true
+        run: .venv\Scripts\python.exe tests\win_run.py test_16_story
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-gif-test_16_story
+          path: tests/test_run/test_16_story/
+          if-no-files-found: warn
+
+      - name: Run test_30_manyresults
+        continue-on-error: true
+        run: .venv\Scripts\python.exe tests\win_run.py test_30_manyresults
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-gif-test_30_manyresults
+          path: tests/test_run/test_30_manyresults/
+          if-no-files-found: warn
+
+      - name: Run test_31_darkmode
+        continue-on-error: true
+        run: .venv\Scripts\python.exe tests\win_run.py test_31_darkmode
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-gif-test_31_darkmode
+          path: tests/test_run/test_31_darkmode/
+          if-no-files-found: warn
+
+      - name: Run test_32_settingtoggles
+        continue-on-error: true
+        run: .venv\Scripts\python.exe tests\win_run.py test_32_settingtoggles
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-gif-test_32_settingtoggles
+          path: tests/test_run/test_32_settingtoggles/
+          if-no-files-found: warn
