@@ -2,7 +2,7 @@ name: Linux tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/github-testing-windows-linux-06b9or]
   pull_request:
   workflow_dispatch:
 
