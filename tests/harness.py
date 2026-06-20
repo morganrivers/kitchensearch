@@ -107,6 +107,7 @@ class TestHarness:
         self.stderr_output: str = ""
         self._stderr_buf: list[bytes] = []
         self._stderr_thread: threading.Thread | None = None
+        self._idle_count = 0
         subprocess.run(
             ["xclip", "-selection", "clipboard"],
             input=b"test started",
@@ -176,8 +177,21 @@ class TestHarness:
         try:
             for line in self._proc.stderr:
                 self._stderr_buf.append(line)
+                if b"KSEVENT idle" in line:
+                    self._idle_count += 1
         except Exception:
             pass
+
+    def wait_for_idle(self, timeout: float = 3.0) -> bool:
+        """Block until the app reports it has settled (event loop quiescent and
+        no thumbnail loads in flight) — emitted after the most recent key."""
+        target = self._idle_count + 1
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self._idle_count >= target:
+                return True
+            time.sleep(0.01)
+        return False
 
     def _killpg(self, sig):
         try:
@@ -385,6 +399,10 @@ class TestHarness:
             wid = self._find_window()
             if wid:
                 self._wid = wid
+        # Synchronise to app readiness: wait until this key has been processed
+        # and any thumbnail loads it triggered have settled (deterministic across
+        # platforms, instead of relying on the script's fixed sleeps).
+        self.wait_for_idle()
 
     def type(self, text: str, delay_ms: int = 40):
         """Type a string into the focused widget."""

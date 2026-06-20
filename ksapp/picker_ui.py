@@ -229,6 +229,7 @@ class TkPicker:
         self._mode      = "input"
         self._rows      = []
         self._sel       = -1
+        self._inflight  = 0     # in-flight async thumbnail loads (test readiness)
         self._img_refs        = []
         self._prompt_img_refs = []
         self._options   = []
@@ -457,6 +458,9 @@ class TkPicker:
         root.bind("<End>",          self._end)
         root.bind("<Return>",       self._on_return)
         root.bind("<F5>",           self._dump_geometry)
+        # Use KeyRelease (not KeyPress): widget/class KeyPress bindings often
+        # return "break", which would preempt an "all"-level KeyPress binding.
+        root.bind_all("<KeyRelease>", self._on_any_key, add="+")
         root.bind("<Control-Down>", self._next_page)
         root.bind("<Control-Up>",   self._prev_page)
         root.bind("<Next>",         self._next_page)
@@ -1130,6 +1134,30 @@ class TkPicker:
         if self._rows and self._sel < len(self._rows) - 1:
             self._select(self._sel + 1)
         self._maybe_load_more()
+
+    # ── test readiness ────────────────────────────────────────────────────────
+    # When KITCHENSEARCH_TEST_EVENTS is set, emit an "idle" event once the event
+    # loop is quiescent *and* no thumbnail loads are in flight. A test can then
+    # wait for this instead of guessing with sleeps — so timing-sensitive steps
+    # (e.g. End jumping to the last *loaded* row) behave the same on every OS.
+    def _dec_inflight(self):
+        self._inflight = max(0, self._inflight - 1)
+        if self._inflight == 0:
+            self._emit_idle()
+
+    def _emit_idle(self):
+        try:
+            if self._inflight == 0 and not self._destroyed:
+                _event("idle")
+        except Exception:
+            pass
+
+    def _on_any_key(self, _e=None):
+        # After every key settles, report readiness (once loads, if any, finish).
+        try:
+            self.root.after_idle(self._emit_idle)
+        except Exception:
+            pass
 
     def _home(self, e=None):
         if self._rows:
@@ -2385,14 +2413,18 @@ class TkPicker:
                     path = on_url(url)
                     _on_image_ready(rank, label, path, score)
                 else:
+                    self._inflight += 1
                     def _worker(rank=rank, label=label, url=url, score=score):
                         _dbg(f"WORKER start rank={rank} url={url[:60]!r}")
                         path = on_url(url)
                         _dbg(f"WORKER done  rank={rank} path_ok={path is not None}")
                         if self._destroyed:
                             return
+                        def _done():
+                            _on_image_ready(rank, label, path, score)
+                            self._dec_inflight()
                         try:
-                            self.root.after(0, lambda: _on_image_ready(rank, label, path, score))
+                            self.root.after(0, _done)
                         except (RuntimeError, tk.TclError):
                             pass
                     threading.Thread(target=_worker, daemon=True).start()
