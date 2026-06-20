@@ -214,7 +214,6 @@ class WinTestHarness:
         self.stderr_output:      str        = ""
         self._stderr_buf:    list[bytes]              = []
         self._stderr_thread: threading.Thread | None = None
-        self._idle_count = 0
         self._stderr_log_path: Path = self.run_dir / "stderr.log"
         self._stderr_log_fh = None
 
@@ -323,8 +322,6 @@ class WinTestHarness:
         try:
             for line in self._proc.stderr:
                 self._stderr_buf.append(line)
-                if b"KSEVENT idle" in line:
-                    self._idle_count += 1
                 fh = self._stderr_log_fh
                 if fh is not None:
                     try:
@@ -478,18 +475,6 @@ class WinTestHarness:
         finally:
             for m in reversed(mods):
                 _send_vk(_MOD_VK[m], up=True)
-        self.wait_for_idle()
-
-    def wait_for_idle(self, timeout: float = 2.5) -> bool:
-        """Block until the app reports it settled (event loop quiescent + no
-        thumbnail loads in flight) after this key — deterministic cross-platform."""
-        target = self._idle_count + 1
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            if self._idle_count >= target:
-                return True
-            time.sleep(0.01)
-        return False
 
     def type(self, text: str, delay_ms: int = 40):
         self._activate()
