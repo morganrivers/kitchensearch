@@ -189,6 +189,20 @@ def _copy_image_xlib(png_data):
 def copy_image_to_clipboard(path):
     png_data = Path(path).read_bytes()
 
+    # Test hook: when KITCHENSEARCH_COPY_LOG is set, record a content hash of
+    # the image we're about to copy. The source PNG is identical on every OS
+    # (same downloaded combo), so this gives a platform-independent record of
+    # *which* image was copied — unlike the clipboard itself, whose encoding
+    # differs per platform (CF_DIB on Windows, raw PNG on macOS/Linux).
+    _copy_log = os.environ.get("KITCHENSEARCH_COPY_LOG")
+    if _copy_log:
+        try:
+            import hashlib
+            with open(_copy_log, "a", encoding="utf-8") as _f:
+                _f.write(f"{hashlib.sha256(png_data).hexdigest()}\t{Path(path).name}\n")
+        except OSError:
+            pass
+
     # macOS
     if sys.platform == "darwin":
         r = subprocess.run(
