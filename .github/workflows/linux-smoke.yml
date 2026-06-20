@@ -128,3 +128,19 @@ jobs:
           name: linux-gif-test_32_settingtoggles
           path: tests/test_run/test_32_settingtoggles/
           if-no-files-found: warn
+
+      # Pass condition: every step that should copy a combo image must have
+      # copied the *same* image as the approved baseline. Runs after all tests
+      # so it sees every per-step <step>_clipboard.png in tests/test_run.
+      - name: Verify clipboard image copies match baseline
+        if: always()
+        run: |
+          .venv/bin/python tests/check_clipboard.py --all --run-dir tests/test_run --json \
+            > tests/test_run/clipboard-check.json || true
+          .venv/bin/python tests/check_clipboard.py --all --run-dir tests/test_run
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-clipboard-check
+          path: tests/test_run/clipboard-check.json
+          if-no-files-found: warn

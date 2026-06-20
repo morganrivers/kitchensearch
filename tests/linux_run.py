@@ -76,6 +76,9 @@ def main():
                    help="parent directory for the per-test run folder")
     p.add_argument("--require-clipboard", action="store_true",
                    help="fail with rc=1 if the clipboard is empty after the test")
+    p.add_argument("--check-clipboard", action="store_true",
+                   help="after the run, verify every step that should copy an image "
+                        "copied the same image as the approved baseline (fail rc=1 if not)")
     args = p.parse_args()
 
     # Auto-wrap under xvfb-run unless we already have a display (real or virtual).
@@ -126,6 +129,15 @@ def main():
     stderr = harness.meaningful_stderr
     if stderr:
         print(f"  STDERR:\n{stderr}")
+
+    if args.check_clipboard:
+        from check_clipboard import check_test, _print_report
+        _BASELINE = _TESTS_DIR / "baseline_approved"
+        result = check_test(args.test_name, Path(args.output_dir), _BASELINE)
+        print()
+        _print_report(result)
+        if result["expected"] and not result["passed"]:
+            failed = True
 
     sys.exit(1 if failed else 0)
 
