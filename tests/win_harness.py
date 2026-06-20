@@ -273,9 +273,10 @@ class WinTestHarness:
                 self._activate()
                 return self
 
+        titles = self._all_window_titles()
         raise RuntimeError(
             f"Window '{self.WINDOW_TITLE}' did not appear within "
-            f"{self.STARTUP_TIMEOUT}s"
+            f"{self.STARTUP_TIMEOUT}s. Visible top-level windows: {titles!r}"
         )
 
     def _terminate_proc(self):
@@ -342,10 +343,38 @@ class WinTestHarness:
     # ── window helpers ───────────────────────────────────────────────────────
 
     def _find_window(self):
-        # Only match the title window owned by the app *we* launched, so a stray
-        # window left over from a previous (e.g. timed-out) test can't be picked up.
+        # Prefer the title window owned by the app *we* launched (so a stray
+        # window from a previous test isn't picked up), but fall back to any
+        # title match. Visibility is not required: a freshly mapped Tk window
+        # may not yet report visible, and we activate it before capturing.
         want_pid = self._proc.pid if self._proc else None
-        matches: list[int] = []
+        pid_matches:   list[int] = []
+        title_matches: list[int] = []
+
+        def _cb(hwnd, _lparam):
+            length = user32.GetWindowTextLengthW(hwnd)
+            if length == 0:
+                return True
+            buf = ctypes.create_unicode_buffer(length + 1)
+            user32.GetWindowTextW(hwnd, buf, length + 1)
+            if self.WINDOW_TITLE not in buf.value:
+                return True
+            title_matches.append(hwnd)
+            if want_pid is not None:
+                pid = wintypes.DWORD(0)
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                if pid.value == want_pid:
+                    pid_matches.append(hwnd)
+            return True
+
+        user32.EnumWindows(_WNDENUMPROC(_cb), 0)
+        if pid_matches:
+            return pid_matches[-1]
+        return title_matches[-1] if title_matches else None
+
+    def _all_window_titles(self) -> list[str]:
+        """Visible top-level window titles — diagnostic for startup failures."""
+        titles: list[str] = []
 
         def _cb(hwnd, _lparam):
             if not user32.IsWindowVisible(hwnd):
@@ -355,18 +384,11 @@ class WinTestHarness:
                 return True
             buf = ctypes.create_unicode_buffer(length + 1)
             user32.GetWindowTextW(hwnd, buf, length + 1)
-            if self.WINDOW_TITLE not in buf.value:
-                return True
-            if want_pid is not None:
-                pid = wintypes.DWORD(0)
-                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-                if pid.value != want_pid:
-                    return True
-            matches.append(hwnd)
+            titles.append(buf.value)
             return True
 
         user32.EnumWindows(_WNDENUMPROC(_cb), 0)
-        return matches[-1] if matches else None
+        return titles
 
     def _activate(self):
         hwnd = self._find_window() or self._hwnd
