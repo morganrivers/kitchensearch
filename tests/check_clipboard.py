@@ -131,15 +131,23 @@ def main():
                    help="parent dir holding per-test run folders")
     p.add_argument("--baseline-dir", default=str(_BASELINE),
                    help="parent dir holding approved baselines")
+    p.add_argument("--skip", action="append", default=[], metavar="TEST",
+                   help="test to exclude from --all (repeatable). Use for copies "
+                        "that can't be reproduced in CI, e.g. the model-generated "
+                        "emoji-story image.")
     p.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     args = p.parse_args()
 
     run_dir  = Path(args.run_dir)
     base_dir = Path(args.baseline_dir)
 
+    skipped = []
     if args.all:
-        tests = sorted(d.name for d in base_dir.iterdir()
-                       if d.is_dir() and any(d.glob("*_clipboard.png")))
+        tests = []
+        for d in sorted(base_dir.iterdir()):
+            if not (d.is_dir() and any(d.glob("*_clipboard.png"))):
+                continue
+            (skipped if d.name in args.skip else tests).append(d.name)
     elif args.test_name:
         tests = [args.test_name]
     else:
@@ -158,6 +166,8 @@ def main():
         ok    = sum(1 for r in results for i in r["images"] if i["status"] == "ok")
         print("  " + "─" * 56)
         print(f"  {ok}/{total} distinct expected image(s) copied across {len(results)} test(s)")
+        if skipped:
+            print(f"  skipped (not reproducible in CI): {', '.join(skipped)}")
         print()
 
     failed = [r for r in results if r["expected"] and not r["passed"]]
