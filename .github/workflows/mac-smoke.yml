@@ -72,6 +72,24 @@ jobs:
         run: |
           "$TOOL_PY" -m unittest discover -s tests/fast -t .
 
+      # Isolated input-layer check: drives a tiny Tk probe and verifies each
+      # harness key() delivers the correct Tk key event. Diagnostic (non-gating)
+      # — this is what catches "F11" being typed as literal text on macOS.
+      - name: Key-command unit test
+        continue-on-error: true
+        run: |
+          mkdir -p tests/test_run
+          "$TOOL_PY" tests/key_test.py --json > tests/test_run/key-test.json || true
+          "$TOOL_PY" tests/key_test.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-key-test
+          path: |
+            tests/test_run/key-test.json
+            tests/test_run/key_test/
+          if-no-files-found: warn
+
       - name: Upterm (interactive) - only when manually triggered
         if: github.event_name == 'workflow_dispatch' && inputs.debug
         uses: owenthereal/action-upterm@v1

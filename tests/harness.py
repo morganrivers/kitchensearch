@@ -92,11 +92,12 @@ class TestHarness:
     STARTUP_SETTLE = 1.5
 
     def __init__(self, run_dir: str | Path, settings_path: Path | None = None,
-                 saved_context: dict | None = None):
+                 saved_context: dict | None = None, app_cmd: list[str] | None = None):
         self.run_dir = Path(run_dir)
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self._settings_path = settings_path
         self._saved_context = saved_context
+        self._app_cmd = list(app_cmd) if app_cmd is not None else None
         self._proc = None
         self._wid = None
         self._shots: list[tuple[str, Path]] = []
@@ -136,7 +137,7 @@ class TestHarness:
         env["KITCHENSEARCH_COPY_LOG"] = str(copy_log)
         env.update(extra_env)
 
-        cmd = [sys.executable, str(_REPO / "kitchensearch.py")]
+        cmd = self._app_cmd or [sys.executable, str(_REPO / "kitchensearch.py")]
         self._stderr_buf = []
         self._proc = subprocess.Popen(cmd, env=env, cwd=str(_REPO),
                                       stderr=subprocess.PIPE,

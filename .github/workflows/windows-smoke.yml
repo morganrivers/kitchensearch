@@ -45,6 +45,23 @@ jobs:
         continue-on-error: true
         run: .venv\Scripts\python.exe -m unittest discover -s tests/fast -t .
 
+      # Isolated input-layer check: drives a tiny Tk probe and verifies each
+      # harness key() delivers the correct Tk key event. Diagnostic (non-gating).
+      - name: Key-command unit test
+        continue-on-error: true
+        run: |
+          mkdir tests\test_run -Force | Out-Null
+          .venv\Scripts\python.exe tests\key_test.py --json > tests/test_run/key-test.json
+          .venv\Scripts\python.exe tests\key_test.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-key-test
+          path: |
+            tests/test_run/key-test.json
+            tests/test_run/key_test/
+          if-no-files-found: warn
+
       # Each test drives the Tk window through the Win32 harness and writes a
       # per-test folder (with the GIF), uploaded as a downloadable artifact.
       - name: Run test_01_main_menu

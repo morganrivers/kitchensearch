@@ -60,6 +60,9 @@ _KEY_CODES = {
     "End":       119,
     "Page_Up":   116,
     "Page_Down": 121,
+    "F1":  122, "F2":  120, "F3":  99,  "F4":  118,
+    "F5":  96,  "F6":  97,  "F7":  98,  "F8":  100,
+    "F9":  101, "F10": 109, "F11": 103, "F12": 111,
 }
 
 _MOD_NAMES = {
@@ -311,9 +314,13 @@ class MacTestHarness:
         code = _KEY_CODES.get(key)
         if code is not None:
             script = f'tell application "System Events" to key code {code}{using}'
-        else:
+        elif len(key) == 1:
             esc = key.replace("\\", "\\\\").replace('"', '\\"')
             script = f'tell application "System Events" to keystroke "{esc}"{using}'
+        else:
+            # Never silently type a multi-char key name (e.g. "F11") as literal
+            # text — that corrupts state and diverges from Linux/Windows. Fail loud.
+            raise ValueError(f"unmapped key: {key!r}")
         _osa(script)
 
     def type(self, text: str, delay_ms: int = 40):

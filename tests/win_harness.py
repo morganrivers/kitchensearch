@@ -127,6 +127,10 @@ _KEY_CODES = {
     "End":       (0x23, True),
     "Page_Up":   (0x21, True),
     "Page_Down": (0x22, True),
+    "F1":  (0x70, False), "F2":  (0x71, False), "F3":  (0x72, False),
+    "F4":  (0x73, False), "F5":  (0x74, False), "F6":  (0x75, False),
+    "F7":  (0x76, False), "F8":  (0x77, False), "F9":  (0x78, False),
+    "F10": (0x79, False), "F11": (0x7A, False), "F12": (0x7B, False),
 }
 
 _MOD_VK = {

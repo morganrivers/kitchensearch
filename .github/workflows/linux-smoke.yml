@@ -50,6 +50,24 @@ jobs:
         run: |
           .venv/bin/python -m unittest discover -s tests/fast -t .
 
+      # Isolated input-layer check: drives a tiny Tk probe and verifies each
+      # harness key() delivers the correct Tk key event. Diagnostic (non-gating)
+      # so per-platform input differences surface without blocking the GIFs.
+      - name: Key-command unit test
+        continue-on-error: true
+        run: |
+          mkdir -p tests/test_run
+          .venv/bin/python tests/key_test.py --json > tests/test_run/key-test.json || true
+          .venv/bin/python tests/key_test.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-key-test
+          path: |
+            tests/test_run/key-test.json
+            tests/test_run/key_test/
+          if-no-files-found: warn
+
       # Each test self-wraps under xvfb-run; the per-test folder (with the GIF)
       # is uploaded as an artifact you can download from the run summary.
       - name: Run test_01_main_menu
