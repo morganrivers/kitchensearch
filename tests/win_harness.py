@@ -107,8 +107,20 @@ user32.SetForegroundWindow.argtypes      = [wintypes.HWND]
 user32.SetForegroundWindow.restype       = wintypes.BOOL
 user32.SendInput.argtypes                = [wintypes.UINT, ctypes.POINTER(_INPUT), ctypes.c_int]
 user32.SendInput.restype                 = wintypes.UINT
+user32.ClientToScreen.argtypes           = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+user32.ClientToScreen.restype            = wintypes.BOOL
+user32.SetCursorPos.argtypes             = [ctypes.c_int, ctypes.c_int]
+user32.SetCursorPos.restype              = wintypes.BOOL
+user32.mouse_event.argtypes              = [wintypes.DWORD, wintypes.DWORD, wintypes.DWORD,
+                                            wintypes.DWORD, ULONG_PTR]
+user32.mouse_event.restype               = None
 kernel32.GetCurrentThreadId.argtypes     = []
 kernel32.GetCurrentThreadId.restype      = wintypes.DWORD
+
+_MOUSEEVENTF = {
+    1: (0x0002, 0x0004),   # left  down, up
+    3: (0x0008, 0x0010),   # right down, up
+}
 
 
 # X11 key names (as used by recorded scripts) → (virtual-key code, is_extended)
@@ -474,14 +486,36 @@ class WinTestHarness:
     def focus(self):
         self._activate()
 
-    def click(self, *_a, **_kw):
-        raise NotImplementedError("click() is not implemented in the Windows harness")
+    def _to_screen(self, x: int, y: int):
+        """Map window client-area coords (as recorded on Linux) to screen px."""
+        hwnd = self._find_window() or self._hwnd
+        pt = wintypes.POINT(int(x), int(y))
+        if hwnd:
+            user32.ClientToScreen(hwnd, ctypes.byref(pt))
+        return pt.x, pt.y
 
-    def mousedown(self, *_a, **_kw):
-        raise NotImplementedError("mousedown() is not implemented in the Windows harness")
+    def click(self, x: int, y: int, button: int = 1):
+        self._activate()
+        sx, sy = self._to_screen(x, y)
+        user32.SetCursorPos(sx, sy)
+        time.sleep(0.05)
+        down, up = _MOUSEEVENTF.get(button, _MOUSEEVENTF[1])
+        user32.mouse_event(down, 0, 0, 0, 0)
+        user32.mouse_event(up, 0, 0, 0, 0)
 
-    def mouseup(self, *_a, **_kw):
-        raise NotImplementedError("mouseup() is not implemented in the Windows harness")
+    def mousedown(self, x: int, y: int, button: int = 1):
+        self._activate()
+        sx, sy = self._to_screen(x, y)
+        user32.SetCursorPos(sx, sy)
+        time.sleep(0.05)
+        down, _ = _MOUSEEVENTF.get(button, _MOUSEEVENTF[1])
+        user32.mouse_event(down, 0, 0, 0, 0)
+        if button == 3:
+            time.sleep(0.35)
+
+    def mouseup(self, x: int, y: int, button: int = 1):
+        _, up = _MOUSEEVENTF.get(button, _MOUSEEVENTF[1])
+        user32.mouse_event(up, 0, 0, 0, 0)
 
     # ── GIF export (duplicated from harness.py on purpose) ───────────────────
 
