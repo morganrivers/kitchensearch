@@ -135,6 +135,7 @@ class TestHarness:
         copy_log = self.run_dir / "copied-images.log"
         copy_log.unlink(missing_ok=True)
         env["KITCHENSEARCH_COPY_LOG"] = str(copy_log)
+        env["KITCHENSEARCH_TEST_EVENTS"] = "1"
         env.update(extra_env)
 
         cmd = self._app_cmd or [sys.executable, str(_REPO / "kitchensearch.py")]

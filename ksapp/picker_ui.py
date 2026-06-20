@@ -101,6 +101,7 @@ class NiceScrollbar(tk.Canvas):
         self._dragging = False
 
 from PIL import Image, ImageDraw, ImageFont as _ImageFont, ImageTk
+from ksapp.log import _event
 from ksapp.picker_utils import (
     _dbg,
     _get_monitors,
@@ -1078,6 +1079,7 @@ class TkPicker:
         self.root.quit()
 
     def _on_return(self, e=None):
+        _event(f"return mode={self._mode} sel={self._sel} nrows={len(self._rows)}")
         if self._mode == "input":
             val = self._entry_var.get().strip()
             self._result = val or None
@@ -1226,6 +1228,7 @@ class TkPicker:
         _dbg(f"SLIDE_WINDOW start={new_start} end={new_end} nrows={n}")
 
     def _select(self, idx, scroll=True):
+        _event(f"select idx={idx} prev_sel={self._sel} nrows={len(self._rows)} mode={self._mode}")
         if 0 <= self._sel < len(self._rows):
             self._color_row(self._sel, selected=False)
         self._sel = idx

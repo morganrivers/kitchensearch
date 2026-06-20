@@ -15,7 +15,7 @@ from ksapp.picker_utils import (
     STORY_OUT, STORY_PY, STORY_BIN,
     DAEMON_LOG,
     BATCH_SIZE, LOAD_MORE, MAX_RESULTS, HEADER_MARKER,
-    _has_semantic_models, _notify, _dbg,
+    _has_semantic_models, _notify, _dbg, _event,
     load_index, search, build_base_emoji_index, format_label,
     get_thumb, render_emoji_pil,
     copy_image_to_clipboard, record_copy,
@@ -651,9 +651,11 @@ def main():
                 def _copy_combo(label, _all=all_combo):
                     m = re.match(r'^\S+', label)
                     sel_alt = m.group(0) if m else label
+                    _event(f"copy_combo label={label!r} sel_alt={sel_alt!r}")
                     for _, alt, url, _ in _all:
                         if alt == sel_alt:
                             path = get_thumb(url)
+                            _event(f"copy_combo match alt={alt!r} path_ok={path is not None}")
                             if path:
                                 copy_image_to_clipboard(path)
                                 record_copy(url, alt)
@@ -757,9 +759,11 @@ def main():
                 def _copy_selected(label, _results=results):
                     m = re.match(r'^\S+', label)
                     sel_alt = m.group(0) if m else label
+                    _event(f"copy_selected label={label!r} sel_alt={sel_alt!r}")
                     for _, alt, url, _ in _results:
                         if alt == sel_alt:
                             path = get_thumb(url)
+                            _event(f"copy_selected match alt={alt!r} path_ok={path is not None}")
                             if path:
                                 copy_image_to_clipboard(path)
                                 record_copy(url, alt)

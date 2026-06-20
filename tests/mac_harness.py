@@ -154,6 +154,7 @@ class MacTestHarness:
         copy_log = self.run_dir / "copied-images.log"
         copy_log.unlink(missing_ok=True)
         env["KITCHENSEARCH_COPY_LOG"] = str(copy_log)
+        env["KITCHENSEARCH_TEST_EVENTS"] = "1"
 
         # Clear the clipboard so a post-test read distinguishes "the app copied
         # something" from "stale clipboard content".

@@ -12,7 +12,7 @@ except ImportError:
 from PIL import Image, ImageDraw, ImageFont as _ImageFont                                                                                                                           
 
 
-from ksapp.log import _dbg
+from ksapp.log import _dbg, _event
 from ksapp.ssl_ctx import ssl_ctx
 from ksapp.data_assets import ensure_data as _ensure_data, _REPO, UI_ASSETS_DIR
 

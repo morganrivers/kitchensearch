@@ -107,8 +107,6 @@ user32.SetForegroundWindow.argtypes      = [wintypes.HWND]
 user32.SetForegroundWindow.restype       = wintypes.BOOL
 user32.SendInput.argtypes                = [wintypes.UINT, ctypes.POINTER(_INPUT), ctypes.c_int]
 user32.SendInput.restype                 = wintypes.UINT
-user32.GetWindowRect.argtypes            = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
-user32.GetWindowRect.restype             = wintypes.BOOL
 kernel32.GetCurrentThreadId.argtypes     = []
 kernel32.GetCurrentThreadId.restype      = wintypes.DWORD
 
@@ -237,6 +235,7 @@ class WinTestHarness:
         copy_log = self.run_dir / "copied-images.log"
         copy_log.unlink(missing_ok=True)
         env["KITCHENSEARCH_COPY_LOG"] = str(copy_log)
+        env["KITCHENSEARCH_TEST_EVENTS"] = "1"
 
         # Clear the clipboard so a post-test read distinguishes "the app copied
         # something" from "stale clipboard content".
@@ -422,61 +421,11 @@ class WinTestHarness:
 
     # ── actions ──────────────────────────────────────────────────────────────
 
-    def _window_rect(self):
-        """(left, top, right, bottom) of the app window, or None."""
-        hwnd = self._find_window() or self._hwnd
-        if not hwnd:
-            return None
-        rect = wintypes.RECT()
-        if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
-            return None
-        if rect.right <= rect.left or rect.bottom <= rect.top:
-            return None
-        return (rect.left, rect.top, rect.right, rect.bottom)
-
-    def _wait_until_stable(self, stable_for: float = 0.25, timeout: float = 3.0,
-                           min_wait: float = 0.2):
-        """Block until the *window region* stops changing — the same
-        synchronise-to-app-readiness behaviour the Linux harness gets from
-        _capture_stable, so thumbnail loads settle before we act/capture."""
-        import numpy as np
-        bbox = self._window_rect()
-        if bbox is None:
-            time.sleep(0.4)
-            return
-
-        def grab():
-            try:
-                return np.asarray(ImageGrab.grab(bbox=bbox))
-            except Exception:
-                return None
-
-        time.sleep(min_wait)
-        prev = grab()
-        stable_since = None
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            time.sleep(0.1)
-            cur = grab()
-            if (cur is not None and prev is not None
-                    and cur.shape == prev.shape and np.array_equal(cur, prev)):
-                if stable_since is None:
-                    stable_since = time.monotonic()
-                elif time.monotonic() - stable_since >= stable_for:
-                    break
-            else:
-                stable_since = None
-            prev = cur
-
     def screenshot(self, name: str, stable: bool = True) -> Path:
-        """Full-screen PNG capture (kept for the GIF); stability is measured on
-        the window region so taskbar/clock don't prevent settling."""
+        """Full-screen PNG capture. No window cropping on Windows for the MVP."""
         path = self.run_dir / f"{name}.png"
         self._activate()
-        if stable:
-            self._wait_until_stable()
-        else:
-            time.sleep(0.05)
+        time.sleep(0.4 if stable else 0.05)
         img = ImageGrab.grab()
         img.save(path)
         self._shots.append((name, path))

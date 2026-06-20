@@ -1,5 +1,22 @@
-import sys, threading, time, traceback, tempfile
+import os, sys, threading, time, traceback, tempfile
 from pathlib import Path
+
+# Test observability: when KITCHENSEARCH_TEST_EVENTS is set, emit structured
+# one-line events to stderr (which the test harnesses drain in real time). This
+# lets a test both *synchronise* on app readiness and *see* what the app did —
+# e.g. which row was selected and whether a copy fired — across platforms.
+_EVENTS_ENABLED = bool(os.environ.get("KITCHENSEARCH_TEST_EVENTS"))
+
+
+def _event(msg):
+    if not _EVENTS_ENABLED:
+        return
+    try:
+        sys.stderr.write(f"KSEVENT {msg}\n")
+        sys.stderr.flush()
+    except Exception:
+        pass
+
 
 _DBG_ENABLED  = "--logging" in sys.argv
 _DBG_LOG_PATH = Path(tempfile.gettempdir()) / "kitchensearch-debug.log"
