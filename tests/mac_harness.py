@@ -150,6 +150,7 @@ class MacTestHarness:
 
         env = os.environ.copy()
         env["XDG_CONFIG_HOME"]         = str(_TEST_CONFIG_DIR.parent)
+        env["KITCHENSEARCH_CONFIG_DIR"] = str(_TEST_CONFIG_DIR)
         env["KITCHENSEARCH_NO_BLINK"]  = "1"
         copy_log = self.run_dir / "copied-images.log"
         copy_log.unlink(missing_ok=True)

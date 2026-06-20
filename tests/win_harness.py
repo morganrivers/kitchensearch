@@ -230,6 +230,7 @@ class WinTestHarness:
 
         env = os.environ.copy()
         env["XDG_CONFIG_HOME"]         = str(_TEST_CONFIG_DIR.parent)
+        env["KITCHENSEARCH_CONFIG_DIR"] = str(_TEST_CONFIG_DIR)
         env["KITCHENSEARCH_NO_BLINK"]  = "1"
         env["KITCHENSEARCH_NO_DAEMON"] = "1"   # run the GUI without background daemons
         copy_log = self.run_dir / "copied-images.log"

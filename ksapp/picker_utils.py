@@ -20,8 +20,14 @@ from ksapp.data_assets import ensure_data as _ensure_data, _REPO, UI_ASSETS_DIR
 from platformdirs import user_cache_dir, user_config_dir
 
 DATA_DIR      = _REPO / "data" / "embeddings"
-CACHE_DIR     = Path(user_cache_dir("kitchensearch"))
-CONFIG_DIR    = Path(user_config_dir("kitchensearch"))
+# Allow tests to pin the config/cache dirs cross-platform. platformdirs honors
+# XDG_* only on Linux; on Windows/macOS it uses %APPDATA% / ~/Library, so the
+# harness's XDG_CONFIG_HOME would otherwise be ignored and the app would run
+# with default settings (e.g. a different front menu) — diverging per platform.
+CACHE_DIR     = Path(os.environ.get("KITCHENSEARCH_CACHE_DIR")
+                     or user_cache_dir("kitchensearch"))
+CONFIG_DIR    = Path(os.environ.get("KITCHENSEARCH_CONFIG_DIR")
+                     or user_config_dir("kitchensearch"))
 _VENV_PY = (
     _REPO / ".venv" / "Scripts" / "python.exe"
     if sys.platform == "win32"

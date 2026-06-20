@@ -129,6 +129,7 @@ class TestHarness:
 
         env = os.environ.copy()
         env["XDG_CONFIG_HOME"] = str(_TEST_CONFIG_DIR.parent)
+        env["KITCHENSEARCH_CONFIG_DIR"] = str(_TEST_CONFIG_DIR)
         env["KITCHENSEARCH_NO_GRAB"] = "1"
         env["KITCHENSEARCH_NO_DAEMON"] = "1"
         env["KITCHENSEARCH_NO_BLINK"] = "1"
