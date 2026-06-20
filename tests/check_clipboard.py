@@ -107,22 +107,28 @@ def check_test(test_name: str, run_dir: Path, baseline_dir: Path) -> dict:
 def _print_report(result: dict) -> None:
     name, n = result["test"], result["expected"]
     if n == 0:
-        print(f"  [{name}] no image-copy steps — nothing to verify")
+        print(f"  [{name}] no image-copy steps - nothing to verify")
         return
     ok = sum(1 for i in result["images"] if i["status"] == "ok")
     verdict = "PASS" if result["passed"] else "FAIL"
     print(f"  [{name}] {verdict}  ({ok}/{n} distinct image(s) copied; "
           f"{result['copied_total']} copy event(s) logged)")
     if not result["log_present"] and n:
-        print(f"      ! no {_COPY_LOG} produced — app didn't log any copies")
+        print(f"      ! no {_COPY_LOG} produced - app didn't log any copies")
     for i in result["images"]:
         if i["status"] != "ok":
-            print(f"      ∅ {i['detail']}  [{i['hash'][:12]}…]")
+            print(f"      X {i['detail']}  [{i['hash'][:12]}...]")
     if result["extra"]:
         print(f"      (note: {len(result['extra'])} other image(s) copied not in baseline)")
 
 
 def main():
+    # Windows consoles default to cp1252; keep output encodable regardless.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
     p = argparse.ArgumentParser()
     p.add_argument("test_name", nargs="?", help="e.g. test_02_keyword_search")
     p.add_argument("--all", action="store_true",
@@ -159,12 +165,12 @@ def main():
         print(json.dumps(results, indent=2))
     else:
         print("\n  Clipboard image-copy verification (by content hash)")
-        print("  " + "─" * 56)
+        print("  " + "-" * 56)
         for r in results:
             _print_report(r)
         total = sum(r["expected"] for r in results)
         ok    = sum(1 for r in results for i in r["images"] if i["status"] == "ok")
-        print("  " + "─" * 56)
+        print("  " + "-" * 56)
         print(f"  {ok}/{total} distinct expected image(s) copied across {len(results)} test(s)")
         if skipped:
             print(f"  skipped (not reproducible in CI): {', '.join(skipped)}")
