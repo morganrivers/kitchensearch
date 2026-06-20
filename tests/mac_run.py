@@ -32,6 +32,12 @@ def _load_script(path: Path):
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     p = argparse.ArgumentParser()
     p.add_argument("test_name", help="e.g. test_34_macsimple")
     p.add_argument("--output-dir", default=str(_DEFAULT_OUT),

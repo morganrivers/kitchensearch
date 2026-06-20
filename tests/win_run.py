@@ -38,6 +38,14 @@ def _load_script(path: Path):
 
 
 def main():
+    # Windows consoles default to cp1252; keep our output (and the app's piped
+    # stderr) encodable so a stray non-ASCII char can't crash the run.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     p = argparse.ArgumentParser()
     p.add_argument("test_name", help="e.g. test_01_main_menu")
     p.add_argument("--output-dir", default=str(_DEFAULT_OUT),
