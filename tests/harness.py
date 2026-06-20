@@ -131,6 +131,9 @@ class TestHarness:
         env["KITCHENSEARCH_NO_GRAB"] = "1"
         env["KITCHENSEARCH_NO_DAEMON"] = "1"
         env["KITCHENSEARCH_NO_BLINK"] = "1"
+        copy_log = self.run_dir / "copied-images.log"
+        copy_log.unlink(missing_ok=True)
+        env["KITCHENSEARCH_COPY_LOG"] = str(copy_log)
         env.update(extra_env)
 
         cmd = [sys.executable, str(_REPO / "kitchensearch.py")]
