@@ -46,16 +46,14 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-# Steps whose copied image is the emoji-story output. That image is a PIL
-# composite whose text rows are drawn with whatever **font** the OS provides
-# (emoji_story.find_font picks DejaVu/Liberation on Linux, Arial/Verdana on
-# Windows, Arial/Helvetica on macOS), so the bytes differ per platform even
-# though the emoji picks and layout are identical. It is therefore not
-# byte-reproducible across OSes — the same reason test_16_story is skipped
-# wholesale. test_30 mixes deterministic combo copies with one story copy at
-# the end, so we drop just the story steps and still verify every reproducible
-# copy. (Confirmed on CI: Linux story hash 5429a9…, Windows c728ad7…, macOS a
-# third value — all from the font, not the model.)
+# Steps whose copied image is the emoji-story output. emoji_story now renders
+# the text with the bundled BubblegumSans font, so the image is identical on
+# Linux/Windows/macOS (the per-OS-font divergence that used to make these bytes
+# differ is fixed). These steps stay excluded only because the committed
+# baseline *_clipboard.png here is the *old* OS-font render and re-recording it
+# requires a CI artifact (blocked from the dev box that produced this). Once the
+# baseline is re-recorded from a current run, drop this entry and the gate will
+# verify the story image too. (test_16_story is still skipped wholesale.)
 _NONREPRODUCIBLE_STEPS: dict[str, frozenset[str]] = {
     "test_30_manyresults": frozenset(
         {"43_Return", "44_step", "45_click_223_250"}

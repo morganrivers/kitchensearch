@@ -65,16 +65,21 @@ DIVIDER     = (210, 210, 210)
 
 
 def find_font(size):
+    # Always render story text with the font shipped inside the app (the same
+    # one the picker UI uses) so a generated story looks identical on every
+    # platform instead of borrowing whatever bold font the OS happens to have.
+    # This is a product choice — consistent output — and it also makes the
+    # generated image byte-reproducible across Linux/Windows/macOS. The OS
+    # fonts remain only as a last-ditch fallback if the bundled file is missing.
     for path in [
-        # Linux
+        str(_REPO / "data" / "fonts" / "BubblegumSans-Regular.ttf"),
+        # Fallbacks (should never be needed — the font ships with the package).
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
         "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-        # Windows
         "C:/Windows/Fonts/arialbd.ttf",
         "C:/Windows/Fonts/verdanab.ttf",
         "C:/Windows/Fonts/calibrib.ttf",
-        # macOS
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
         "/Library/Fonts/Arial Bold.ttf",
         "/System/Library/Fonts/Helvetica.ttc",
