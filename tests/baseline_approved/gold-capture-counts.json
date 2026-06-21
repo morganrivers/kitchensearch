@@ -1,0 +1,6 @@
+{
+  "_comment": "Gold-standard total copy-event count per test, taken from the Linux reference run (Linux is the baseline). Screenshot counts and distinct-image counts are derived live from the baseline artifacts (the per-step PNGs and *_clipboard.png), so only the total number of copy events - which the old baselines don't store - is recorded here. check_clipboard gates each OS's run against these: same screenshots, same copy events, same duplicate count, or the test fails (it means an OS couldn't reach the end the same way). Refresh from a fresh Linux run if the recorded tests change.",
+  "test_02_keyword_search": 1,
+  "test_30_manyresults": 6,
+  "test_32_settingtoggles": 2
+}

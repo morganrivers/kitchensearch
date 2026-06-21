@@ -41,14 +41,6 @@ jobs:
       - name: Install kitchensearch into the venv from the working tree
         run: uv pip install --python .venv/bin/python .
 
-      # Pin Pillow to one version across all three OSes so the story image is
-      # rasterized by the same Pillow release everywhere, and print the bundled
-      # FreeType version — if those differ per platform, the text bytes will too.
-      - name: Pin Pillow + show font stack versions
-        run: |
-          uv pip install --python .venv/bin/python "Pillow==11.3.0"
-          .venv/bin/python -c "import PIL, PIL.features as f; print('PILLOW', PIL.__version__, 'FREETYPE', f.version('freetype'))"
-
       - name: Verify tkinter import inside the venv's Python
         run: |
           .venv/bin/python -c "import tkinter; print(tkinter.TkVersion)"

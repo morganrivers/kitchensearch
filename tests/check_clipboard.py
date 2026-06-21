@@ -47,10 +47,30 @@ _TESTS_DIR   = Path(__file__).parent
 _BASELINE    = _TESTS_DIR / "baseline_approved"
 _DEFAULT_RUN = _TESTS_DIR / "test_run"
 _COPY_LOG    = "copied-images.log"
+# Total copy-event count per test from the Linux reference run (Linux is the
+# gold standard). Screenshot + distinct-image counts come from the baseline
+# artifacts; only the raw copy-event total isn't recoverable, so it's recorded.
+_GOLD_CAPTURES = _BASELINE / "gold-capture-counts.json"
 
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _count_screenshots(d: Path) -> int:
+    """Per-step screenshot frames in a run/baseline dir (the GIF frames):
+    files named like ``07_Down.png`` but not the ``*_clipboard.png`` captures."""
+    if not d.exists():
+        return 0
+    return sum(1 for p in d.glob("[0-9]*.png") if not p.name.endswith("_clipboard.png"))
+
+
+def _gold_capture_counts() -> dict:
+    try:
+        data = json.loads(_GOLD_CAPTURES.read_text(encoding="utf-8"))
+        return {k: v for k, v in data.items() if not k.startswith("_")}
+    except Exception:
+        return {}
 
 
 # Steps whose copied image is *reported* for cross-OS consistency but is NOT
@@ -120,12 +140,39 @@ def check_test(test_name: str, run_dir: Path, baseline_dir: Path) -> dict:
     if gating and not log_present:
         passed = False
 
+    # ── capture-count gate ────────────────────────────────────────────────
+    # Every OS must reach the end of the test capturing the SAME number of
+    # screenshots and copy events as the gold standard (Linux), with the same
+    # number of duplicate copies. A shortfall means the OS couldn't complete
+    # the run the same way (the readiness/callback sync failed, or it got stuck
+    # repeating one image) — so it fails the build.
+    gold_shots   = _count_screenshots(base)
+    run_shots    = _count_screenshots(run)
+    gold_copies  = _gold_capture_counts().get(test_name)
+    gold_distinct = len(expected)                  # distinct baseline images
+    run_distinct  = len(copied_set)
+    cap = {
+        "gold_screenshots": gold_shots,
+        "run_screenshots":  run_shots,
+        "screenshots_ok":   (gold_shots == 0) or (run_shots == gold_shots),
+        "gold_copies":      gold_copies,
+        "run_copies":       len(copied),
+        "copies_ok":        (gold_copies is None) or (len(copied) == gold_copies),
+        "gold_duplicates":  (gold_copies - gold_distinct) if gold_copies is not None else None,
+        "run_duplicates":   len(copied) - run_distinct,
+        "duplicates_ok":    (gold_copies is None)
+                             or ((len(copied) - run_distinct) == (gold_copies - gold_distinct)),
+    }
+    if not (cap["screenshots_ok"] and cap["copies_ok"] and cap["duplicates_ok"]):
+        passed = False
+
     return {"test": test_name,
             "expected": len(gating),               # # of gating (pass-condition) images
             "gate_ok": gate_ok,
             "report_only": [i for i in images if i["report_only"]],
             "copied_total": len(copied),
             "extra": extra,
+            "captures": cap,
             "log_present": log_present,
             "run_exists": run.exists(),
             "passed": passed,
@@ -147,6 +194,18 @@ def _print_report(result: dict) -> None:
         if not i["report_only"] and i["status"] != "ok":
             print(f"      X expected image (baseline step(s) {', '.join(i['steps'])}) "
                   f"was never copied  [{i['hash'][:12]}...]")
+    # Capture-count gate: same # screenshots + copy events + duplicates as the
+    # gold standard, or this OS didn't reach the end the same way.
+    cap = result.get("captures", {})
+    if not cap.get("screenshots_ok", True):
+        print(f"      X screenshots: captured {cap['run_screenshots']}, "
+              f"gold standard {cap['gold_screenshots']} (run did not reach the end)")
+    if not cap.get("copies_ok", True):
+        print(f"      X copy events: {cap['run_copies']} copied, "
+              f"gold standard {cap['gold_copies']} (an image capture was missed)")
+    if not cap.get("duplicates_ok", True):
+        print(f"      X duplicate copies: {cap['run_duplicates']}, "
+              f"gold standard {cap['gold_duplicates']} (got stuck on / skipped a repeat)")
     # Cross-OS consistency (reported, not gating): does THIS OS reproduce the
     # Linux-recorded baseline bytes for the generated images?
     for i in ro:
@@ -212,8 +271,15 @@ def main():
         ok    = sum(r["gate_ok"] for r in results)
         ro_all = [i for r in results for i in r["report_only"]]
         ro_ok  = sum(1 for i in ro_all if i["status"] == "ok")
+        cap_fail = [r for r in results
+                    if not (r["captures"]["screenshots_ok"]
+                            and r["captures"]["copies_ok"]
+                            and r["captures"]["duplicates_ok"])]
         print("  " + "-" * 56)
         print(f"  {ok}/{total} gating image(s) matched the (Linux) baseline across {len(results)} test(s)")
+        cap_checked = len(results) - len(cap_fail)
+        print(f"  capture counts (screenshots + copies + duplicates vs gold standard): "
+              f"{cap_checked}/{len(results)} test(s) matched")
         if ro_all:
             print(f"  cross-OS consistency (reported, not gating): "
                   f"{ro_ok}/{len(ro_all)} generated image(s) reproduced the Linux baseline here")
