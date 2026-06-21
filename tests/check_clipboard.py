@@ -46,11 +46,31 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+# Steps whose copied image is the emoji-story output. That image is a PIL
+# composite whose text rows are drawn with whatever **font** the OS provides
+# (emoji_story.find_font picks DejaVu/Liberation on Linux, Arial/Verdana on
+# Windows, Arial/Helvetica on macOS), so the bytes differ per platform even
+# though the emoji picks and layout are identical. It is therefore not
+# byte-reproducible across OSes — the same reason test_16_story is skipped
+# wholesale. test_30 mixes deterministic combo copies with one story copy at
+# the end, so we drop just the story steps and still verify every reproducible
+# copy. (Confirmed on CI: Linux story hash 5429a9…, Windows c728ad7…, macOS a
+# third value — all from the font, not the model.)
+_NONREPRODUCIBLE_STEPS: dict[str, frozenset[str]] = {
+    "test_30_manyresults": frozenset(
+        {"43_Return", "44_step", "45_click_223_250"}
+    ),
+}
+
+
 def _expected_images(base: Path) -> dict[str, list[str]]:
-    """{image_hash: [baseline step names...]} for every copied image."""
+    """{image_hash: [baseline step names...]} for every reproducible copy."""
+    skip_steps = _NONREPRODUCIBLE_STEPS.get(base.name, frozenset())
     exp: dict[str, list[str]] = {}
     for clip in sorted(base.glob("*_clipboard.png")):
         step = clip.name[: -len("_clipboard.png")]
+        if step in skip_steps:
+            continue
         exp.setdefault(_sha256(clip.read_bytes()), []).append(step)
     return exp
 

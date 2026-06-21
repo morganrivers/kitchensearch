@@ -30,24 +30,20 @@ def run(h):
 
     # 2. Type the whole query and press Enter to dispatch the search (the front
     #    menu returns typed text as a query — kitchensearch.py runs semantic or
-    #    keyword search on it). Then wait for the results to finish loading and
-    #    the list to be painted — event-driven, no sleep.
+    #    keyword search on it). Wait for the results to finish loading; "loaded"
+    #    fires after the screen is painted, so it alone means the list is ready.
     h.type("cat")
     h.key("Return")
     h.wait_for_event("loaded")
-    h.wait_for_event("ready mode=imagelist")
     h.screenshot("02_results")               # state *before* the copy
 
-    # 3. Arrow into the result list and copy. The first arrow after a fresh
-    #    search can be absorbed establishing list focus, so confirm the
-    #    selection actually moved via the "select" beacon (still event-driven)
-    #    before pressing Enter, then wait for the copy to fire.
-    for _ in range(3):
-        h.key("Down")
-        if h.wait_for_event("select idx=", timeout=3):
-            break
+    # 3. Arrow into the result list and copy. The search box keeps focus after a
+    #    fresh search, so confirm the selection actually moved (the "select"
+    #    beacon) before pressing Enter, then wait for the copy to fire.
+    h.key("Down")
+    h.wait_for_event("select idx=", timeout=10)
     h.key("Return")
-    h.wait_for_event("copy_selected", timeout=8)
+    h.wait_for_event("copy_selected", timeout=10)
     h.screenshot("03_after_copy")            # state *after* the copy
 
     # 4. Escape out of the results; wait for the next screen to be painted.
