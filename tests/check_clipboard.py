@@ -46,11 +46,28 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+# Steps whose copied image is produced by the emoji-story generator. That image
+# is model-rendered, so its bytes are NOT identical across operating systems
+# (unlike the downloaded emoji-kitchen combo assets, which are). Requiring it to
+# match a single baseline can never pass cross-platform — the same reason
+# test_16_story is skipped wholesale via --skip. Here test_30 mixes deterministic
+# combo copies with one story copy at the very end, so we drop just the story
+# steps and still verify every reproducible copy in the test.
+_NONREPRODUCIBLE_STEPS: dict[str, frozenset[str]] = {
+    "test_30_manyresults": frozenset(
+        {"43_Return", "44_step", "45_click_223_250"}
+    ),
+}
+
+
 def _expected_images(base: Path) -> dict[str, list[str]]:
-    """{image_hash: [baseline step names...]} for every copied image."""
+    """{image_hash: [baseline step names...]} for every reproducible copy."""
+    skip_steps = _NONREPRODUCIBLE_STEPS.get(base.name, frozenset())
     exp: dict[str, list[str]] = {}
     for clip in sorted(base.glob("*_clipboard.png")):
         step = clip.name[: -len("_clipboard.png")]
+        if step in skip_steps:
+            continue
         exp.setdefault(_sha256(clip.read_bytes()), []).append(step)
     return exp
 
