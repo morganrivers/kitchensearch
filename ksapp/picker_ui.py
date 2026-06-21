@@ -905,6 +905,12 @@ class TkPicker:
         if self._pending_toast:
             _msg, self._pending_toast = self._pending_toast, None
             self.root.after(400, lambda m=_msg: self._show_toast(m))
+        # Screen-ready beacon for tests: fires once this screen's event loop is
+        # running and it has been painted/activated. Lets harnesses sync on a
+        # stable screen transition (e.g. after Enter/Escape) instead of sleeping.
+        # Image-list results emit a separate "loaded" event once thumbnails
+        # finish loading (see pick_with_images).
+        self.root.after(0, lambda m=self._mode: _event(f"ready mode={m}"))
         self.root.mainloop()
         try:
             self.root.grab_release()
@@ -2358,8 +2364,17 @@ class TkPicker:
                 self._img_refs.append(photo)
             pending[rank] = (label, photo, score)
             _flush()
+            # When the last in-flight worker of the current batch has flushed,
+            # the visible result set is stable — emit "loaded" so tests can sync
+            # on fully-rendered results instead of guessing with a sleep.
+            if next_rank[0] == dispatched[0]:
+                _emit_loaded()
 
         dispatched = [0]
+
+        def _emit_loaded():
+            _event(f"loaded gen={gen} nrows={len(self._rows)} flushed={next_rank[0]} "
+                   f"total={len(entries)} more={dispatched[0] < len(entries)}")
 
         def _dispatch_next_batch():
             start = dispatched[0]
@@ -2398,6 +2413,10 @@ class TkPicker:
                     threading.Thread(target=_worker, daemon=True).start()
             dispatched[0] = end
             self._load_next_batch_fn = _dispatch_next_batch if end < len(entries) else None
+            # All-synchronous batches (headers / preloaded / url-less rows) flush
+            # during the loop above, so no worker callback fires _emit_loaded.
+            if next_rank[0] == dispatched[0]:
+                _emit_loaded()
             if prompt_fn:
                 self._set_prompt(prompt_fn(end, len(entries)))
             if self._load_next_batch_fn and self._load_poll_after_id is None:

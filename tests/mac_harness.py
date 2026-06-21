@@ -214,6 +214,23 @@ class MacTestHarness:
         except Exception:
             pass
 
+    def wait_for_event(self, substr: str, timeout: float = 15.0):
+        """Block until the app emits a new ``KSEVENT`` line containing ``substr``.
+
+        Event-driven screen sync (see TestHarness.wait_for_event). Polls the
+        already-drained stderr; snapshots at call time so it waits for an event
+        *after* this call. Returns the matching line, or None on timeout.
+        """
+        start = len(self._stderr_buf)
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            for raw in self._stderr_buf[start:]:
+                line = raw.decode(errors="replace") if isinstance(raw, bytes) else raw
+                if "KSEVENT" in line and substr in line:
+                    return line.strip()
+            time.sleep(0.03)
+        return None
+
     def _killpg(self, sig):
         try:
             os.killpg(os.getpgid(self._proc.pid), sig)

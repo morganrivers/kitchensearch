@@ -166,6 +166,19 @@ jobs:
           path: tests/test_run/test_32_settingtoggles/
           if-no-files-found: warn
 
+      # Prototype of the fast screen-state style (one image per stable screen,
+      # synced on app readiness events — see tests/scripts/test_40_fast_keyword).
+      # Non-gating while the approach is evaluated.
+      - name: Run test_40_fast_keyword (prototype)
+        continue-on-error: true
+        run: '"$TOOL_PY" tests/mac_run.py test_40_fast_keyword'
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gif-test_40_fast_keyword
+          path: tests/test_run/test_40_fast_keyword/
+          if-no-files-found: warn
+
       # Pass condition: every step that should copy a combo image must have
       # copied the same image (verified by source-content hash, cross-platform).
       - name: Verify clipboard image copies match baseline

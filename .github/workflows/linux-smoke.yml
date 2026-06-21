@@ -147,6 +147,20 @@ jobs:
           path: tests/test_run/test_32_settingtoggles/
           if-no-files-found: warn
 
+      # Prototype of the fast screen-state style (one image per stable screen,
+      # synced on app readiness events — see tests/scripts/test_40_fast_keyword).
+      # Non-gating while the approach is evaluated.
+      - name: Run test_40_fast_keyword (prototype)
+        continue-on-error: true
+        timeout-minutes: 10
+        run: .venv/bin/python tests/linux_run.py test_40_fast_keyword
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-gif-test_40_fast_keyword
+          path: tests/test_run/test_40_fast_keyword/
+          if-no-files-found: warn
+
       # Pass condition: every step that should copy a combo image must have
       # copied the *same* image as the approved baseline. Runs after all tests
       # so it sees every per-step <step>_clipboard.png in tests/test_run.
