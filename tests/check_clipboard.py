@@ -26,9 +26,16 @@ Usage:
     python tests/check_clipboard.py --all
     python tests/check_clipboard.py --all --run-dir tests/test_run --json
 
+The baseline is recorded on Linux, so it doubles as the cross-OS reference:
+"matches the baseline" means "byte-identical to what Linux produced". Combo
+images gate the build; generated images (the emoji story) are *reported* for
+consistency against that Linux baseline but never fail it — see
+``_REPORT_ONLY_STEPS``.
+
 Exit code:
-    0  every distinct expected image was copied (or the test copies no images)
-    1  an expected image was never copied, or no copy log was produced
+    0  every gating image was copied (or the test copies no gating images)
+    1  a gating image was never copied, or no copy log was produced
+       (a report-only image diverging across OSes does NOT set this)
 """
 import argparse
 import hashlib
@@ -46,20 +53,33 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _expected_images(base: Path) -> dict[str, list[str]]:
-    """{image_hash: [baseline step names...]} for every copied image.
+# Steps whose copied image is *reported* for cross-OS consistency but is NOT
+# part of the pass/fail gate. The clipboard baseline here is recorded on Linux,
+# so "matches the baseline" == "byte-identical to what Linux produced". The
+# downloaded combo images must match (they gate the build); the emoji-story
+# image is generated locally (a PIL composite) and is reported instead — we
+# surface whether each OS reproduced the Linux bytes and flag the ones that
+# didn't, but a story divergence (e.g. a font / FreeType difference) does not
+# fail the build. (test_16_story is skipped wholesale at the call site because
+# that whole test is just the story image.)
+_REPORT_ONLY_STEPS: dict[str, frozenset[str]] = {
+    "test_30_manyresults": frozenset({"43_Return", "44_step", "45_click_223_250"}),
+}
 
-    The emoji-story image (test_30's final steps) is no longer excluded: now
-    that emoji_story renders with the bundled DejaVu Sans Bold on every OS, it
-    is byte-identical across Linux/Windows/macOS and matches the baseline (which
-    was itself recorded with DejaVu on Linux). test_16_story is still skipped at
-    the call site because that whole test is the story image with nothing else.
-    """
+
+def _expected_images(base: Path) -> dict[str, list[str]]:
+    """{image_hash: [baseline step names...]} for every image in the baseline."""
     exp: dict[str, list[str]] = {}
     for clip in sorted(base.glob("*_clipboard.png")):
         step = clip.name[: -len("_clipboard.png")]
         exp.setdefault(_sha256(clip.read_bytes()), []).append(step)
     return exp
+
+
+def _is_report_only(test_name: str, steps: list[str]) -> bool:
+    """True if every baseline step for this image is report-only (e.g. story)."""
+    ro = _REPORT_ONLY_STEPS.get(test_name, frozenset())
+    return bool(ro) and all(s in ro for s in steps)
 
 
 def _copied_hashes(run: Path) -> tuple[list[str], bool]:
@@ -85,24 +105,25 @@ def check_test(test_name: str, run_dir: Path, baseline_dir: Path) -> dict:
 
     images = []
     for h, steps in expected.items():
-        if h in copied_set:
-            images.append({"hash": h, "steps": steps, "status": "ok",
-                           "detail": f"copied (baseline step(s): {', '.join(steps)})"})
-        else:
-            images.append({"hash": h, "steps": steps, "status": "missing",
-                           "detail": f"expected image (baseline step(s) {', '.join(steps)}) "
-                                     f"was never copied"})
+        images.append({"hash": h, "steps": steps,
+                       "status": "ok" if h in copied_set else "missing",
+                       "report_only": _is_report_only(test_name, steps)})
 
     # Images the app copied that the baseline never recorded — informational.
+    # (For a report-only image that diverged, this is the OS's own render.)
     extra = sorted(copied_set - set(expected))
 
-    passed = all(i["status"] == "ok" for i in images)
-    # If we expected copies but got no log at all, that's a hard failure.
-    if expected and not log_present:
+    gating  = [i for i in images if not i["report_only"]]
+    gate_ok = sum(1 for i in gating if i["status"] == "ok")
+    passed  = all(i["status"] == "ok" for i in gating)
+    # If we expected gating copies but got no log at all, that's a hard failure.
+    if gating and not log_present:
         passed = False
 
     return {"test": test_name,
-            "expected": len(expected),
+            "expected": len(gating),               # # of gating (pass-condition) images
+            "gate_ok": gate_ok,
+            "report_only": [i for i in images if i["report_only"]],
             "copied_total": len(copied),
             "extra": extra,
             "log_present": log_present,
@@ -113,22 +134,30 @@ def check_test(test_name: str, run_dir: Path, baseline_dir: Path) -> dict:
 
 def _print_report(result: dict) -> None:
     name, n = result["test"], result["expected"]
-    if n == 0:
+    ro = result["report_only"]
+    if n == 0 and not ro:
         print(f"  [{name}] no image-copy steps - nothing to verify")
         return
-    ok = sum(1 for i in result["images"] if i["status"] == "ok")
     verdict = "PASS" if result["passed"] else "FAIL"
-    print(f"  [{name}] {verdict}  ({ok}/{n} distinct image(s) copied; "
+    print(f"  [{name}] {verdict}  ({result['gate_ok']}/{n} gating image(s) copied; "
           f"{result['copied_total']} copy event(s) logged)")
     if not result["log_present"] and n:
         print(f"      ! no {_COPY_LOG} produced - app didn't log any copies")
     for i in result["images"]:
-        if i["status"] != "ok":
-            print(f"      X {i['detail']}  [{i['hash'][:12]}...]")
-    if result["extra"]:
-        # Print the actual hashes: lets us compare what each OS copied across
-        # runs (e.g. confirm a generated image is identical on Linux/Win/macOS)
-        # straight from the job logs, without downloading artifacts.
+        if not i["report_only"] and i["status"] != "ok":
+            print(f"      X expected image (baseline step(s) {', '.join(i['steps'])}) "
+                  f"was never copied  [{i['hash'][:12]}...]")
+    # Cross-OS consistency (reported, not gating): does THIS OS reproduce the
+    # Linux-recorded baseline bytes for the generated images?
+    for i in ro:
+        steps = ', '.join(i["steps"])
+        if i["status"] == "ok":
+            print(f"      consistency OK    {steps}: matches Linux baseline [{i['hash'][:12]}...]")
+        else:
+            mine = ', '.join(h[:12] for h in result["extra"]) or "nothing"
+            print(f"      consistency DIFFERS {steps}: Linux baseline [{i['hash'][:12]}...] "
+                  f"not reproduced here (this OS copied: {mine})")
+    if result["extra"] and not ro:
         print(f"      (note: {len(result['extra'])} other image(s) copied not in baseline: "
               f"{', '.join(h[:12] for h in result['extra'])})")
 
@@ -180,9 +209,14 @@ def main():
         for r in results:
             _print_report(r)
         total = sum(r["expected"] for r in results)
-        ok    = sum(1 for r in results for i in r["images"] if i["status"] == "ok")
+        ok    = sum(r["gate_ok"] for r in results)
+        ro_all = [i for r in results for i in r["report_only"]]
+        ro_ok  = sum(1 for i in ro_all if i["status"] == "ok")
         print("  " + "-" * 56)
-        print(f"  {ok}/{total} distinct expected image(s) copied across {len(results)} test(s)")
+        print(f"  {ok}/{total} gating image(s) matched the (Linux) baseline across {len(results)} test(s)")
+        if ro_all:
+            print(f"  cross-OS consistency (reported, not gating): "
+                  f"{ro_ok}/{len(ro_all)} generated image(s) reproduced the Linux baseline here")
         if skipped:
             print(f"  skipped (not reproducible in CI): {', '.join(skipped)}")
         print()
