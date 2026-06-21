@@ -119,7 +119,11 @@ def _print_report(result: dict) -> None:
         if i["status"] != "ok":
             print(f"      X {i['detail']}  [{i['hash'][:12]}...]")
     if result["extra"]:
-        print(f"      (note: {len(result['extra'])} other image(s) copied not in baseline)")
+        # Print the actual hashes: lets us compare what each OS copied across
+        # runs (e.g. confirm a generated image is identical on Linux/Win/macOS)
+        # straight from the job logs, without downloading artifacts.
+        print(f"      (note: {len(result['extra'])} other image(s) copied not in baseline: "
+              f"{', '.join(h[:12] for h in result['extra'])})")
 
 
 def main():
