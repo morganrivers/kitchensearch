@@ -41,6 +41,18 @@ jobs:
       - name: Verify tkinter import inside the venv's Python
         run: .venv\Scripts\python.exe -c "import tkinter; print(tkinter.TkVersion)"
 
+      # Start the semantic-search daemon once and load its model, so the GUI's
+      # semantic search has a backend during the tests (the harness runs with
+      # NO_DAEMON, but query_daemon just connects to whatever daemon is up).
+      # Diagnostic: if the model can't load on this runner the step fails but
+      # the build continues (semantic tests will simply find no results).
+      - name: Prime the semantic search daemon (load the model once)
+        continue-on-error: true
+        run: |
+          Start-Process -FilePath ".venv\Scripts\emoji_split_daemon.exe"
+          Start-Sleep -Seconds 18
+          .venv\Scripts\python.exe -c "import json, getpass; from multiprocessing.connection import Client; addr=r'\\.\pipe\kitchensearch-'+getpass.getuser(); c=Client(addr); c.send_bytes(json.dumps({'query':'cat','limit':3}).encode()); r=json.loads(c.recv_bytes().decode()); c.close(); print('daemon results:', r); assert isinstance(r, list) and r, 'daemon returned no results'"
+
       - name: Fast unit tests
         continue-on-error: true
         run: .venv\Scripts\python.exe -m unittest discover -s tests/fast -t .

@@ -45,6 +45,29 @@ jobs:
         run: |
           .venv/bin/python -c "import tkinter; print(tkinter.TkVersion)"
 
+      # Start the semantic-search daemon once and load its model, so the GUI's
+      # semantic search has a backend during the tests (the harness runs with
+      # NO_DAEMON, but query_daemon just connects to whatever daemon is up).
+      # Diagnostic: if the model can't load on this runner the step fails but
+      # the build continues (semantic tests will simply find no results).
+      - name: Prime the semantic search daemon (load the model once)
+        continue-on-error: true
+        run: |
+          .venv/bin/emoji_split_daemon &
+          sleep 15
+          .venv/bin/python - <<'PY'
+          import json, pathlib
+          from multiprocessing.connection import Client
+          from platformdirs import user_cache_dir
+          sock = pathlib.Path(user_cache_dir("kitchensearch")) / "split-daemon.sock"
+          conn = Client(str(sock))
+          conn.send_bytes(json.dumps({"query": "cat", "limit": 3}).encode())
+          resp = json.loads(conn.recv_bytes().decode())
+          conn.close()
+          print("daemon results:", resp)
+          assert isinstance(resp, list) and resp, "daemon returned no results"
+          PY
+
       - name: Fast unit tests
         continue-on-error: true
         run: |

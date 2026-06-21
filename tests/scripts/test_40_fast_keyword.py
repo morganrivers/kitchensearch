@@ -6,9 +6,8 @@ screen dozens of times. That is slow and timing-fragile: a slower runner loads
 results late and the screenshots diverge per OS.
 
 This style instead:
-  * uses the front search screen and types the **whole** word at once
-    (with the default semantic-first settings, typing searches live — no
-    Enter needed to run it),
+  * uses the front search screen, types the **whole** word at once and
+    presses Enter to run the search,
   * captures **one image per stable screen** (not per keystroke),
   * brackets the copy and Escape with before/after images, and
   * synchronises on the app's own readiness beacons (KSEVENT) rather than
@@ -29,10 +28,12 @@ def run(h):
     #    map + settle, so it is up; capture it.
     h.screenshot("01_menu")
 
-    # 2. Type the whole query at once. With semantic-first settings this runs
-    #    the search live, so just wait for the results to finish loading and
+    # 2. Type the whole query and press Enter to dispatch the search (the front
+    #    menu returns typed text as a query — kitchensearch.py runs semantic or
+    #    keyword search on it). Then wait for the results to finish loading and
     #    the list to be painted — event-driven, no sleep.
-    h.type("dancing cow")
+    h.type("cat")
+    h.key("Return")
     h.wait_for_event("loaded")
     h.wait_for_event("ready mode=imagelist")
     h.screenshot("02_results")               # state *before* the copy
