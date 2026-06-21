@@ -65,15 +65,7 @@ DIVIDER     = (210, 210, 210)
 
 
 def find_font(size):
-    # Prefer the font bundled with the app (the same one the picker UI uses).
-    # Using a single shipped font means the story text renders with identical
-    # glyphs on Linux/Windows/macOS instead of whatever OS font happens to be
-    # installed — so the generated image is reproducible across platforms
-    # rather than diverging on fonts alone.
-    bundled = _REPO / "data" / "fonts" / "BubblegumSans-Regular.ttf"
     for path in [
-        str(bundled),
-        # Fallbacks if the bundled font is somehow missing.
         # Linux
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
