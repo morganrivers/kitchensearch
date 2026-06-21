@@ -46,29 +46,18 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-# Steps whose copied image is the emoji-story output. emoji_story now renders
-# the text with the bundled BubblegumSans font, so the image is identical on
-# Linux/Windows/macOS (the per-OS-font divergence that used to make these bytes
-# differ is fixed). These steps stay excluded only because the committed
-# baseline *_clipboard.png here is the *old* OS-font render and re-recording it
-# requires a CI artifact (blocked from the dev box that produced this). Once the
-# baseline is re-recorded from a current run, drop this entry and the gate will
-# verify the story image too. (test_16_story is still skipped wholesale.)
-_NONREPRODUCIBLE_STEPS: dict[str, frozenset[str]] = {
-    "test_30_manyresults": frozenset(
-        {"43_Return", "44_step", "45_click_223_250"}
-    ),
-}
-
-
 def _expected_images(base: Path) -> dict[str, list[str]]:
-    """{image_hash: [baseline step names...]} for every reproducible copy."""
-    skip_steps = _NONREPRODUCIBLE_STEPS.get(base.name, frozenset())
+    """{image_hash: [baseline step names...]} for every copied image.
+
+    The emoji-story image (test_30's final steps) is no longer excluded: now
+    that emoji_story renders with the bundled DejaVu Sans Bold on every OS, it
+    is byte-identical across Linux/Windows/macOS and matches the baseline (which
+    was itself recorded with DejaVu on Linux). test_16_story is still skipped at
+    the call site because that whole test is the story image with nothing else.
+    """
     exp: dict[str, list[str]] = {}
     for clip in sorted(base.glob("*_clipboard.png")):
         step = clip.name[: -len("_clipboard.png")]
-        if step in skip_steps:
-            continue
         exp.setdefault(_sha256(clip.read_bytes()), []).append(step)
     return exp
 
