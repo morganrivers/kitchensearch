@@ -130,6 +130,9 @@ def main():
 
     app_cmd = [sys.executable, str(_PROBE), "--log", str(log_path)]
     harness = _make_harness(run_dir, app_cmd)
+    # The probe is a bare Tk window, not the app — it emits no readiness beacon,
+    # so don't block each key() waiting for one (that would hang this test).
+    harness.beacon_sync = False
 
     print(f"\n  Key-command unit test on {sys.platform} ...", flush=True)
     try:

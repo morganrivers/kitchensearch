@@ -236,6 +236,8 @@ class MacTestHarness:
         nothing loading (KSEVENT 'settled ... busy=0') — the uniform replacement
         for fixed sleeps. Returns on timeout (or if the app exited) so a missed
         beacon can't hang the run."""
+        if not getattr(self, "beacon_sync", True):
+            return True   # target doesn't emit beacons (e.g. the key probe)
         start = len(self._stderr_buf) if since is None else since
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
