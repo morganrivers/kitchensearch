@@ -128,6 +128,8 @@ class MacTestHarness:
         self._debug_log_src: Path = Path(tempfile.gettempdir()) / "kitchensearch-debug.log"
         self._debug_log_dst: Path = self.run_dir / "debug.log"
         self._daemon_ready_seen = False
+        self._daemon_gave_up = False
+        self._daemon_free = False
 
     # ── lifecycle ────────────────────────────────────────────────────────────
 
@@ -304,13 +306,16 @@ class MacTestHarness:
         return path
 
     def _wait_daemon_ready(self):
-        """Consistent cross-OS gate: don't capture while the model is still
-        loading. Cheap once ready; cached. See readiness.py."""
-        if self._daemon_ready_seen:
+        """Don't capture while the model is still loading. Skipped when the GUI
+        runs daemon-free, and never blocks more than once: on timeout it gives
+        up so it can't stall every screenshot. See readiness.py."""
+        if self._daemon_free or self._daemon_ready_seen or self._daemon_gave_up:
             return
         from readiness import wait_for_daemon_ready
-        if wait_for_daemon_ready():
+        if wait_for_daemon_ready(timeout=10):
             self._daemon_ready_seen = True
+        else:
+            self._daemon_gave_up = True
 
     def wait(self, seconds: float):
         time.sleep(seconds)

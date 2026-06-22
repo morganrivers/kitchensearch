@@ -102,6 +102,8 @@ class TestHarness:
         self._shots: list[tuple[str, Path]] = []
         self._widget_server_ready = False
         self._daemon_ready_seen = False
+        self._daemon_gave_up = False
+        self._daemon_free = False
         self.effective_settings: dict = {}
         self.effective_env: dict = {}
         self.stderr_output: str = ""
@@ -131,6 +133,7 @@ class TestHarness:
         env["XDG_CONFIG_HOME"] = str(_TEST_CONFIG_DIR.parent)
         env["KITCHENSEARCH_NO_GRAB"] = "1"
         env["KITCHENSEARCH_NO_DAEMON"] = "1"
+        self._daemon_free = True   # no daemon to wait on; search runs in-process
         env["KITCHENSEARCH_NO_BLINK"] = "1"
         copy_log = self.run_dir / "copied-images.log"
         copy_log.unlink(missing_ok=True)
@@ -384,13 +387,17 @@ class TestHarness:
 
     def _wait_daemon_ready(self):
         """Block until the search daemon (the model) has finished loading, the
-        one variable-latency step that differs across machines/OSes. Cheap once
-        loaded; cached so it only ever blocks the first time. See readiness.py."""
-        if self._daemon_ready_seen:
+        one variable-latency step that differs across machines/OSes. Skipped
+        when the GUI runs daemon-free (these tests do), and it never blocks more
+        than once: on timeout it gives up so it can't stall every screenshot.
+        See readiness.py."""
+        if self._daemon_free or self._daemon_ready_seen or self._daemon_gave_up:
             return
         from readiness import wait_for_daemon_ready
-        if wait_for_daemon_ready():
+        if wait_for_daemon_ready(timeout=10):
             self._daemon_ready_seen = True
+        else:
+            self._daemon_gave_up = True
 
     def wait(self, seconds: float):
         time.sleep(seconds)
