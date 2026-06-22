@@ -148,9 +148,15 @@ def check_test(test_name: str, run_dir: Path, baseline_dir: Path) -> dict:
     # repeating one image) — so it fails the build.
     gold_shots   = _count_screenshots(base)
     run_shots    = _count_screenshots(run)
-    gold_copies  = _gold_capture_counts().get(test_name)
-    gold_distinct = len(expected)                  # distinct baseline images
+    gold         = _gold_capture_counts().get(test_name) or {}
+    gold_copies  = gold.get("copy_events")
+    gold_distinct = gold.get("distinct_copies")    # distinct copies in the gold run
     run_distinct  = len(copied_set)
+    # duplicates = copies that repeated an already-copied image (computed from
+    # the gold run's own counts, not the baseline's distinct-image set, since a
+    # run may legitimately copy images that aren't in the baseline).
+    gold_dups = (gold_copies - gold_distinct) if (
+        gold_copies is not None and gold_distinct is not None) else None
     cap = {
         "gold_screenshots": gold_shots,
         "run_screenshots":  run_shots,
@@ -158,10 +164,10 @@ def check_test(test_name: str, run_dir: Path, baseline_dir: Path) -> dict:
         "gold_copies":      gold_copies,
         "run_copies":       len(copied),
         "copies_ok":        (gold_copies is None) or (len(copied) == gold_copies),
-        "gold_duplicates":  (gold_copies - gold_distinct) if gold_copies is not None else None,
+        "gold_duplicates":  gold_dups,
         "run_duplicates":   len(copied) - run_distinct,
-        "duplicates_ok":    (gold_copies is None)
-                             or ((len(copied) - run_distinct) == (gold_copies - gold_distinct)),
+        "duplicates_ok":    (gold_dups is None)
+                             or ((len(copied) - run_distinct) == gold_dups),
     }
     if not (cap["screenshots_ok"] and cap["copies_ok"] and cap["duplicates_ok"]):
         passed = False
