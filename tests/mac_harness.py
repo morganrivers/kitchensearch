@@ -238,15 +238,26 @@ class MacTestHarness:
         beacon can't hang the run."""
         if not getattr(self, "beacon_sync", True):
             return True   # target doesn't emit beacons (e.g. the key probe)
-        start = len(self._stderr_buf) if since is None else since
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if self._proc is not None and self._proc.poll() is not None:
                 return True
-            for raw in self._stderr_buf[start:]:
-                line = raw.decode(errors="replace") if isinstance(raw, bytes) else raw
-                if "KSEVENT settled" in line and "busy=0" in line:
+            if since is None:
+                # A bare wait() sends no input, so don't block for a *new*
+                # beacon (none is coming) — just confirm the app is currently
+                # settled: the most recent settled beacon reports busy=0.
+                last_busy = None
+                for raw in self._stderr_buf:
+                    line = raw.decode(errors="replace") if isinstance(raw, bytes) else raw
+                    if "KSEVENT settled" in line:
+                        last_busy = 0 if "busy=0" in line else 1
+                if last_busy != 1:
                     return True
+            else:
+                for raw in self._stderr_buf[since:]:
+                    line = raw.decode(errors="replace") if isinstance(raw, bytes) else raw
+                    if "KSEVENT settled" in line and "busy=0" in line:
+                        return True
             time.sleep(0.02)
         return False
 
