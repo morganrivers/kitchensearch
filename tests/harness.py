@@ -101,6 +101,7 @@ class TestHarness:
         self._wid = None
         self._shots: list[tuple[str, Path]] = []
         self._widget_server_ready = False
+        self._daemon_ready_seen = False
         self.effective_settings: dict = {}
         self.effective_env: dict = {}
         self.stderr_output: str = ""
@@ -323,11 +324,14 @@ class TestHarness:
         """
         path = self.run_dir / f"{name}.png"
         if stable:
-            # Prefer an app-driven readiness signal: wait until the Tk event
-            # loop has drained before capturing, so the screen is settled at a
-            # logical point that's identical regardless of machine speed. The
-            # pixel-stability fallback below still runs as a safety net (and is
-            # the only mechanism if the app doesn't expose the test server).
+            # Consistent readiness gate (cheap once the model is loaded): never
+            # capture while the search daemon is still loading, so every OS shows
+            # the post-load screen rather than a transient loading bar.
+            self._wait_daemon_ready()
+            # Then wait for the Tk event loop to drain so the screen is settled
+            # at a logical point that's identical regardless of machine speed.
+            # The pixel-stability fallback below still runs as a safety net (and
+            # is the only mechanism if the app doesn't expose the test server).
             if self._widget_server_ready:
                 try:
                     fetch_idle()
@@ -377,6 +381,16 @@ class TestHarness:
             (self.run_dir / f"{name}_clipboard.png").write_bytes(data)
         else:
             (self.run_dir / f"{name}_clipboard.txt").write_bytes(data)
+
+    def _wait_daemon_ready(self):
+        """Block until the search daemon (the model) has finished loading, the
+        one variable-latency step that differs across machines/OSes. Cheap once
+        loaded; cached so it only ever blocks the first time. See readiness.py."""
+        if self._daemon_ready_seen:
+            return
+        from readiness import wait_for_daemon_ready
+        if wait_for_daemon_ready():
+            self._daemon_ready_seen = True
 
     def wait(self, seconds: float):
         time.sleep(seconds)

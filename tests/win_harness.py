@@ -200,6 +200,7 @@ class WinTestHarness:
         self._stderr_thread: threading.Thread | None = None
         self._stderr_log_path: Path = self.run_dir / "stderr.log"
         self._stderr_log_fh = None
+        self._daemon_ready_seen = False
 
     # ── lifecycle ────────────────────────────────────────────────────────────
 
@@ -419,6 +420,8 @@ class WinTestHarness:
     def screenshot(self, name: str, stable: bool = True) -> Path:
         """Full-screen PNG capture. No window cropping on Windows for the MVP."""
         path = self.run_dir / f"{name}.png"
+        if stable:
+            self._wait_daemon_ready()
         self._activate()
         time.sleep(0.4 if stable else 0.05)
         img = ImageGrab.grab()
@@ -426,6 +429,15 @@ class WinTestHarness:
         self._shots.append((name, path))
         print(f"    [shot] {name}", flush=True)
         return path
+
+    def _wait_daemon_ready(self):
+        """Consistent cross-OS gate: don't capture while the model is still
+        loading. Cheap once ready; cached. See readiness.py."""
+        if self._daemon_ready_seen:
+            return
+        from readiness import wait_for_daemon_ready
+        if wait_for_daemon_ready():
+            self._daemon_ready_seen = True
 
     def wait(self, seconds: float):
         time.sleep(seconds)

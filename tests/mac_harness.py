@@ -121,6 +121,7 @@ class MacTestHarness:
         self._stderr_log_fh = None
         self._debug_log_src: Path = Path(tempfile.gettempdir()) / "kitchensearch-debug.log"
         self._debug_log_dst: Path = self.run_dir / "debug.log"
+        self._daemon_ready_seen = False
 
     # ── lifecycle ────────────────────────────────────────────────────────────
 
@@ -286,6 +287,8 @@ class MacTestHarness:
     def screenshot(self, name: str, stable: bool = True) -> Path:
         """Full-screen PNG capture. No window cropping on macOS for the MVP."""
         path = self.run_dir / f"{name}.png"
+        if stable:
+            self._wait_daemon_ready()
         self._activate()
         time.sleep(0.4 if stable else 0.05)
         subprocess.run(["screencapture", "-x", str(path)],
@@ -293,6 +296,15 @@ class MacTestHarness:
         self._shots.append((name, path))
         print(f"    [shot] {name}", flush=True)
         return path
+
+    def _wait_daemon_ready(self):
+        """Consistent cross-OS gate: don't capture while the model is still
+        loading. Cheap once ready; cached. See readiness.py."""
+        if self._daemon_ready_seen:
+            return
+        from readiness import wait_for_daemon_ready
+        if wait_for_daemon_ready():
+            self._daemon_ready_seen = True
 
     def wait(self, seconds: float):
         time.sleep(seconds)
