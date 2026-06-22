@@ -50,6 +50,11 @@ jobs:
         run: |
           "$TOOL_PY" -c "import tkinter; print(tkinter.TkVersion)"
 
+      - name: Install Quartz for synthetic mouse input (test harness only)
+        run: |
+          "$TOOL_PY" -m pip install --quiet pyobjc-framework-Quartz
+          "$TOOL_PY" -c "import Quartz; print('Quartz OK')"
+
       - name: Smoke-launch the search daemon (also primes the model for the visual test)
         run: |
           emoji_split_daemon &

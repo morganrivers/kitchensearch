@@ -25,6 +25,12 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+try:
+    import Quartz  # pyobjc-framework-Quartz: window bounds + synthetic mouse events
+    _HAS_QUARTZ = True
+except Exception:
+    _HAS_QUARTZ = False
+
 
 _REPO            = Path(__file__).parent.parent
 _TEST_CONFIG_DIR = Path(__file__).parent / "_test_config" / "kitchensearch"
@@ -337,14 +343,77 @@ class MacTestHarness:
     def focus(self):
         self._activate()
 
-    def click(self, *_a, **_kw):
-        raise NotImplementedError("click() is not implemented in the macOS harness")
+    # Recorded coordinates are relative to the window content origin (the Linux
+    # window is undecorated). If the macOS window carries a title bar, bump this
+    # to (0, title_bar_height); 0 assumes the floating window is borderless.
+    MAC_CONTENT_OFFSET = (0, 0)
 
-    def mousedown(self, *_a, **_kw):
-        raise NotImplementedError("mousedown() is not implemented in the macOS harness")
+    def _window_bounds(self):
+        """(x, y, w, h) of the app window in screen pixels, via Quartz."""
+        if not _HAS_QUARTZ:
+            return None
+        pid = self._proc.pid if self._proc else None
+        info = Quartz.CGWindowListCopyWindowInfo(
+            Quartz.kCGWindowListOptionOnScreenOnly
+            | Quartz.kCGWindowListExcludeDesktopElements,
+            Quartz.kCGNullWindowID,
+        )
+        best = None
+        for w in info:
+            if pid is not None and w.get("kCGWindowOwnerPID") != pid:
+                continue
+            b = w.get("kCGWindowBounds")
+            if not b:
+                continue
+            cand = (b["X"], b["Y"], b["Width"], b["Height"])
+            if self.WINDOW_TITLE in (w.get("kCGWindowName") or ""):
+                return cand
+            if best is None or cand[2] * cand[3] > best[2] * best[3]:
+                best = cand
+        return best
 
-    def mouseup(self, *_a, **_kw):
-        raise NotImplementedError("mouseup() is not implemented in the macOS harness")
+    def _to_screen(self, x: int, y: int) -> tuple[float, float]:
+        b = self._window_bounds()
+        if b is None:
+            raise RuntimeError(
+                "could not locate the app window for a click "
+                "(pyobjc-framework-Quartz missing?)"
+            )
+        ox, oy = self.MAC_CONTENT_OFFSET
+        return b[0] + ox + int(x), b[1] + oy + int(y)
+
+    def _cg_codes(self, button: int):
+        return {
+            1: (Quartz.kCGEventLeftMouseDown,  Quartz.kCGEventLeftMouseUp,  Quartz.kCGMouseButtonLeft),
+            2: (Quartz.kCGEventOtherMouseDown, Quartz.kCGEventOtherMouseUp, Quartz.kCGMouseButtonCenter),
+            3: (Quartz.kCGEventRightMouseDown, Quartz.kCGEventRightMouseUp, Quartz.kCGMouseButtonRight),
+        }[button]
+
+    def _cg_post(self, evtype, sx: float, sy: float, btn):
+        ev = Quartz.CGEventCreateMouseEvent(None, evtype, Quartz.CGPointMake(sx, sy), btn)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+
+    def click(self, x: int, y: int, button: int = 1):
+        self._activate()
+        sx, sy = self._to_screen(x, y)
+        down, up, btn = self._cg_codes(button)
+        self._cg_post(down, sx, sy, btn)
+        self._cg_post(up, sx, sy, btn)
+
+    def mousedown(self, x: int, y: int, button: int = 1):
+        """Press (but do not release) — used before a screenshot to capture a
+        transient menu (e.g. a right-click popup)."""
+        self._activate()
+        sx, sy = self._to_screen(x, y)
+        down, _up, btn = self._cg_codes(button)
+        self._cg_post(down, sx, sy, btn)
+        if button == 3:
+            time.sleep(0.35)   # let the popup post (mirrors the Linux harness)
+
+    def mouseup(self, x: int, y: int, button: int = 1):
+        sx, sy = self._to_screen(x, y)
+        _down, up, btn = self._cg_codes(button)
+        self._cg_post(up, sx, sy, btn)
 
     # ── GIF export (duplicated from harness.py on purpose) ───────────────────
 

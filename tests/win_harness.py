@@ -52,10 +52,25 @@ kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 ULONG_PTR = ctypes.c_size_t
 
 INPUT_KEYBOARD        = 1
+INPUT_MOUSE           = 0
 KEYEVENTF_EXTENDEDKEY = 0x0001
 KEYEVENTF_KEYUP       = 0x0002
 KEYEVENTF_UNICODE     = 0x0004
 SW_RESTORE            = 9
+
+MOUSEEVENTF_LEFTDOWN   = 0x0002
+MOUSEEVENTF_LEFTUP     = 0x0004
+MOUSEEVENTF_RIGHTDOWN  = 0x0008
+MOUSEEVENTF_RIGHTUP    = 0x0010
+MOUSEEVENTF_MIDDLEDOWN = 0x0020
+MOUSEEVENTF_MIDDLEUP   = 0x0040
+
+# button number (X11/xdotool convention) -> (down flag, up flag)
+_MOUSE_BTN = {
+    1: (MOUSEEVENTF_LEFTDOWN,   MOUSEEVENTF_LEFTUP),
+    2: (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP),
+    3: (MOUSEEVENTF_RIGHTDOWN,  MOUSEEVENTF_RIGHTUP),
+}
 
 
 class _KEYBDINPUT(ctypes.Structure):
@@ -109,6 +124,10 @@ user32.SendInput.argtypes                = [wintypes.UINT, ctypes.POINTER(_INPUT
 user32.SendInput.restype                 = wintypes.UINT
 kernel32.GetCurrentThreadId.argtypes     = []
 kernel32.GetCurrentThreadId.restype      = wintypes.DWORD
+user32.SetCursorPos.argtypes             = [ctypes.c_int, ctypes.c_int]
+user32.SetCursorPos.restype              = wintypes.BOOL
+user32.ClientToScreen.argtypes           = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+user32.ClientToScreen.restype            = wintypes.BOOL
 
 
 # X11 key names (as used by recorded scripts) → (virtual-key code, is_extended)
@@ -480,14 +499,48 @@ class WinTestHarness:
     def focus(self):
         self._activate()
 
-    def click(self, *_a, **_kw):
-        raise NotImplementedError("click() is not implemented in the Windows harness")
+    def _to_screen(self, x: int, y: int) -> tuple[int, int]:
+        """Map window-client-relative (x, y) to absolute screen pixels.
 
-    def mousedown(self, *_a, **_kw):
-        raise NotImplementedError("mousedown() is not implemented in the Windows harness")
+        The recorded coordinates are relative to the window's content origin
+        (the Linux harness positions with `xdotool mousemove --window`, and the
+        CI Linux window is undecorated). On Windows the matching origin is the
+        *client* area top-left (excludes the native title bar/frame), so a
+        recorded coordinate lands on the same widget on both OSes.
+        """
+        self._activate()
+        hwnd = self._hwnd
+        pt = wintypes.POINT(0, 0)
+        user32.ClientToScreen(hwnd, ctypes.byref(pt))
+        return pt.x + int(x), pt.y + int(y)
 
-    def mouseup(self, *_a, **_kw):
-        raise NotImplementedError("mouseup() is not implemented in the Windows harness")
+    def _send_mouse(self, flags: int):
+        inp = _INPUT(type=INPUT_MOUSE)
+        inp.mi = _MOUSEINPUT(dx=0, dy=0, mouseData=0, dwFlags=flags, time=0, dwExtraInfo=0)
+        user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(_INPUT))
+
+    def click(self, x: int, y: int, button: int = 1):
+        down, up = _MOUSE_BTN[button]
+        sx, sy = self._to_screen(x, y)
+        user32.SetCursorPos(sx, sy)
+        time.sleep(0.05)
+        self._send_mouse(down)
+        self._send_mouse(up)
+
+    def mousedown(self, x: int, y: int, button: int = 1):
+        """Press (but do not release) — used before a screenshot to capture a
+        transient menu (e.g. a right-click popup)."""
+        down, _ = _MOUSE_BTN[button]
+        sx, sy = self._to_screen(x, y)
+        user32.SetCursorPos(sx, sy)
+        time.sleep(0.05)
+        self._send_mouse(down)
+        if button == 3:
+            time.sleep(0.35)   # let the popup post (mirrors the Linux harness)
+
+    def mouseup(self, x: int, y: int, button: int = 1):
+        _, up = _MOUSE_BTN[button]
+        self._send_mouse(up)
 
     # ── GIF export (duplicated from harness.py on purpose) ───────────────────
 
