@@ -2,7 +2,7 @@ name: macOS tests
 
 on:
   push:
-    branches: [main, claude/github-testing-windows-linux-06b9or]
+    branches: [main, claude/github-testing-windows-linux-06b9or, claude/recent-push-windows-failures-da50h4]
   pull_request:
   workflow_dispatch:
     inputs:
