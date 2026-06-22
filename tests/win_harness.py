@@ -354,6 +354,23 @@ class WinTestHarness:
             time.sleep(0.03)
         return None
 
+    def _wait_settled(self, since: int | None = None, timeout: float = 12.0) -> bool:
+        """Block until the app has handled the last input and gone idle with
+        nothing loading (KSEVENT 'settled ... busy=0') — the uniform replacement
+        for fixed sleeps. Returns on timeout (or if the app exited) so a missed
+        beacon can't hang the run."""
+        start = len(self._stderr_buf) if since is None else since
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self._proc is not None and self._proc.poll() is not None:
+                return True
+            for raw in self._stderr_buf[start:]:
+                line = raw.decode(errors="replace") if isinstance(raw, bytes) else raw
+                if "KSEVENT settled" in line and "busy=0" in line:
+                    return True
+            time.sleep(0.02)
+        return False
+
     def close(self):
         if self._proc:
             # Kill the whole tree so any daemon children spawned by the app die too.
@@ -463,10 +480,13 @@ class WinTestHarness:
         return path
 
     def wait(self, seconds: float):
-        time.sleep(seconds)
+        # Timings from the recording are ignored — we pace on the app's
+        # readiness beacon, so there are no sleep-based waits anywhere.
+        self._wait_settled()
 
     def key(self, key_name: str):
         """Send a key press. Supports modifier+key syntax: 'ctrl+Right'."""
+        mark = len(self._stderr_buf)
         self._activate()
         parts = key_name.split("+")
         key   = parts[-1]
@@ -492,13 +512,16 @@ class WinTestHarness:
         finally:
             for m in reversed(mods):
                 _send_vk(_MOD_VK[m], up=True)
+        self._wait_settled(mark)
 
     def type(self, text: str, delay_ms: int = 40):
+        mark = len(self._stderr_buf)
         self._activate()
         for ch in text:
             _send_unicode(ch)
             if delay_ms:
                 time.sleep(delay_ms / 1000.0)
+        self._wait_settled(mark)
 
     def focus(self):
         self._activate()
@@ -512,6 +535,7 @@ class WinTestHarness:
         return pt.x, pt.y
 
     def click(self, x: int, y: int, button: int = 1):
+        mark = len(self._stderr_buf)
         self._activate()
         sx, sy = self._to_screen(x, y)
         user32.SetCursorPos(sx, sy)
@@ -519,6 +543,7 @@ class WinTestHarness:
         down, up = _MOUSEEVENTF.get(button, _MOUSEEVENTF[1])
         user32.mouse_event(down, 0, 0, 0, 0)
         user32.mouse_event(up, 0, 0, 0, 0)
+        self._wait_settled(mark)
 
     def mousedown(self, x: int, y: int, button: int = 1):
         self._activate()

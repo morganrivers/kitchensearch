@@ -199,6 +199,24 @@ class TestHarness:
             time.sleep(0.03)
         return None
 
+    def _wait_settled(self, since: int | None = None, timeout: float = 12.0) -> bool:
+        """Block until the app has handled the last input and gone idle with
+        nothing loading (KSEVENT 'settled ... busy=0'). This is the uniform
+        replacement for fixed sleeps: every action paces on the app's readiness
+        beacon, never the clock. Returns on timeout (or if the app exited) so a
+        missed beacon can't hang the run."""
+        start = len(self._stderr_buf) if since is None else since
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self._proc is not None and self._proc.poll() is not None:
+                return True
+            for raw in self._stderr_buf[start:]:
+                line = raw.decode(errors="replace") if isinstance(raw, bytes) else raw
+                if "KSEVENT settled" in line and "busy=0" in line:
+                    return True
+            time.sleep(0.02)
+        return False
+
     def _killpg(self, sig):
         try:
             os.killpg(os.getpgid(self._proc.pid), sig)
@@ -392,10 +410,13 @@ class TestHarness:
             (self.run_dir / f"{name}_clipboard.txt").write_bytes(data)
 
     def wait(self, seconds: float):
-        time.sleep(seconds)
+        # The recording's timings are ignored on purpose: we pace on the app's
+        # readiness beacon, so there are no sleep-based waits anywhere.
+        self._wait_settled()
 
     def key(self, key_name: str):
         """Send a key press (e.g. 'Return', 'Up', 'Down', 'Escape', 'ctrl+a')."""
+        mark = len(self._stderr_buf)
         result = subprocess.run(
             ["xdotool", "key", "--window", self._wid, "--clearmodifiers", key_name],
             stderr=subprocess.DEVNULL,
@@ -405,9 +426,11 @@ class TestHarness:
             wid = self._find_window()
             if wid:
                 self._wid = wid
+        self._wait_settled(mark)
 
     def type(self, text: str, delay_ms: int = 40):
         """Type a string into the focused widget."""
+        mark = len(self._stderr_buf)
         subprocess.run(
             [
                 "xdotool", "type", "--window", self._wid,
@@ -415,15 +438,18 @@ class TestHarness:
             ],
             check=True,
         )
+        self._wait_settled(mark)
 
     def click(self, x: int, y: int, button: int = 1):
         """Click at pixel (x, y) relative to the window's top-left corner."""
+        mark = len(self._stderr_buf)
         subprocess.run(
             ["xdotool", "mousemove", "--window", self._wid, "--sync", str(x), str(y)],
             check=True,
         )
         time.sleep(0.05)
         subprocess.run(["xdotool", "click", str(button)], check=True)
+        self._wait_settled(mark)
 
     def mousedown(self, x: int, y: int, button: int = 1):
         """Press (but do not release) a mouse button — use before screenshot to capture menus."""

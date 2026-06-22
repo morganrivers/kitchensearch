@@ -231,6 +231,23 @@ class MacTestHarness:
             time.sleep(0.03)
         return None
 
+    def _wait_settled(self, since: int | None = None, timeout: float = 12.0) -> bool:
+        """Block until the app has handled the last input and gone idle with
+        nothing loading (KSEVENT 'settled ... busy=0') — the uniform replacement
+        for fixed sleeps. Returns on timeout (or if the app exited) so a missed
+        beacon can't hang the run."""
+        start = len(self._stderr_buf) if since is None else since
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self._proc is not None and self._proc.poll() is not None:
+                return True
+            for raw in self._stderr_buf[start:]:
+                line = raw.decode(errors="replace") if isinstance(raw, bytes) else raw
+                if "KSEVENT settled" in line and "busy=0" in line:
+                    return True
+            time.sleep(0.02)
+        return False
+
     def _killpg(self, sig):
         try:
             os.killpg(os.getpgid(self._proc.pid), sig)
@@ -317,10 +334,13 @@ class MacTestHarness:
         return path
 
     def wait(self, seconds: float):
-        time.sleep(seconds)
+        # Timings from the recording are ignored — we pace on the app's
+        # readiness beacon, so there are no sleep-based waits anywhere.
+        self._wait_settled()
 
     def key(self, key_name: str):
         """Send a key press. Supports modifier+key syntax: 'ctrl+Right'."""
+        mark = len(self._stderr_buf)
         self._activate()
         parts = key_name.split("+")
         key   = parts[-1]
@@ -341,12 +361,15 @@ class MacTestHarness:
             # text — that corrupts state and diverges from Linux/Windows. Fail loud.
             raise ValueError(f"unmapped key: {key!r}")
         _osa(script)
+        self._wait_settled(mark)
 
     def type(self, text: str, delay_ms: int = 40):
+        mark = len(self._stderr_buf)
         self._activate()
         esc = text.replace("\\", "\\\\").replace('"', '\\"')
         script = f'tell application "System Events" to keystroke "{esc}"'
         _osa(script)
+        self._wait_settled(mark)
 
     def focus(self):
         self._activate()

@@ -249,6 +249,12 @@ class TkPicker:
         self._load_poll_after_id = None
         self._window_start       = 0
         self._ph_active = False
+        # Uniform readiness beacon: the harness waits on "KSEVENT settled ...
+        # inflight=0" after every input instead of sleeping. _inflight counts
+        # image-loading workers still in flight for the current view.
+        self._inflight        = 0
+        self._settled_seq     = 0
+        self._settled_pending = False
         self._pending_toast  = None
         self._toast_widget   = None
         self._toast_after_id = None
@@ -472,8 +478,48 @@ class TkPicker:
         self._entry.bind("<FocusIn>",  lambda e: self._entry.configure(highlightthickness=3), add="+")
         self._entry.bind("<FocusOut>", lambda e: self._entry.configure(highlightthickness=2), add="+")
 
+        # After the app finishes handling any input it schedules a "settled"
+        # beacon (see _schedule_settled). The harness waits on this uniformly
+        # instead of sleeping, so no test needs its own timing.
+        root.bind("<KeyRelease>",    self._schedule_settled, add="+")
+        root.bind("<ButtonRelease>", self._schedule_settled, add="+")
+
         self._make_dm_button()
         self._make_back_btn()
+
+    # ── uniform readiness beacon ──────────────────────────────────────────────
+
+    def _schedule_settled(self, _e=None):
+        """Emit a 'settled' beacon once the Tk event queue drains after input.
+
+        after_idle fires only when the app has finished processing the pending
+        event(s), so the beacon means "the input you just sent has been fully
+        handled". _inflight reports whether image workers are still loading the
+        current view, so the harness can wait for inflight=0 (fully rendered)."""
+        if self._settled_pending:
+            return
+        self._settled_pending = True
+        try:
+            self.root.after_idle(self._emit_settled)
+        except (RuntimeError, tk.TclError):
+            self._settled_pending = False
+
+    def _emit_settled(self):
+        self._settled_pending = False
+        self._settled_seq += 1
+        # "busy" means work the harness must wait out before the next input:
+        # image workers still loading, or a debounced query/filter not yet run.
+        # (Background lazy-load polling is deliberately excluded so the app can
+        # reach a settled state instead of looking busy forever.)
+        busy = 1 if (self._inflight > 0 or self._filter_after_id is not None) else 0
+        _event(f"settled seq={self._settled_seq} busy={busy} inflight={self._inflight}")
+
+    def _worker_done(self):
+        """A dispatched image worker has flushed on the main thread."""
+        if self._inflight > 0:
+            self._inflight -= 1
+        if self._inflight == 0:
+            self._schedule_settled()
 
     # ── dark mode button ──────────────────────────────────────────────────────
 
@@ -911,6 +957,10 @@ class TkPicker:
         # Image-list results emit a separate "loaded" event once thumbnails
         # finish loading (see pick_with_images).
         self.root.after(0, lambda m=self._mode: _event(f"ready mode={m}"))
+        # A new screen is also a settle point — emit the readiness beacon so the
+        # harness can pace on one uniform signal across both in-screen input and
+        # screen transitions (busy stays 1 until any images finish loading).
+        self.root.after(0, self._schedule_settled)
         self.root.mainloop()
         try:
             self.root.grab_release()
@@ -2375,6 +2425,10 @@ class TkPicker:
         def _emit_loaded():
             _event(f"loaded gen={gen} nrows={len(self._rows)} flushed={next_rank[0]} "
                    f"total={len(entries)} more={dispatched[0] < len(entries)}")
+            # Results are rendered — re-emit the readiness beacon so a harness
+            # that pressed a key which triggered this load (debounced search,
+            # text-only results with no image workers) sees it become settled.
+            self._schedule_settled()
 
         def _dispatch_next_batch():
             start = dispatched[0]
@@ -2407,9 +2461,11 @@ class TkPicker:
                         if self._destroyed:
                             return
                         try:
-                            self.root.after(0, lambda: _on_image_ready(rank, label, path, score))
+                            self.root.after(0, lambda: (_on_image_ready(rank, label, path, score),
+                                                        self._worker_done()))
                         except (RuntimeError, tk.TclError):
                             pass
+                    self._inflight += 1
                     threading.Thread(target=_worker, daemon=True).start()
             dispatched[0] = end
             self._load_next_batch_fn = _dispatch_next_batch if end < len(entries) else None
