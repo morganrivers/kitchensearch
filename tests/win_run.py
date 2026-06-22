@@ -38,6 +38,14 @@ def _load_script(path: Path):
 
 
 def main():
+    # Windows consoles default to cp1252; keep output encodable so a stray
+    # non-ASCII char in a print() can never crash the run with the runner.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
     p = argparse.ArgumentParser()
     p.add_argument("test_name", help="e.g. test_01_main_menu")
     p.add_argument("--output-dir", default=str(_DEFAULT_OUT),
@@ -59,21 +67,21 @@ def main():
         settings_path=companion if companion.exists() else None,
     )
 
-    print(f"\n  Running {args.test_name} on Windows …")
+    print(f"\n  Running {args.test_name} on Windows ...")
     failed = False
     try:
         with harness as h:
             mod.run(h)
             gif = out_dir / "recording.gif"
             h.make_gif(gif)
-            print(f"  GIF → {gif}")
+            print(f"  GIF -> {gif}")
     except Exception as exc:
         print(f"  ERROR: {exc}", file=sys.stderr)
         failed = True
 
     clip = dump_clipboard(out_dir)
     if clip:
-        print(f"  Clipboard → {clip}")
+        print(f"  Clipboard -> {clip}")
     else:
         print("  Clipboard was empty")
         if args.require_clipboard:

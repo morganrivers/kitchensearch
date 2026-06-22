@@ -84,7 +84,6 @@ def _handle_client(conn: socket.socket, root: tk.Widget):
     try:
         data = conn.recv(64).decode().strip()
         if data == "DUMP":
-            dump = root.after(0, lambda: None)   # ensure we're on main thread
             # We can't call tkinter from a thread; schedule and wait
             result_holder: list = []
             event = threading.Event()
@@ -97,6 +96,16 @@ def _handle_client(conn: socket.socket, root: tk.Widget):
             event.wait(timeout=3.0)
             payload = json.dumps(result_holder[0] if result_holder else {})
             conn.sendall((payload + "\n").encode())
+        elif data == "IDLE":
+            # Readiness signal: report back once Tk's event loop has drained its
+            # pending work. after_idle fires only when there are no events left
+            # to process, so a screenshot taken after this lands on a settled UI
+            # — a deterministic, machine-speed-independent capture point, instead
+            # of a fixed sleep. Returns "BUSY" if the loop never went idle in time.
+            event = threading.Event()
+            root.after_idle(event.set)
+            ready = event.wait(timeout=5.0)
+            conn.sendall(b"OK\n" if ready else b"BUSY\n")
     finally:
         conn.close()
 
@@ -143,6 +152,27 @@ def fetch_dump(timeout: float = 3.0) -> dict:
             break
     conn.close()
     return json.loads(buf.decode().strip())
+
+
+def fetch_idle(timeout: float = 6.0) -> bool:
+    """Block until the app's Tk event loop is idle (all pending UI work done).
+
+    Returns True once the app reports it's settled, False if it couldn't be
+    reached or didn't go idle in time. Callers should treat False as "fall back
+    to the timing heuristic" rather than an error — the app may not expose the
+    test server (e.g. KITCHENSEARCH_NO_GRAB unset).
+    """
+    sock_path = str(SOCK_PATH)
+    try:
+        conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        conn.settimeout(timeout)
+        conn.connect(sock_path)
+        conn.sendall(b"IDLE\n")
+        reply = conn.recv(16)
+        conn.close()
+        return reply.strip() == b"OK"
+    except OSError:
+        return False
 
 
 # ── diff ──────────────────────────────────────────────────────────────────────

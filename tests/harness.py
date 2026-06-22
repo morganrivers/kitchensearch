@@ -31,7 +31,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 # Add tests/ dir to path so widget_dump is importable
 sys.path.insert(0, str(Path(__file__).parent))
-from widget_dump import fetch_dump
+from widget_dump import fetch_dump, fetch_idle
 
 _REPO = Path(__file__).parent.parent
 _TEST_CONFIG_DIR = Path(__file__).parent / "_test_config" / "kitchensearch"
@@ -323,6 +323,16 @@ class TestHarness:
         """
         path = self.run_dir / f"{name}.png"
         if stable:
+            # Prefer an app-driven readiness signal: wait until the Tk event
+            # loop has drained before capturing, so the screen is settled at a
+            # logical point that's identical regardless of machine speed. The
+            # pixel-stability fallback below still runs as a safety net (and is
+            # the only mechanism if the app doesn't expose the test server).
+            if self._widget_server_ready:
+                try:
+                    fetch_idle()
+                except Exception:
+                    pass
             self._capture_stable(path)
         else:
             self._capture(path)
