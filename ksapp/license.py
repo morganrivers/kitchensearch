@@ -42,7 +42,11 @@ from ksapp.picker_utils import CONFIG_DIR
 # Fill these in with values from your Polar dashboard. ORGANIZATION_ID is the
 # UUID of the Polar organization that owns the license-key benefit. Until it is
 # set, licensing stays disabled and all gated features remain hidden.
-POLAR_ORGANIZATION_ID = ""
+# POLAR_CHECKOUT_URL is the public checkout link the Settings screen opens when
+# the user clicks "Buy a license"; it should resolve to a Polar product that
+# grants a license-key benefit on purchase.
+POLAR_ORGANIZATION_ID = "a68cb446-bae8-49e0-a45c-7bd0f35ec8ac"
+POLAR_CHECKOUT_URL    = "https://buy.polar.sh/polar_cl_ZMalIyTWg5yqsmoqd9mY0uHMMWLfPhO687XwU3bSRSP"
 POLAR_API_BASE        = "https://api.polar.sh"
 
 _LICENSE_FILE = CONFIG_DIR / "license.json"
@@ -84,13 +88,12 @@ class LicenseManager:
             return {}
 
     def _save(self):
-        try:
-            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-            tmp = _LICENSE_FILE.with_suffix(".json.tmp")
-            tmp.write_text(json.dumps(self._state, indent=2), encoding="utf-8")
-            tmp.replace(_LICENSE_FILE)
-        except Exception as e:
-            _dbg(f"license save failed: {e}")
+        """Persist self._state atomically. Raises on failure so callers can
+        roll back rather than silently burning an activation slot."""
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = _LICENSE_FILE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(self._state, indent=2), encoding="utf-8")
+        tmp.replace(_LICENSE_FILE)
 
     # ── HTTP ──────────────────────────────────────────────────────────────────
     def _post(self, endpoint, payload):
@@ -139,6 +142,12 @@ class LicenseManager:
     # ── public state ────────────────────────────────────────────────────────
     def configured(self):
         return bool(POLAR_ORGANIZATION_ID)
+
+    @staticmethod
+    def checkout_url():
+        """Public checkout URL the Settings 'Buy a license' entry opens in a
+        browser. Empty string means buy flow is not configured."""
+        return POLAR_CHECKOUT_URL
 
     def is_licensed(self):
         """Fast, offline check. True only if we have a validated activation that
@@ -196,6 +205,7 @@ class LicenseManager:
             return False, "Unexpected response from the licensing server."
 
         with self._lock:
+            prev_state = dict(self._state)
             self._state.update({
                 "key":               key,
                 "activation_id":     activation_id,
@@ -204,7 +214,19 @@ class LicenseManager:
                 "limit_activations": lk.get("limit_activations"),
                 "usage":             lk.get("usage"),
             })
-            self._save()
+            try:
+                self._save()
+            except Exception as e:
+                # Polar already consumed an activation slot; rolling back our
+                # cache means is_licensed() stays False so the user can retry
+                # without thinking it worked. They will need to deactivate via
+                # the dashboard to free the slot.
+                self._state = prev_state
+                _dbg(f"license save failed during activate: {e}")
+                return False, (
+                    "License activated on the server, but the local cache could "
+                    "not be saved.\nCheck that your config directory is writable "
+                    "and try again.")
         return True, "License activated. Thanks for your support!"
 
     def validate(self):
@@ -229,6 +251,12 @@ class LicenseManager:
             return self.is_licensed()  # offline: trust the grace window
 
         with self._lock:
+            # A concurrent deactivate() may have cleared our state while the
+            # validate POST was in flight. If activation_id changed under us,
+            # drop this response on the floor — otherwise a successful response
+            # would silently re-license a machine the user just deactivated.
+            if self._state.get("activation_id") != activation_id:
+                return False
             if status == 200 and (body or {}).get("status") == "granted":
                 self._state["valid"]             = True
                 self._state["last_validated_at"] = time.time()
@@ -241,11 +269,19 @@ class LicenseManager:
                 # Polar reached and said no: revoked, disabled, or unknown key.
                 self._state["valid"] = False
                 ok = False
-            self._save()
+            try:
+                self._save()
+            except Exception as e:
+                _dbg(f"license save failed during validate: {e}")
         return ok
 
     def deactivate(self):
-        """Release this machine's activation slot. Returns (ok, message)."""
+        """Release this machine's activation slot. Returns (ok, message).
+
+        Local state is cleared *only* on a real success (or 404 = already gone
+        server-side). Network failures and Polar errors leave local state
+        intact so the user can retry without leaking the slot on Polar's side.
+        """
         st = self._state
         key, activation_id = st.get("key"), st.get("activation_id")
         if not key or not activation_id:
@@ -257,17 +293,27 @@ class LicenseManager:
              "organization_id": POLAR_ORGANIZATION_ID,
              "activation_id": activation_id},
         )
-        # 200/204 = success; 404 = already gone server-side. Either way, clear
-        # local state so the slot is considered freed here.
         if status is None:
             return False, "Could not reach the licensing server.\nTry again when you are online."
+        if status not in (200, 204, 404):
+            return False, self._error_message(
+                body, "License could not be deactivated. Try again later.")
 
         with self._lock:
+            prev_state = dict(self._state)
             self._state = {}
-            self._save()
-        if status in (200, 204, 404):
-            return True, "License deactivated on this device."
-        return True, self._error_message(body, "License deactivated on this device.")
+            try:
+                self._save()
+            except Exception as e:
+                # Server already freed the slot; local cache write failed, so
+                # is_licensed() will still report True until the file is
+                # writable again. Surface this so the user can fix permissions.
+                self._state = prev_state
+                _dbg(f"license save failed during deactivate: {e}")
+                return False, (
+                    "Deactivated on the server, but the local cache could not "
+                    "be cleared.\nCheck that your config directory is writable.")
+        return True, "License deactivated on this device."
 
     def refresh_async(self):
         """If cached state is stale, re-validate in a background thread so the

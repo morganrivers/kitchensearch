@@ -833,50 +833,6 @@ def get_thumb(url):
 
 
 
-_BMC_BASE_URL                     = "https://www.buymeacoffee.com/morganrivers"
-_BMC_BUTTON_PATH                  = _REPO / "data" / "ui_assets" / "buymeacoffee_button.png"
-_TIP_MODAL_MIN_HOURS              = 72
-_TIP_MODAL_MIN_COPIES             = 14
-_TIP_MODAL_DISMISSAL_SECS         = 3 * 86400
-_TIP_MODAL_DISMISSAL_MIN_COPIES   = 6
-
-
-def get_buymeacoffee_url():
-    return _BMC_BASE_URL
-
-
-def get_tip_modal_button_path():
-    return str(_BMC_BUTTON_PATH) if _BMC_BUTTON_PATH.exists() else None
-
-
-def should_show_tip_modal(settings, now):
-    assert isinstance(settings, dict), "settings must be a dict"
-    if os.environ.get("KITCHENSEARCH_SHOW_BANNER") == "1":
-        return True
-    if bool(settings.get("hide_ads")):
-        return False
-    if now < settings.get("snooze_until", 0):
-        return False
-    install = settings.get("install")
-    if install is None:
-        return False
-    if (now - float(install)) / 3600 < _TIP_MODAL_MIN_HOURS:
-        return False
-    copy_count = int(settings.get("copy_count", 0))
-    if copy_count < _TIP_MODAL_MIN_COPIES:
-        return False
-    dismissed_at = settings.get("dismissed_at", 0)
-    if dismissed_at:
-        if (now - dismissed_at) < _TIP_MODAL_DISMISSAL_SECS:
-            return False
-        dismissed_cc = int(settings.get("dismissed_copy_count", 0))
-        if (copy_count - dismissed_cc) < _TIP_MODAL_DISMISSAL_MIN_COPIES:
-            return False
-    return True
-
-
-
-
 _PIL_EMOJI_FONT  = None   # PIL ImageFont, loaded once
 _PIL_EMOJI_CACHE = {}     # char -> PIL Image (or None on failure)
 

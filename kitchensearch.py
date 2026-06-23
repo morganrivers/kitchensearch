@@ -6,7 +6,7 @@ Results appear one-by-one as thumbnails download. Borderless, half-screen, cente
 Bind in i3 config:
   bindsym $mod+shift+e exec --no-startup-id python3 ~/.local/bin/kitchensearch.py
 """
-import os, sys, re, json, hashlib, webbrowser, time
+import os, sys, re, json, hashlib, webbrowser
 from pathlib import Path
 from PIL import Image
 from ksapp.picker_utils import (
@@ -21,8 +21,7 @@ from ksapp.picker_utils import (
     copy_image_to_clipboard, record_copy,
     query_daemon,
     _trim_thumb_cache, _spawn_daemon, _daemon_alive,
-    get_buymeacoffee_url, get_tip_modal_button_path, should_show_tip_modal,
-    load_favorites, add_favorite, remove_favorite, toggle_favorite,
+    load_favorites, remove_favorite, toggle_favorite,
 )
 from ksapp.picker_ui import (
     TkPicker, pick_base_emoji,
@@ -42,7 +41,9 @@ _MODE_FAVORITES = "favorites"
 _MODE_SETTINGS  = "settings"
 
 _SETTINGS_KEY_HOTKEY             = "__hotkey__"
-_SETTINGS_KEY_LICENSE            = "__license__"
+_SETTINGS_KEY_LICENSE_BUY        = "__license_buy__"
+_SETTINGS_KEY_LICENSE_ENTER      = "__license_enter__"
+_SETTINGS_KEY_LICENSE_INFO       = "__license_info__"
 _SETTINGS_KEY_LICENSE_DEACTIVATE = "__license_deactivate__"
 
 # ── settings ──────────────────────────────────────────────────────────────────
@@ -65,7 +66,6 @@ _DEFAULT_SETTINGS = {
     "frameless":       False,
     "always_on_top":   False,
     "dark_mode":       False,
-    "copy_count":      0,
 }
 
 _BOOL_SETTINGS_ITEMS = [
@@ -159,28 +159,6 @@ def _open_hotkey_settings():
         subprocess.run([_PYTHON, str(daemon_py), "--settings"])
 
 
-_TIP_MODAL_TEXT = (
-    "Thanks for using the app! This app is pay what you want.\n"
-    "The suggested price is $2, which helps me build more apps like this."
-)
-
-
-def _maybe_show_tip_modal(picker, settings):
-    if not should_show_tip_modal(settings, time.time()):
-        return
-    if "hide_ads" not in settings:
-        settings["hide_ads"] = False
-
-    def _on_tip_result(action):
-        settings["dismissed_at"]         = time.time()
-        settings["dismissed_copy_count"] = int(settings.get("copy_count", 0))
-        save_settings(settings)
-        if action == TkPicker.TIP_RESULT_TIP:
-            webbrowser.open(get_buymeacoffee_url())
-
-    picker.queue_tip_overlay(_TIP_MODAL_TEXT, get_tip_modal_button_path(), _on_tip_result)
-
-
 def _run_settings(picker, settings, lic):
     sel_idx = 0
     tiling = _is_tiling_wm()
@@ -200,18 +178,22 @@ def _run_settings(picker, settings, lic):
             hotkey = settings.get("hotkey", "Ctrl+Alt+K")
             display_items.append(f"Keyboard shortcut: {hotkey}  (click to change)")
             item_keys.append(_SETTINGS_KEY_HOTKEY)
-        if "hide_ads" in settings:
-            display_items.append(f"{'[x]' if settings['hide_ads'] else '[ ]'} Don't show support modal")
-            item_keys.append("hide_ads")
 
         if lic.configured():
             licensed = lic.is_licensed()
-            verb = "manage" if licensed else "enter key"
-            display_items.append(f"License: {lic.status_summary()}  (click to {verb})")
-            item_keys.append(_SETTINGS_KEY_LICENSE)
             if licensed:
+                display_items.append(f"License: {lic.status_summary()}  (click for info)")
+                item_keys.append(_SETTINGS_KEY_LICENSE_INFO)
                 display_items.append("Deactivate license on this device")
                 item_keys.append(_SETTINGS_KEY_LICENSE_DEACTIVATE)
+            else:
+                if lic.checkout_url():
+                    display_items.append(
+                        "Unlock favorites & dark mode — buy a license")
+                    item_keys.append(_SETTINGS_KEY_LICENSE_BUY)
+                display_items.append(
+                    f"Enter license key  ({lic.status_summary()})")
+                item_keys.append(_SETTINGS_KEY_LICENSE_ENTER)
 
         assert len(item_keys) == len(display_items)
 
@@ -232,74 +214,94 @@ def _run_settings(picker, settings, lic):
             except Exception as e:
                 _dbg(f"re-read settings after hotkey change failed: {e}")
             continue
-        if key == _SETTINGS_KEY_LICENSE:
-            if lic.is_licensed():
-                picker.message(
-                    f"License is {lic.status_summary()}.\n\n"
-                    "Unlocks the Favorites menu and the dark-mode toggle.\n"
-                    "Use 'Deactivate license on this device' to free this "
-                    "activation for another machine.")
-            else:
-                entered = picker.ask("Paste your license key, then press Enter:",
-                                     placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX")
+        if key == _SETTINGS_KEY_LICENSE_BUY:
+            url = lic.checkout_url()
+            if url:
+                webbrowser.open(url)
+                entered = picker.ask(
+                    "Opening the license checkout in your browser.\n\n"
+                    "After purchase, paste your license key below and press "
+                    "Enter (or Esc to dismiss):",
+                    placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX")
                 if entered:
-                    ok, msg = lic.activate(entered)
+                    _ok, msg = lic.activate(entered)
                     picker.message(msg)
             continue
+        if key == _SETTINGS_KEY_LICENSE_ENTER:
+            entered = picker.ask("Paste your license key, then press Enter:",
+                                 placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX")
+            if entered:
+                _ok, msg = lic.activate(entered)
+                picker.message(msg)
+            continue
+        if key == _SETTINGS_KEY_LICENSE_INFO:
+            picker.message(
+                f"License is {lic.status_summary()}.\n\n"
+                "Unlocks the Favorites menu and the dark-mode toggle.\n"
+                "Use 'Deactivate license on this device' to free this "
+                "activation for another machine.")
+            continue
         if key == _SETTINGS_KEY_LICENSE_DEACTIVATE:
-            ok, msg = lic.deactivate()
+            _ok, msg = lic.deactivate()
             picker.message(msg)
             continue
         settings[key] = not settings[key]
-        if key == "hide_ads":
-            settings["snooze_until"] = 0
         save_settings(settings)
 
 
 def _run_favorites(picker, settings):
-    favs = load_favorites()
-    if not favs:
-        picker.message("No favorites yet.\n\n"
-                       "Right-click any search or combo result to add it here.")
+    """Show the favorites list. A right-click removes a favorite and re-renders
+    the list inline (via a `removed` flag on the closure) so the user sees the
+    change without having to reopen the menu."""
+    while True:
+        favs = load_favorites()
+        if not favs:
+            picker.message("No favorites yet.\n\n"
+                           "Right-click any search or combo result to add it here.")
+            return
+
+        fav_entries = [(format_label(f["alt"], f["url"], f.get("text", "")), f["url"], i)
+                       for i, f in enumerate(favs)]
+
+        def _resolve(label, _favs=favs):
+            m = re.match(r'^\S+', label)
+            sel_alt = m.group(0) if m else label
+            for f in _favs:
+                if f["alt"] == sel_alt:
+                    return f
+            return None
+
+        def _copy_fav(label):
+            f = _resolve(label)
+            if not f:
+                return
+            path = get_thumb(f["url"])
+            if path:
+                copy_image_to_clipboard(path)
+                record_copy(f["url"], f["alt"])
+                if settings["notify_on_copy"]:
+                    _notify("Copied to clipboard")
+
+        removed = [False]
+        def _remove_fav(label):
+            f = _resolve(label)
+            if not f:
+                return
+            remove_favorite(f["url"])
+            removed[0] = True
+            picker.queue_toast("removed from favorites")
+            # Close the current pick so the outer loop re-renders the list.
+            picker.cancel()
+
+        on_sel = None if settings["exit_on_select"] else _copy_fav
+        result = picker.pick_with_images(
+            "Favorites  (right-click to remove):", fav_entries, get_thumb,
+            on_select=on_sel, on_favorite=_remove_fav)
+        if removed[0]:
+            continue
+        if result and settings["exit_on_select"]:
+            _copy_fav(result)
         return
-
-    fav_entries = [(format_label(f["alt"], f["url"], f.get("text", "")), f["url"], i)
-                   for i, f in enumerate(favs)]
-
-    def _resolve(label, _favs=favs):
-        m = re.match(r'^\S+', label)
-        sel_alt = m.group(0) if m else label
-        for f in _favs:
-            if f["alt"] == sel_alt:
-                return f
-        return None
-
-    def _copy_fav(label):
-        f = _resolve(label)
-        if not f:
-            return
-        path = get_thumb(f["url"])
-        if path:
-            copy_image_to_clipboard(path)
-            record_copy(f["url"], f["alt"])
-            settings["copy_count"] = settings.get("copy_count", 0) + 1
-            save_settings(settings)
-            if settings["notify_on_copy"]:
-                _notify("Copied to clipboard")
-
-    def _remove_fav(label):
-        f = _resolve(label)
-        if not f:
-            return
-        remove_favorite(f["url"])
-        picker.queue_toast("removed from favorites (reopen to refresh)")
-
-    on_sel = None if settings["exit_on_select"] else _copy_fav
-    result = picker.pick_with_images(
-        "Favorites  (right-click to remove):", fav_entries, get_thumb,
-        on_select=on_sel, on_favorite=_remove_fav)
-    if result and settings["exit_on_select"]:
-        _copy_fav(result)
 
 
 def _hotkey_daemon_alive():
@@ -426,9 +428,6 @@ def main():
     # Users can launch `kitchensearch_daemon` manually for now; we'll re-enable
     # auto-spawn once the underlying conflict is understood.
     settings = load_settings()
-    if "install" not in settings:
-        settings["install"] = time.time()
-        save_settings(settings)
     lic = LicenseManager()
     lic.refresh_async()
     if (sys.platform != "win32"
@@ -456,7 +455,6 @@ def main():
         entries     = load_index()
         _dbg(f"APP: load_index done n_entries={len(entries)}")
         base_index  = build_base_emoji_index(entries)
-        _maybe_show_tip_modal(picker, settings)
         while True:
             has_sem  = _has_semantic_models()
             has_data = SEARCH_INDEX.exists()
@@ -504,7 +502,8 @@ def main():
                                            thumb_size=48, preload=True,
                                            placeholder="type to search..." if settings.get("semantic_first", True) else "type to keyword search...",
                                            filter=False,
-                                           show_dark_btn=_licensed)
+                                           show_dark_btn=_licensed,
+                                           show_back_btn=False)
             _dbg(f"MENU_SHOW_DONE mode={mode!r}")
             if not mode:
                 sys.exit(0)
@@ -604,8 +603,6 @@ def main():
                     str(STORY_OUT))
                 if action == "copy":
                     copy_image_to_clipboard(str(STORY_OUT))
-                    settings["copy_count"] = settings.get("copy_count", 0) + 1
-                    save_settings(settings)
                     if settings["notify_on_copy"]:
                         _notify("Story copied to clipboard")
                     if settings["exit_on_select"]:
@@ -657,8 +654,6 @@ def main():
                             if path:
                                 copy_image_to_clipboard(path)
                                 record_copy(url, alt)
-                                settings["copy_count"] = settings.get("copy_count", 0) + 1
-                                save_settings(settings)
                                 if settings["notify_on_copy"]:
                                     _notify("Copied to clipboard")
                             break
@@ -763,8 +758,6 @@ def main():
                             if path:
                                 copy_image_to_clipboard(path)
                                 record_copy(url, alt)
-                                settings["copy_count"] = settings.get("copy_count", 0) + 1
-                                save_settings(settings)
                                 if settings["notify_on_copy"]:
                                     _notify("Copied to clipboard")
                             break
