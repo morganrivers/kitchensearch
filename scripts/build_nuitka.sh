@@ -61,14 +61,23 @@ echo "=== build done ==="
 
 cd "$REPO_DIR/nuitka-build"
 rm -rf kitchensearch
-mv emoji_split_daemon.dist kitchensearch
+# Nuitka multidist names the .dist folder after the first --main; recent
+# versions kebab-case it (emoji-split-daemon.dist), older versions used
+# snake_case (emoji_split_daemon.dist). Accept either.
+if [ -d emoji-split-daemon.dist ]; then
+  mv emoji-split-daemon.dist kitchensearch
+else
+  mv emoji_split_daemon.dist kitchensearch
+fi
 cd kitchensearch
 
 if [ "$OS" = "Windows_NT" ]; then
   echo "Windows build — separate .exe per entry point, no symlinks or tar"
-  cp emoji_split_daemon.exe kitchensearch.exe
-  cp emoji_split_daemon.exe emoji_story.exe
-  cp emoji_split_daemon.exe kitchensearch_daemon.exe
+  # Nuitka multidist emits one .exe per --main with kebab-case names.
+  # The installer and source code reference snake_case; rename to match.
+  [ -f emoji-split-daemon.exe ] && mv emoji-split-daemon.exe emoji_split_daemon.exe
+  [ -f emoji-story.exe ]         && mv emoji-story.exe         emoji_story.exe
+  [ -f kitchensearch-daemon.exe ] && mv kitchensearch-daemon.exe kitchensearch_daemon.exe
 
   ls -1 *.exe
 else

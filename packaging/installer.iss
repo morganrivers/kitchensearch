@@ -80,7 +80,22 @@ Filename: "{app}\kitchensearch.exe"; \
 
 [Code]
 
+function GetUninstallString(): String;
+var
+  sKey: String;
+  sVal: String;
+begin
+  sKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F3A2B1C-9D4E-4F87-B532-1A2C3D4E5F60}_is1';
+  sVal := '';
+  if not RegQueryStringValue(HKCU, sKey, 'UninstallString', sVal) then
+    RegQueryStringValue(HKLM, sKey, 'UninstallString', sVal);
+  Result := sVal;
+end;
+
 function InitializeSetup(): Boolean;
+var
+  UninstallStr: String;
+  ResultCode: Integer;
 begin
   if CheckForMutexes('Global\KitchenSearchDaemon') then
   begin
@@ -92,6 +107,24 @@ begin
     Result := False;
     Exit;
   end;
+
+  UninstallStr := GetUninstallString();
+  if UninstallStr <> '' then
+  begin
+    if MsgBox(
+      'A previous installation of Kitchen Search was found.' + #13#10 +
+      'It must be uninstalled before installing this version.' + #13#10#13#10 +
+      'Uninstall it now and continue?',
+      mbConfirmation, MB_YESNO
+    ) <> IDYES then
+    begin
+      Result := False;
+      Exit;
+    end;
+    Exec(RemoveQuotes(UninstallStr), '/SILENT', '', SW_HIDE,
+         ewWaitUntilTerminated, ResultCode);
+  end;
+
   Result := True;
 end;
 
