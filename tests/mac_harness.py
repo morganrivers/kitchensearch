@@ -312,7 +312,7 @@ class MacTestHarness:
         if self._daemon_free or self._daemon_ready_seen or self._daemon_gave_up:
             return
         from readiness import wait_for_daemon_ready
-        if wait_for_daemon_ready(timeout=10):
+        if wait_for_daemon_ready(timeout=60):
             self._daemon_ready_seen = True
         else:
             self._daemon_gave_up = True

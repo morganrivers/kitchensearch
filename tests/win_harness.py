@@ -249,8 +249,6 @@ class WinTestHarness:
         env = os.environ.copy()
         env["XDG_CONFIG_HOME"]         = str(_TEST_CONFIG_DIR.parent)
         env["KITCHENSEARCH_NO_BLINK"]  = "1"
-        env["KITCHENSEARCH_NO_DAEMON"] = "1"   # run the GUI without background daemons
-        self._daemon_free = True               # no daemon to wait on (search in-process)
         copy_log = self.run_dir / "copied-images.log"
         copy_log.unlink(missing_ok=True)
         env["KITCHENSEARCH_COPY_LOG"] = str(copy_log)
@@ -459,7 +457,7 @@ class WinTestHarness:
         if self._daemon_free or self._daemon_ready_seen or self._daemon_gave_up:
             return
         from readiness import wait_for_daemon_ready
-        if wait_for_daemon_ready(timeout=10):
+        if wait_for_daemon_ready(timeout=60):
             self._daemon_ready_seen = True
         else:
             self._daemon_gave_up = True

@@ -45,6 +45,14 @@ jobs:
         continue-on-error: true
         run: .venv\Scripts\python.exe -m unittest discover -s tests/fast -t .
 
+      # Start the search daemon and load the model *before* the visual tests, so
+      # the daemon-ready gate in the harness finds it ready at the first
+      # screenshot (the tests now run with the daemon, not daemon-free).
+      - name: Prime the search daemon (load the model once)
+        run: |
+          Start-Process -FilePath ".venv\Scripts\emoji_split_daemon.exe" -WindowStyle Hidden
+          .venv\Scripts\python.exe -c "from ksapp.picker_utils import _wait_for_daemon; assert _wait_for_daemon(180), 'daemon did not become ready'; print('daemon ready')"
+
       # Each test drives the Tk window through the Win32 harness and writes a
       # per-test folder (with the GIF), uploaded as a downloadable artifact.
       - name: Run test_01_main_menu

@@ -50,6 +50,15 @@ jobs:
         run: |
           .venv/bin/python -m unittest discover -s tests/fast -t .
 
+      # Start the search daemon and load the model *before* the visual tests, so
+      # the daemon-ready gate in the harness finds it ready at the first
+      # screenshot (the tests now run with the daemon, not daemon-free).
+      - name: Prime the search daemon (load the model once)
+        run: |
+          .venv/bin/emoji_split_daemon &
+          echo $! > /tmp/ks-daemon.pid
+          .venv/bin/python -c "from ksapp.picker_utils import _wait_for_daemon; assert _wait_for_daemon(120), 'daemon did not become ready'; print('daemon ready')"
+
       # Each test self-wraps under xvfb-run; the per-test folder (with the GIF)
       # is uploaded as an artifact you can download from the run summary.
       - name: Run test_01_main_menu

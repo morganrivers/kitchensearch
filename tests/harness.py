@@ -132,8 +132,6 @@ class TestHarness:
         env = os.environ.copy()
         env["XDG_CONFIG_HOME"] = str(_TEST_CONFIG_DIR.parent)
         env["KITCHENSEARCH_NO_GRAB"] = "1"
-        env["KITCHENSEARCH_NO_DAEMON"] = "1"
-        self._daemon_free = True   # no daemon to wait on; search runs in-process
         env["KITCHENSEARCH_NO_BLINK"] = "1"
         copy_log = self.run_dir / "copied-images.log"
         copy_log.unlink(missing_ok=True)
@@ -394,7 +392,7 @@ class TestHarness:
         if self._daemon_free or self._daemon_ready_seen or self._daemon_gave_up:
             return
         from readiness import wait_for_daemon_ready
-        if wait_for_daemon_ready(timeout=10):
+        if wait_for_daemon_ready(timeout=60):
             self._daemon_ready_seen = True
         else:
             self._daemon_gave_up = True
