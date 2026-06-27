@@ -29,10 +29,14 @@ _REPO      = Path(__file__).resolve().parent
 CACHE_DIR  = Path(user_cache_dir("kitchensearch"))
 THUMB_DIR  = CACHE_DIR / "thumbs"
 DAEMON_PY  = _REPO / "emoji_split_daemon.py"
+# Nuitka 4.x sets __file__ for package modules to <dist>/ksapp/…, so _REPO is
+# inside the package — not the dist root where the binaries live. Use
+# sys.executable's directory instead so the frozen build finds the daemon.
+_frozen = getattr(sys, "frozen", False)
 DAEMON_BIN = (
-    _REPO / ("emoji_split_daemon.exe" if sys.platform == "win32" else "emoji_split_daemon")
-    if (_REPO / "emoji_split_daemon").exists() or sys.platform == "win32"
-    else Path(shutil.which("emoji_split_daemon") or "emoji_split_daemon")
+    Path(sys.executable).parent / ("emoji-split-daemon.exe" if sys.platform == "win32" else "emoji_split_daemon")
+    if _frozen
+    else Path(shutil.which("emoji-split-daemon") or "emoji-split-daemon")
 )
 
 

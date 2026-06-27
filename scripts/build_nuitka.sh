@@ -11,7 +11,7 @@ if [ ! -d "$REPO_DIR/ksapp/data/fonts" ]; then
 fi
 
 if [ "$OS" = "Windows_NT" ]; then
-  TRAY_ICON_ARG="--include-data-file=$REPO_DIR/ksapp/data/ui_assets/tray-icon.png=ksapp/data/ui_assets/tray-icon.png"
+  TRAY_ICON_ARG="--include-data-file=$REPO_DIR/data/ui_assets/tray-icon.png=ksapp/data/ui_assets/tray-icon.png"
 else
   TRAY_ICON_ARG=""
 fi
@@ -25,6 +25,7 @@ python -m nuitka \
   --main=kitchensearch_daemon.py \
   --enable-plugin=numpy \
   --enable-plugin=tk-inter \
+  --include-package=encodings \
   --include-package=platformdirs \
   --include-package=onnxruntime.capi \
   --include-package=tokenizers \
@@ -73,11 +74,24 @@ cd kitchensearch
 
 if [ "$OS" = "Windows_NT" ]; then
   echo "Windows build — separate .exe per entry point, no symlinks or tar"
-  # Nuitka multidist emits one .exe per --main with kebab-case names.
-  # The installer and source code reference snake_case; rename to match.
-  [ -f emoji-split-daemon.exe ] && mv emoji-split-daemon.exe emoji_split_daemon.exe
-  [ -f emoji-story.exe ]         && mv emoji-story.exe         emoji_story.exe
-  [ -f kitchensearch-daemon.exe ] && mv kitchensearch-daemon.exe kitchensearch_daemon.exe
+  # Nuitka multidist dispatch key = stem of the exe that argv[0] resolves to.
+  # Python 3.12 + Nuitka 4.1.x produces snake_case stems (emoji_split_daemon);
+  # Python 3.14 + Nuitka 4.1.x produced kebab-case stems (emoji-split-daemon).
+  # Detect which convention this build used and copy accordingly.
+  if [ -f emoji-split-daemon.exe ]; then
+    DISPATCH=emoji-split-daemon.exe
+    cp "$DISPATCH" kitchensearch.exe
+    cp "$DISPATCH" kitchensearch-daemon.exe
+    cp "$DISPATCH" emoji-story.exe
+  elif [ -f emoji_split_daemon.exe ]; then
+    DISPATCH=emoji_split_daemon.exe
+    cp "$DISPATCH" kitchensearch.exe
+    cp "$DISPATCH" kitchensearch_daemon.exe
+    cp "$DISPATCH" emoji_story.exe
+  else
+    echo "ERROR: no dispatch exe found (checked emoji-split-daemon.exe and emoji_split_daemon.exe)"
+    exit 1
+  fi
 
   ls -1 *.exe
 else

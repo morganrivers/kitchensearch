@@ -35,7 +35,7 @@ _PYTHONW = _PYTHON.parent / "pythonw.exe"
 
 _PICKER_EXE = _HERE / "kitchensearch.exe"
 _PICKER_PY  = _HERE / "kitchensearch.py"
-_DAEMON_EXE = _HERE / "kitchensearch_daemon.exe"
+_DAEMON_EXE = _HERE / "kitchensearch-daemon.exe"
 
 APP_NAME       = "KitchenSearch"
 DEFAULT_HOTKEY = "Ctrl+Alt+K"

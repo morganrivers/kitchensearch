@@ -45,9 +45,9 @@ from ksapp.picker_utils import CONFIG_DIR
 # POLAR_CHECKOUT_URL is the public checkout link the Settings screen opens when
 # the user clicks "Buy a license"; it should resolve to a Polar product that
 # grants a license-key benefit on purchase.
-POLAR_ORGANIZATION_ID = "a68cb446-bae8-49e0-a45c-7bd0f35ec8ac"
-POLAR_CHECKOUT_URL    = "https://buy.polar.sh/polar_cl_ZMalIyTWg5yqsmoqd9mY0uHMMWLfPhO687XwU3bSRSP"
-POLAR_API_BASE        = "https://api.polar.sh"
+POLAR_ORGANIZATION_ID = "4fe552d5-9e18-4b49-ad80-d46ee070515a"
+POLAR_CHECKOUT_URL    = "https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_4bJTxctynmYttDxJvFIEt5rPlK50Rtt7VAyOm48uZ4s/redirect"
+POLAR_API_BASE        = "https://sandbox-api.polar.sh"
 
 _LICENSE_FILE = CONFIG_DIR / "license.json"
 

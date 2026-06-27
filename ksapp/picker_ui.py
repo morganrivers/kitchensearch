@@ -158,7 +158,7 @@ class TkPicker:
     THUMB         = 96
     RAINBOW_VIVID = ["#FF0000", "#FF8C00", "#FFD700", "#32CD32", "#1E90FF", "#8B00FF"]
     TITLE_H       = 52
-    _VIRT_ROW_H   = 34
+    _VIRT_ROW_H   = 40
     _DM_SIZE      = 26
     _BACK_W       = 58
     # Max image rows packed in _inner at once. X11 has a 32767-pixel rendering
@@ -249,8 +249,10 @@ class TkPicker:
         self._pending_toast  = None
         self._toast_widget   = None
         self._toast_after_id = None
-        self._cancel_hook    = None
-        self._on_favorite    = None
+        self._cancel_hook         = None
+        self._on_favorite         = None
+        self._is_favorite_fn      = None
+        self._selected_heart_btn  = None
         self._build()
 
     def _build(self):
@@ -318,6 +320,7 @@ class TkPicker:
         self._entry.bind("<Prior>",        lambda e: (_dbg("ENTRY PageUp"),    self._prev_page(), "break")[2])
         self._entry.bind("<Key>",          self._dbg_keypress)
         self._entry.bind("<Key>",          self._on_entry_key_for_ph, add="+")
+        self._entry.bind("<<Paste>>",      lambda e: self._hide_ph(), add="+")
 
         # ── story multiline text (hidden by default) ──────────────────────
         self._story_text_height = 6
@@ -1031,6 +1034,13 @@ class TkPicker:
             order.append(self._research_cb)
         if self._rows:
             order.append(self._canvas)
+            heart = self._selected_heart_btn
+            if heart is not None:
+                try:
+                    if heart.winfo_ismapped():
+                        order.append(heart)
+                except tk.TclError:
+                    pass
         if self._back_btn.winfo_ismapped():
             order.append(self._back_btn)
         if self._dm_btn.winfo_ismapped():
@@ -1236,19 +1246,22 @@ class TkPicker:
         if 0 <= idx < len(self._rows):
             self._ensure_in_window(idx)
             self._color_row(idx, selected=True)
+            self._selected_heart_btn = self._rows[idx].get("heart_btn")
             if scroll:
                 self._scroll_into_view(idx)
+        else:
+            self._selected_heart_btn = None
 
     def _dump_top_copies(self, e=None):
         import sys
         from ksapp.picker_utils import top_copied
-        rows = top_copied(10)
-        sys.stdout.write("\n=== TOP 10 MOST COPIED EMOJIS ===\n")
+        rows = top_copied(100)
+        sys.stdout.write("\n=== TOP 100 MOST COPIED EMOJIS ===\n")
         if not rows:
             sys.stdout.write("(no copies recorded yet)\n")
         else:
             for i, (count, alt) in enumerate(rows, 1):
-                sys.stdout.write(f"{i:2d}. {count:5d}  {alt}\n")
+                sys.stdout.write(f"{i:3d}. {count:5d}  {alt}\n")
         sys.stdout.flush()
         return "break"
 
@@ -1467,8 +1480,10 @@ class TkPicker:
         self._dm_btn.place_forget()
         self._dismiss_toast()
         self._back_btn.place_forget()
-        self._cancel_hook = None
-        self._on_favorite = None
+        self._cancel_hook        = None
+        self._on_favorite        = None
+        self._is_favorite_fn     = None
+        self._selected_heart_btn = None
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -1807,7 +1822,7 @@ class TkPicker:
                 canvas.delete(cid)
 
         # Create rows newly entering the buffered window
-        EM = 20
+        EM = 24
         for i in range(first_vis, last_vis + 1):
             if i in self._virt_items:
                 continue
@@ -1823,7 +1838,7 @@ class TkPicker:
 
             cids   = []
             photos = []  # kept alive via virt_items, not _img_refs
-            x = 10
+            x = max(20, cw // 8)
 
             # Segment label into emoji / plain-text runs
             segs, buf, in_em = [], "", False
@@ -1857,13 +1872,13 @@ class TkPicker:
                         else:
                             cid = canvas.create_text(
                                 x, yc, text=ch, anchor="w",
-                                font=("Helvetica", 12), fill=self.FG, tags="vrow")
+                                font=("Helvetica", 14), fill=self.FG, tags="vrow")
                             cids.append(cid)
-                            x += 18
+                            x += 20
                 else:
                     cid = canvas.create_text(
                         x, yc, text=content, anchor="w",
-                        font=("Helvetica", 12, "bold"), fill=self.FG, tags="vrow")
+                        font=("Helvetica", 14, "bold"), fill=self.FG, tags="vrow")
                     cids.append(cid)
 
             self._virt_items[i] = {"rect": rect, "cids": cids, "photos": photos}
@@ -1890,7 +1905,7 @@ class TkPicker:
                 rbg = self.BG
 
             row   = tk.Frame(self._inner, bg=rbg, cursor="hand2")
-            row.pack(fill="x", padx=2, pady=(0, 1) if is_toggle else (6, 2))
+            row.pack(fill="x", padx=14, pady=(0, 1) if is_toggle else (6, 2))
 
             if is_toggle:
                 strip_color = self.ACCENT if is_checked else "#cccccc"
@@ -1916,14 +1931,14 @@ class TkPicker:
                 display = label[4:]
                 fg = self.FG if is_checked else self.FG_DIM
                 lbl = tk.Label(row, text=display, bg=rbg, fg=fg,
-                               font=("Helvetica", 12), anchor="w")
+                               font=("Helvetica", 14), anchor="w")
                 lbl.pack(side="left", fill="x", expand=True, pady=10, padx=(0, 12))
 
                 all_widgets = [row, strip, box_cv, lbl]
                 bg_widgets  = [row, box_cv, lbl]
             else:
                 inner_ws    = self._pack_rich_label(row, label, rbg,
-                                                    font=("Helvetica", 12, "bold"), pady=8)
+                                                    font=("Helvetica", 14, "bold"), pady=8)
                 all_widgets = [row] + inner_ws
                 bg_widgets  = all_widgets
 
@@ -1948,10 +1963,11 @@ class TkPicker:
             self._select(min(initial_sel, len(self._rows) - 1))
         return self._run()
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None):
+    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None, is_favorite_fn=None):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
-        self._on_favorite = on_favorite
+        self._on_favorite    = on_favorite
+        self._is_favorite_fn = is_favorite_fn
         if show_dark_btn:
             self._dm_btn.place(relx=1.0, rely=1.0, anchor="se", x=-6, y=-6)
             self.root.tk.call('raise', self._dm_btn._w)
@@ -1969,6 +1985,14 @@ class TkPicker:
         pending         = {}
 
         def _append_header_row(text, color, image_path=None):
+            if color == "__SEPARATOR__":
+                sep = tk.Frame(self._inner, bg=self.BG)
+                sep.pack(fill="x", padx=14, pady=(10, 6))
+                tk.Frame(sep, bg="#cccccc", height=1).pack(fill="x")
+                tk.Frame(sep, bg=self.BG,   height=3).pack(fill="x")
+                tk.Frame(sep, bg="#cccccc", height=1).pack(fill="x")
+                self._all_image_children.append(("h", sep))
+                return
             hr = tk.Frame(self._inner, bg=self.BG, bd=0, highlightthickness=0)
             hr.pack(fill="x", padx=6, pady=(6, 2))
             self._all_image_children.append(("h", hr))
@@ -2029,6 +2053,18 @@ class TkPicker:
             txt.bind("<Key>",      lambda e: "break")
             txt.bind("<Button-2>", lambda e: "break")
             txt.bind("<FocusIn>",  lambda e: self._entry.focus_set())
+
+            heart_btn = None
+            if self._on_favorite:
+                is_fav    = self._is_favorite_fn(label) if self._is_favorite_fn else False
+                heart_ch  = "♥" if is_fav else "♡"
+                heart_fg  = "#e05050" if is_fav else self.FG_DIM
+                heart_btn = tk.Label(row, text=heart_ch, bg=rbg, fg=heart_fg,
+                                     font=("Helvetica", 16), cursor="hand2",
+                                     padx=6, pady=0, takefocus=True,
+                                     highlightthickness=0)
+                heart_btn.pack(side="right", padx=(0, 6))
+
             txt.pack(side="left", fill="x", expand=True, padx=(0, 8), pady=0)
 
             def _auto_height(e, t=txt):
@@ -2092,10 +2128,11 @@ class TkPicker:
                 else:
                     txt.insert("end", kw_part, "kw_normal")
 
-            all_widgets = [row, img_lbl, txt]
+            all_widgets = [row, img_lbl, txt] + ([heart_btn] if heart_btn else [])
             rd = {"frame": row, "label": label,
                   "row_bg": rbg, "all_widgets": all_widgets,
-                  "txt": txt, "_copied": False}
+                  "txt": txt, "_copied": False,
+                  "heart_btn": heart_btn}
             self._all_image_children.append(("d", row, rd))
             q = self._entry_var.get().lower().strip() if not self._ph_active else ""
             in_filter_mode = self._filter_mode or (
@@ -2107,13 +2144,33 @@ class TkPicker:
                 new_idx = len(self._rows) - 1
                 if new_idx < self._window_start + self.IMG_WINDOW_MAX:
                     row.pack(fill="x", padx=2, pady=1)
+            for w in [row, img_lbl, txt]:
+                w.bind("<Button-1>", lambda e, _rd=rd: self._click_image_row(_rd))
             for w in all_widgets:
-                w.bind("<Button-1>",   lambda e, _rd=rd: self._click_image_row(_rd))
                 w.bind("<MouseWheel>", self._on_scroll)
                 w.bind("<Button-4>",   self._on_scroll)
                 w.bind("<Button-5>",   self._on_scroll)
-                if self._on_favorite:
-                    w.bind("<Button-3>", lambda e, _rd=rd: self._favorite_image_row(_rd))
+            if heart_btn is not None:
+                def _on_heart_click(e=None, _rd=rd, _btn=heart_btn):
+                    self._favorite_image_row(_rd)
+                    cur = _btn.cget("text")
+                    _btn.configure(
+                        text="♥" if cur == "♡" else "♡",
+                        fg="#e05050" if cur == "♡" else self.FG_DIM,
+                    )
+                    return "break"
+                heart_btn.bind("<Button-1>", _on_heart_click)
+                heart_btn.bind("<Return>",   lambda e: _on_heart_click())
+                heart_btn.bind("<space>",    lambda e: _on_heart_click())
+                heart_btn.bind("<Tab>",       lambda e: (self._focus_next(), "break")[1])
+                heart_btn.bind("<Shift-Tab>", lambda e: (self._focus_prev(), "break")[1])
+                heart_btn.bind("<FocusIn>",
+                    lambda e, b=heart_btn: b.configure(
+                        highlightthickness=2,
+                        highlightcolor=self.ACCENT,
+                        highlightbackground=self.ACCENT))
+                heart_btn.bind("<FocusOut>",
+                    lambda e, b=heart_btn: b.configure(highlightthickness=0))
             if len(self._rows) == 1:
                 self._select(0)
 

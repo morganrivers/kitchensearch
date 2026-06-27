@@ -111,18 +111,31 @@ begin
   UninstallStr := GetUninstallString();
   if UninstallStr <> '' then
   begin
-    if MsgBox(
-      'A previous installation of Kitchen Search was found.' + #13#10 +
-      'It must be uninstalled before installing this version.' + #13#10#13#10 +
-      'Uninstall it now and continue?',
-      mbConfirmation, MB_YESNO
-    ) <> IDYES then
+    if not FileExists(RemoveQuotes(UninstallStr)) then
     begin
-      Result := False;
-      Exit;
+      { Stale registry entry — uninstaller is gone. Clear it and proceed. }
+      RegDeleteValue(HKCU,
+        'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F3A2B1C-9D4E-4F87-B532-1A2C3D4E5F60}_is1',
+        'UninstallString');
+      RegDeleteValue(HKLM,
+        'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F3A2B1C-9D4E-4F87-B532-1A2C3D4E5F60}_is1',
+        'UninstallString');
+    end
+    else
+    begin
+      if MsgBox(
+        'A previous installation of Kitchen Search was found.' + #13#10 +
+        'It must be uninstalled before installing this version.' + #13#10#13#10 +
+        'Uninstall it now and continue?',
+        mbConfirmation, MB_YESNO
+      ) <> IDYES then
+      begin
+        Result := False;
+        Exit;
+      end;
+      Exec(RemoveQuotes(UninstallStr), '/SILENT', '', SW_HIDE,
+           ewWaitUntilTerminated, ResultCode);
     end;
-    Exec(RemoveQuotes(UninstallStr), '/SILENT', '', SW_HIDE,
-         ewWaitUntilTerminated, ResultCode);
   end;
 
   Result := True;

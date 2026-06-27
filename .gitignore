@@ -1,6 +1,9 @@
 micromamba
 __pycache__
 .venv
+.venv-py*/
+data/
+nuitka-crash-report.xml
 
 emoji-story.png
 nuitka-build/

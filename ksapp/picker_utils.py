@@ -46,11 +46,24 @@ IPC_ADDRESS    = _ipc_address()
 IS_NAMED_PIPE  = IPC_ADDRESS.startswith(r"\\.\pipe")
 DAEMON_STATUS  = CACHE_DIR / "split-daemon-loading.json"
 DAEMON_PY      = _REPO / "emoji_split_daemon.py"
-DAEMON_BIN     = (
-    _REPO / ("emoji_split_daemon.exe" if sys.platform == "win32" else "emoji_split_daemon")
-    if (_REPO / "emoji_split_daemon").exists() or sys.platform == "win32"
-    else Path(shutil.which("emoji_split_daemon") or "emoji_split_daemon")
-)
+# Nuitka 4.x sets __file__ for package modules to <dist>/ksapp/…, so _REPO
+# resolves to <dist>/ksapp/ — not the dist root where the binaries live.
+# Use sys.executable's directory instead; it's correct in both frozen and dev
+# mode (dev: Python interpreter dir has no daemon exe, so _spawn_daemon falls
+# back to DAEMON_PY automatically).
+_frozen = getattr(sys, "frozen", False)
+_EXE_DIR = Path(sys.executable).parent
+def _daemon_bin() -> Path:
+    if sys.platform != "win32":
+        return _EXE_DIR / "emoji_split_daemon"
+    # Nuitka dispatch key matches the exe stem. Python 3.14 builds use
+    # kebab-case; Python 3.12 builds use snake_case. Try both.
+    for name in ("emoji_split_daemon.exe", "emoji-split-daemon.exe"):
+        p = _EXE_DIR / name
+        if p.exists():
+            return p
+    return _EXE_DIR / "emoji_split_daemon.exe"  # fallback (will fail loudly)
+DAEMON_BIN     = _daemon_bin()
 DAEMON_PID     = CACHE_DIR / "split-daemon.pid"
 DAEMON_LOG     = CACHE_DIR / "split-daemon.log"
 
@@ -63,11 +76,7 @@ BATCH_SIZE     = 20
 LOAD_MORE      = "⬇  load more results..."
 HEADER_MARKER  = "__HEADER__"
 STORY_PY    = _REPO / "emoji_story.py"
-STORY_BIN   = (
-    _REPO / ("emoji_story.exe" if sys.platform == "win32" else "emoji_story")
-    if (_REPO / "emoji_story").exists() or sys.platform == "win32"
-    else Path(shutil.which("emoji_story") or "emoji_story")
-)
+STORY_BIN   = _EXE_DIR / ("emoji-story.exe" if sys.platform == "win32" else "emoji_story")
 STORY_OUT   = CACHE_DIR / "emoji-story.png"
 
 PRIORITY_EMOJIS = frozenset({
@@ -524,8 +533,18 @@ def _spawn_daemon():
         _kill_daemon()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     log = open(DAEMON_LOG, "wb")
-    cmd = [str(DAEMON_BIN)] if DAEMON_BIN.exists() else [_PYTHON, str(DAEMON_PY)]
-    kwargs = {"stdout": log, "stderr": subprocess.STDOUT}
+    if DAEMON_BIN.exists():
+        cmd = [str(DAEMON_BIN)]
+        env  = None
+    else:
+        cmd = [_PYTHON, str(DAEMON_PY)]
+        # Ensure the repo root is importable so `from ksapp import …` works
+        # when the daemon is spawned as a plain script (dev / source-run mode).
+        env = os.environ.copy()
+        repo_root = str(_REPO.parent)
+        existing = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{repo_root}{os.pathsep}{existing}" if existing else repo_root
+    kwargs = {"stdout": log, "stderr": subprocess.STDOUT, **({"env": env} if env else {})}
     if sys.platform == "win32":
         kwargs["creationflags"] = (
             subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
@@ -710,8 +729,9 @@ def record_copy(url, alt):
     with _copy_counts_lock:
         d = _load_copy_counts()
         rec = d.get(key, {"count": 0, "alt": alt})
-        rec["count"] = int(rec.get("count", 0)) + 1
-        rec["alt"] = alt or rec.get("alt", "")
+        rec["count"]       = int(rec.get("count", 0)) + 1
+        rec["alt"]         = alt or rec.get("alt", "")
+        rec["last_copied"] = time.time()
         d[key] = rec
         _save_copy_counts(d)
     path = THUMB_DIR / (key + ".png")
@@ -724,10 +744,12 @@ def record_copy(url, alt):
 
 def top_copied(n=10):
     d = _load_copy_counts()
-    items = [(int(v.get("count", 0)), v.get("alt", "") or "(unnamed)")
-             for v in d.values() if int(v.get("count", 0)) > 0]
-    items.sort(reverse=True)
-    return items[:n]
+    items = [
+        (int(v.get("count", 0)), float(v.get("last_copied", 0)), v.get("alt", "") or "(unnamed)")
+        for v in d.values() if int(v.get("count", 0)) > 0
+    ]
+    items.sort(key=lambda x: (-x[0], -x[1]))  # count DESC, most-recent DESC
+    return [(count, alt) for count, _, alt in items[:n]]
 
 
 # ── favorites ──────────────────────────────────────────────────────────────
