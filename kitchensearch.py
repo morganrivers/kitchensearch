@@ -259,7 +259,7 @@ def _run_favorites(picker, settings):
         favs = load_favorites()
         if not favs:
             picker.message("No favorites yet.\n\n"
-                           "Right-click any search or combo result to add it here.")
+                           "Click the heart on any search or combo result to add it here.")
             return
 
         fav_entries = [(format_label(f["alt"], f["url"], f.get("text", "")), f["url"], i)

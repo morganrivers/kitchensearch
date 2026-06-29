@@ -116,7 +116,8 @@ from ksapp.picker_utils import (
     _kill_daemon,
     _cleanup_incomplete_data,
     copy_text_to_clipboard,
-)                                                                                                                                                                      
+)
+from ksapp.placeholder_entry import PlaceholderManager, DEFAULT_FILTER_PROMPT                                                                                                                                                                      
 
 
 def _darken(hex_color, factor=0.75):
@@ -246,8 +247,6 @@ class TkPicker:
         self._last_batch_time    = 0.0
         self._load_poll_after_id = None
         self._window_start       = 0
-        self._ph_active = False
-        self._ph_text   = None
         self._pending_toast  = None
         self._toast_widget   = None
         self._toast_after_id = None
@@ -319,7 +318,8 @@ class TkPicker:
         self._entry.bind("<Next>",         lambda e: (_dbg("ENTRY PageDown"),  self._next_page(), "break")[2])
         self._entry.bind("<Prior>",        lambda e: (_dbg("ENTRY PageUp"),    self._prev_page(), "break")[2])
         self._entry.bind("<Key>",          self._dbg_keypress)
-        self._entry.bind("<Key>",          self._on_entry_key_for_ph, add="+")
+
+        self._ph = PlaceholderManager(self._entry, self._entry_var, self.FG)
 
         # ── story multiline text (hidden by default) ──────────────────────
         self._story_text_height = 6
@@ -470,8 +470,6 @@ class TkPicker:
 
         self._entry.bind("<FocusIn>",  lambda e: self._entry.configure(highlightthickness=3), add="+")
         self._entry.bind("<FocusOut>", lambda e: self._entry.configure(highlightthickness=2), add="+")
-        self._entry.bind("<FocusOut>", self._on_entry_focus_out_for_ph, add="+")
-        self._entry.bind("<Button-1>", lambda e: self._hide_ph(),       add="+")
 
         self._make_dm_button()
         self._make_back_btn()
@@ -635,8 +633,8 @@ class TkPicker:
             highlightbackground=new_theme["ENTRY_BORDER"],
             highlightcolor=self.ACCENT,
         )
-        if self._ph_active:
-            self._entry.config(fg=self._PH_COLOR)
+        self._ph.update_fg_color(self.FG)
+        self._ph.restore_color()
         self._redraw_story_gen_btn(self.ACCENT)
         self._story_gen_btn.configure(bg=self.BG)
         self._research_cb.configure(
@@ -913,46 +911,6 @@ class TkPicker:
             pass
         return self._result
 
-    _PH_TEXT  = "start typing to filter"
-    _PH_COLOR = "#aaaaaa"
-
-    def _show_ph(self, text=None):
-        self._ph_text = text if text is not None else self._PH_TEXT
-        if self._ph_active:
-            return
-        self._ph_active = True
-        self._entry_var.set(self._ph_text)
-        self._entry.config(fg=self._PH_COLOR)
-        self._entry.icursor(0)
-
-    def _hide_ph(self):
-        if not self._ph_active:
-            return
-        self._entry_var.set("")   # trace fires here; _ph_active still True → no-op
-        self._ph_active = False
-        self._entry.config(fg=self.FG)
-
-    def _real_text(self):
-        return "" if self._ph_active else self._entry_var.get()
-
-    def _on_entry_key_for_ph(self, e):
-        if self._ph_active:
-            if e.char and e.char.isprintable():
-                self._hide_ph()
-            elif e.keysym in ("BackSpace", "Delete"):
-                return "break"
-
-    def _on_entry_focus_out_for_ph(self, _e=None):
-        """Restore the placeholder when the entry loses focus while empty."""
-        if self._ph_active or self._ph_text is None:
-            return
-        if self._entry_var.get():
-            return
-        self._ph_active = True
-        self._entry_var.set(self._ph_text)
-        self._entry.config(fg=self._PH_COLOR)
-        self._entry.icursor(0)
-
     def _set_prompt(self, text):
         has_emoji = any(self._is_emoji_char(ch) for ch in text)
         children = self._prompt_frame.winfo_children()
@@ -972,7 +930,7 @@ class TkPicker:
             w.configure(fg=self.ACCENT)
 
     def _on_space_key(self, e=None):
-        if not self._real_text() and self._mode in ("list", "imagelist"):
+        if not self._ph.real_text() and self._mode in ("list", "imagelist"):
             self._on_return()
             return "break"
 
@@ -1065,7 +1023,7 @@ class TkPicker:
         target = order[(idx + 1) % len(order)]
         target.focus_set()
         if target is self._entry:
-            self._hide_ph()
+            self._ph.clear_for_user_focus()
         return "break"
 
     def _focus_prev(self, e=None):
@@ -1080,7 +1038,7 @@ class TkPicker:
         target = order[(idx - 1) % len(order)]
         target.focus_set()
         if target is self._entry:
-            self._hide_ph()
+            self._ph.clear_for_user_focus()
         return "break"
 
     def _cancel(self, e=None):
@@ -1112,10 +1070,10 @@ class TkPicker:
             if self._sel >= 0 and self._rows:
                 self._result = self._rows[self._sel]["label"]
             else:
-                self._result = self._real_text().strip() or None
+                self._result = self._ph.real_text().strip() or None
             self.root.quit()
         elif self._mode == "imagelist":
-            val = self._real_text().strip()
+            val = self._ph.real_text().strip()
             if val and self._sel < 0:
                 if self._research_cb.winfo_ismapped() and not self._research_var.get():
                     if self._rows:
@@ -1227,7 +1185,7 @@ class TkPicker:
         in_filter = self._filter_mode or (
             self._research_cb.winfo_ismapped() and not self._research_var.get()
         )
-        q = self._entry_var.get().lower().strip() if not self._ph_active else ""
+        q = self._entry_var.get().lower().strip() if not self._ph.is_active() else ""
         for item in self._all_image_children:
             try:
                 item[1].pack_forget()
@@ -1474,10 +1432,7 @@ class TkPicker:
         if self._load_poll_after_id:
             self.root.after_cancel(self._load_poll_after_id)
         self._load_poll_after_id = None
-        self._ph_active = False
-        self._ph_text   = None
-        self._entry.config(fg=self.FG)
-        self._entry_var.set("")
+        self._ph.reset()
         self._prog_frame.pack_forget()
         self._progbar.configure(mode="determinate")
         self._research_cb.pack_forget()
@@ -1549,7 +1504,7 @@ class TkPicker:
         if link_url:
             self._pack_clickable_link(self._inner, link_url)
         if placeholder is not None:
-            self._show_ph(placeholder)
+            self._ph.show(placeholder)
         return self._run()
 
     def ask_story(self, prompt):
@@ -1582,7 +1537,7 @@ class TkPicker:
         self._set_prompt(prompt)
         self._show_back_btn()
         if placeholder is not None:
-            self._show_ph(placeholder)
+            self._ph.show(placeholder)
 
         if _daemon_ready():
             return self._run()
@@ -1676,14 +1631,14 @@ class TkPicker:
             self._select(min(initial_sel, len(self._rows) - 1))
         if filter:
             self._trace_id = self._entry_var.trace_add("write", self._filter_cb)
-            self._show_ph()
+            self._ph.show()
         _dbg("PICK: _run start")
         result = self._run()
         _dbg(f"PICK: _run done result={result!r}")
         return result
 
     def _filter_cb(self, *_):
-        if self._ph_active:
+        if self._ph.is_active():
             return
         if self._filter_after_id:
             self.root.after_cancel(self._filter_after_id)
@@ -1692,7 +1647,7 @@ class TkPicker:
 
     def _do_filter(self):
         self._filter_after_id = None
-        if self._ph_active:
+        if self._ph.is_active():
             return
         q = self._entry_var.get().lower()
         filtered = [o for o in self._options if q in o.lower()] if q else self._options
@@ -1701,11 +1656,11 @@ class TkPicker:
         if self._rows:
             self._select(min(prev, len(self._rows) - 1) if prev >= 0 else 0)
         if not q and self._filter_mode:
-            self._show_ph()
+            self._ph.show()
 
     def _do_image_filter(self):
         self._filter_after_id = None
-        if self._ph_active:
+        if self._ph.is_active():
             return
         q = self._entry_var.get().lower().strip()
         for item in self._all_image_children:
@@ -1730,11 +1685,11 @@ class TkPicker:
         if visible:
             self._select(0)
         if not q:
-            self._show_ph()
+            self._ph.show()
 
     def _do_research_return(self):
         self._filter_after_id = None
-        if self._ph_active:
+        if self._ph.is_active():
             return
         q = self._entry_var.get().strip()
         if q:
@@ -2179,7 +2134,7 @@ class TkPicker:
                   "row_bg": rbg, "all_widgets": all_widgets,
                   "txt": txt, "_copied": False}
             self._all_image_children.append(("d", row, rd))
-            q = self._entry_var.get().lower().strip() if not self._ph_active else ""
+            q = self._entry_var.get().lower().strip() if not self._ph.is_active() else ""
             in_filter_mode = self._filter_mode or (
                 self._research_cb.winfo_ismapped() and not self._research_var.get()
             )
@@ -2290,15 +2245,14 @@ class TkPicker:
         if show_research_cb:
             self._research_cb.pack(side="right", padx=(8, 0))
             _ph_search = placeholder if placeholder is not None else "type query, press Enter to search"
-            _ph_filter = "start typing to filter"
+            _ph_filter = DEFAULT_FILTER_PROMPT
 
             def _current_ph():
                 return _ph_search if self._research_var.get() else _ph_filter
 
             def _on_research_toggle(*_):
-                if self._ph_active:
-                    self._ph_active = False
-                    self._show_ph(_current_ph())
+                if self._ph.is_active():
+                    self._ph.show(_current_ph())
                 if self._research_var.get() and self._sel >= 0:
                     self._color_row(self._sel, selected=False)
                     self._sel = -1
@@ -2306,14 +2260,14 @@ class TkPicker:
             self._toggle_trace_id = self._research_var.trace_add("write", _on_research_toggle)
 
             def _research_aware_cb(*_):
-                if self._ph_active:
+                if self._ph.is_active():
                     return
                 q = self._entry_var.get().strip()
                 if not q:
                     if not self._research_var.get():
                         self._do_image_filter()
                     else:
-                        self._show_ph(_current_ph())
+                        self._ph.show(_current_ph())
                         if self._rows:
                             self._select(0)
                     return
@@ -2331,7 +2285,7 @@ class TkPicker:
             self._trace_id = self._entry_var.trace_add("write", self._filter_cb)
         else:
             def _no_filter_cb(*_):
-                if self._ph_active:
+                if self._ph.is_active():
                     return
                 q = self._entry_var.get().strip()
                 if q:
@@ -2339,11 +2293,11 @@ class TkPicker:
                         self._color_row(self._sel, selected=False)
                         self._sel = -1
                 else:
-                    self._show_ph(placeholder)
+                    self._ph.show(placeholder)
                     if self._rows:
                         self._select(0)
             self._trace_id = self._entry_var.trace_add("write", _no_filter_cb)
-        self._show_ph(_ph_to_show)
+        self._ph.show(_ph_to_show)
         result = self._run()
         _dbg(f"PICK_WITH_IMAGES: _run done gen={gen} result={result!r}")
         return result
