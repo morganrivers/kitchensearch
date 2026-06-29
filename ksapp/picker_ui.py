@@ -115,6 +115,7 @@ from ksapp.picker_utils import (
     _daemon_ready,
     _kill_daemon,
     _cleanup_incomplete_data,
+    copy_text_to_clipboard,
 )                                                                                                                                                                      
 
 
@@ -246,6 +247,7 @@ class TkPicker:
         self._load_poll_after_id = None
         self._window_start       = 0
         self._ph_active = False
+        self._ph_text   = None
         self._pending_toast  = None
         self._toast_widget   = None
         self._toast_after_id = None
@@ -468,6 +470,8 @@ class TkPicker:
 
         self._entry.bind("<FocusIn>",  lambda e: self._entry.configure(highlightthickness=3), add="+")
         self._entry.bind("<FocusOut>", lambda e: self._entry.configure(highlightthickness=2), add="+")
+        self._entry.bind("<FocusOut>", self._on_entry_focus_out_for_ph, add="+")
+        self._entry.bind("<Button-1>", lambda e: self._hide_ph(),       add="+")
 
         self._make_dm_button()
         self._make_back_btn()
@@ -913,10 +917,11 @@ class TkPicker:
     _PH_COLOR = "#aaaaaa"
 
     def _show_ph(self, text=None):
+        self._ph_text = text if text is not None else self._PH_TEXT
         if self._ph_active:
             return
         self._ph_active = True
-        self._entry_var.set(text if text is not None else self._PH_TEXT)
+        self._entry_var.set(self._ph_text)
         self._entry.config(fg=self._PH_COLOR)
         self._entry.icursor(0)
 
@@ -937,6 +942,17 @@ class TkPicker:
             elif e.keysym in ("BackSpace", "Delete"):
                 return "break"
 
+    def _on_entry_focus_out_for_ph(self, _e=None):
+        """Restore the placeholder when the entry loses focus while empty."""
+        if self._ph_active or self._ph_text is None:
+            return
+        if self._entry_var.get():
+            return
+        self._ph_active = True
+        self._entry_var.set(self._ph_text)
+        self._entry.config(fg=self._PH_COLOR)
+        self._entry.icursor(0)
+
     def _set_prompt(self, text):
         has_emoji = any(self._is_emoji_char(ch) for ch in text)
         children = self._prompt_frame.winfo_children()
@@ -951,7 +967,7 @@ class TkPicker:
         widgets = self._pack_rich_label(
             self._prompt_frame, text, self.BG,
             font=("Helvetica", 11, "bold"), pady=2,
-            img_refs=self._prompt_img_refs)
+            img_refs=self._prompt_img_refs, wrap=True)
         for w in widgets:
             w.configure(fg=self.ACCENT)
 
@@ -1046,7 +1062,10 @@ class TkPicker:
             idx = order.index(focused)
         except ValueError:
             idx = -1
-        order[(idx + 1) % len(order)].focus_set()
+        target = order[(idx + 1) % len(order)]
+        target.focus_set()
+        if target is self._entry:
+            self._hide_ph()
         return "break"
 
     def _focus_prev(self, e=None):
@@ -1058,7 +1077,10 @@ class TkPicker:
             idx = order.index(focused)
         except ValueError:
             idx = 1
-        order[(idx - 1) % len(order)].focus_set()
+        target = order[(idx - 1) % len(order)]
+        target.focus_set()
+        if target is self._entry:
+            self._hide_ph()
         return "break"
 
     def _cancel(self, e=None):
@@ -1453,6 +1475,7 @@ class TkPicker:
             self.root.after_cancel(self._load_poll_after_id)
         self._load_poll_after_id = None
         self._ph_active = False
+        self._ph_text   = None
         self._entry.config(fg=self.FG)
         self._entry_var.set("")
         self._prog_frame.pack_forget()
@@ -1470,14 +1493,61 @@ class TkPicker:
         self._cancel_hook = None
         self._on_favorite = None
 
+    def _pack_clickable_link(self, parent, url):
+        """Render `url` as an underlined accent-coloured label. Left-click opens
+        it in the browser; right-click offers Open/Copy actions, matching the
+        old tip-overlay banner."""
+        normal = self.ACCENT
+        hover  = _darken(self.ACCENT, 0.7) if not self._dark else "#c4aaff"
+        link = tk.Label(
+            parent, text=url, bg=self.BG, fg=normal,
+            font=("Helvetica", 11, "underline"),
+            cursor="hand2", anchor="w", padx=10, pady=4,
+            wraplength=max(200, self.root.winfo_width() - 40),
+            justify="left",
+        )
+        link.pack(fill="x")
+
+        def _open(_e=None):
+            webbrowser.open(url)
+        def _copy(_e=None):
+            ok = copy_text_to_clipboard(url)
+            if not ok:
+                self.root.clipboard_clear()
+                self.root.clipboard_append(url)
+        def _enter(_e):
+            link.configure(fg=hover)
+        def _leave(_e):
+            link.configure(fg=normal)
+        def _menu(e):
+            self._dismiss_popup()
+            menu = tk.Menu(self.root, tearoff=0)
+            menu.add_command(label="Open in browser",   command=_open)
+            menu.add_command(label="Copy link address", command=_copy)
+            try:
+                menu.tk_popup(e.x_root, e.y_root)
+            finally:
+                menu.grab_release()
+
+        link.bind("<Button-1>", _open)
+        link.bind("<Button-3>", _menu)
+        link.bind("<Enter>",    _enter)
+        link.bind("<Leave>",    _leave)
+        return link
+
     # ── public API ────────────────────────────────────────────────────────────
 
-    def ask(self, prompt, placeholder=None):
-        """Plain text input. Returns typed text or None."""
+    def ask(self, prompt, placeholder=None, link_url=None):
+        """Plain text input. Returns typed text or None.
+
+        If `link_url` is given, render the URL as a clickable/copyable link
+        between the prompt and the entry."""
         self._reset()
         self._mode = "input"
         self._set_prompt(prompt)
         self._show_back_btn()
+        if link_url:
+            self._pack_clickable_link(self._inner, link_url)
         if placeholder is not None:
             self._show_ph(placeholder)
         return self._run()
@@ -1696,10 +1766,12 @@ class TkPicker:
                 0x2B00 <= cp <= 0x2BFF or   # Misc Symbols and Arrows
                 0x1F000 <= cp <= 0x1FFFF)   # Main emoji block
 
-    def _pack_rich_label(self, parent, text, bg, font=("Helvetica", 12), pady=5, img_refs=None):
+    def _pack_rich_label(self, parent, text, bg, font=("Helvetica", 12), pady=5, img_refs=None, wrap=False):
         """
         Pack a series of Label widgets into parent for text that may contain
         emoji characters. Emoji are rendered via PIL; plain text uses font.
+        If `wrap` is True, text labels get a wraplength that tracks `parent`'s
+        width so long prompts don't get clipped.
         Returns a list of all created widgets (for click-binding).
         """
         if img_refs is None:
@@ -1737,12 +1809,22 @@ class TkPicker:
                     widgets.append(w)
             else:
                 w = tk.Label(parent, text=content, bg=bg, fg=self.FG,
-                             font=font, anchor="w")
+                             font=font, anchor="w", justify="left")
                 kw = dict(side="left", pady=pady)
                 if is_last:
                     kw.update(fill="x", expand=True)
                 w.pack(**kw)
                 widgets.append(w)
+        if wrap:
+            text_labels = [w for w in widgets
+                           if isinstance(w, tk.Label) and not w.cget("image")]
+            def _apply_wrap(_e=None):
+                avail = max(1, parent.winfo_width() - 8)
+                for tw in text_labels:
+                    if tw.winfo_exists():
+                        tw.configure(wraplength=avail)
+            parent.bind("<Configure>", _apply_wrap, add="+")
+            parent.after_idle(_apply_wrap)
         return widgets
 
     def _on_canvas_configure(self, e):
