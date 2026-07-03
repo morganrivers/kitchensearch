@@ -221,9 +221,11 @@ def _run_settings(picker, settings, lic):
                 webbrowser.open(url)
                 entered = picker.ask(
                     "Opening the license checkout in your browser.\n\n"
-                    "After purchase, paste your license key below and press "
-                    "Enter (or Esc to dismiss):",
-                    placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX")
+                    "If it didn't open, click the link below "
+                    "(right-click to copy). After purchase, paste your "
+                    "license key and press Enter (or Esc to dismiss):",
+                    placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+                    link_url=url)
                 if entered:
                     _ok, msg = lic.activate(entered)
                     picker.message(msg)
@@ -277,7 +279,7 @@ def _run_favorites(picker, settings, entries):
 
         if not fav_section and not top_section:
             picker.message("No favorites yet.\n\n"
-                           "Click ♥ on any search or combo result to add it here.")
+                           "Click the heart on any search or combo result to add it here.")
             return
 
         all_entries = list(fav_section)
