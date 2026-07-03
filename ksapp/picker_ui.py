@@ -275,6 +275,7 @@ class TkPicker:
 
         self._prompt_frame = tk.Frame(top, bg=self.BG)
         self._prompt_frame.pack(fill="x")
+        self._prompt_frame.bind("<Configure>", self._on_prompt_frame_configure)
 
         self._entry_var = tk.StringVar()
         self._entry_row = tk.Frame(top, bg=self.BG)
@@ -939,6 +940,13 @@ class TkPicker:
                 self._hide_ph()
             elif e.keysym in ("BackSpace", "Delete"):
                 return "break"
+
+    def _on_prompt_frame_configure(self, e):
+        w = e.width
+        if w > 1:
+            for child in self._prompt_frame.winfo_children():
+                if isinstance(child, tk.Label) and not child.cget("image"):
+                    child.configure(wraplength=w, justify="left")
 
     def _set_prompt(self, text):
         has_emoji = any(self._is_emoji_char(ch) for ch in text)

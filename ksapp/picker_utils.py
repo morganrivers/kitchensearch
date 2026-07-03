@@ -20,7 +20,11 @@ from ksapp.data_assets import ensure_data as _ensure_data, _REPO, UI_ASSETS_DIR
 from platformdirs import user_cache_dir, user_config_dir
 
 DATA_DIR      = _REPO / "data" / "embeddings"
-CACHE_DIR     = Path(user_cache_dir("kitchensearch"))
+# KITCHENSEARCH_CACHE_DIR lets tests redirect the cache without depending on
+# platformdirs env-var behavior (on Windows it reads Win32 CSIDL directly and
+# ignores LOCALAPPDATA/XDG_CACHE_HOME env changes). Must match the same env
+# name in emoji_split_daemon.py so both sides land in the same place.
+CACHE_DIR     = Path(os.environ.get("KITCHENSEARCH_CACHE_DIR") or user_cache_dir("kitchensearch"))
 CONFIG_DIR    = Path(user_config_dir("kitchensearch"))
 _VENV_PY = (
     _REPO / ".venv" / "Scripts" / "python.exe"
@@ -484,7 +488,68 @@ def _identity_matches(pid, expected_start):
     return live is not None and live == expected_start
 
 
+def _stale_pid_cleanup():
+    """Invalidate a stale daemon pid record (POSIX path only).
+
+    On Windows the pid file isn't used at all — liveness is tracked via a
+    named mutex owned by the daemon process (auto-released by the kernel
+    on exit). Defensive truncate-on-PermissionError fallback is kept for
+    POSIX edge cases (e.g. read-only fs after cache corruption).
+    """
+    try:
+        DAEMON_PID.unlink(missing_ok=True)
+        return
+    except PermissionError as e:
+        _dbg(f"DAEMON_PID unlink denied: {e}; truncating instead")
+    try:
+        DAEMON_PID.write_bytes(b"")
+    except OSError as e:
+        _dbg(f"DAEMON_PID truncate also failed: {e}")
+
+
+# Windows-only: daemon liveness is determined by a named mutex the daemon
+# acquires at startup (see ksapp/emoji_split_daemon._acquire_windows_singleton).
+# Mutexes are kernel objects, so they auto-release on process death — no
+# stale-file cleanup, no AV/indexer-induced PermissionError on unlink, no
+# pid-reuse race. Must match the mutex name in the daemon.
+_WIN_SPLIT_DAEMON_MUTEX = r"Global\KitchenSearchSplitDaemon"
+
+
+def _win_split_daemon_running() -> bool:
+    """True iff a process is currently holding the daemon's singleton mutex."""
+    import ctypes
+    SYNCHRONIZE = 0x00100000
+    h = ctypes.windll.kernel32.OpenMutexW(SYNCHRONIZE, False, _WIN_SPLIT_DAEMON_MUTEX)
+    if h:
+        ctypes.windll.kernel32.CloseHandle(h)
+        return True
+    return False
+
+
+def _daemon_status_loaded() -> bool:
+    """True iff the daemon's status file reports loading complete (pct >= 100)."""
+    try:
+        status = json.loads(DAEMON_STATUS.read_text(encoding="utf-8"))
+        return status.get("pct", 0) >= 100
+    except (OSError, ValueError):
+        return False
+
+
 def _kill_daemon():
+    # Windows: no pid available (we never wrote one) — kill by image name.
+    # Both kebab and snake variants exist depending on the Nuitka/Python
+    # build combination (see scripts/build_nuitka.sh).
+    if IS_NAMED_PIPE:
+        for exe in ("emoji-split-daemon.exe", "emoji_split_daemon.exe"):
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/IM", exe],
+                    capture_output=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+            except OSError as e:
+                _dbg(f"_kill_daemon taskkill {exe} failed: {e}")
+        return
     if not DAEMON_PID.exists():
         return
     pid, expected_start = _read_pid_record()
@@ -493,38 +558,44 @@ def _kill_daemon():
             os.kill(pid, signal.SIGTERM)
         except (OSError, ProcessLookupError):
             pass
-    DAEMON_PID.unlink(missing_ok=True)
-    if not IS_NAMED_PIPE:
-        Path(IPC_ADDRESS).unlink(missing_ok=True)
+    _stale_pid_cleanup()
+    Path(IPC_ADDRESS).unlink(missing_ok=True)
 
 
 def _daemon_alive():
+    if IS_NAMED_PIPE:
+        if not _win_split_daemon_running():
+            return False
+        # Zombie check: status says loaded but the pipe won't accept a
+        # connection — daemon is wedged, kill so a fresh one can spawn.
+        if _daemon_status_loaded() and _try_connect() is None:
+            _kill_daemon()
+            return False
+        return True
     if not DAEMON_PID.exists():
         return False
     pid, expected_start = _read_pid_record()
     if pid is None:
-        DAEMON_PID.unlink(missing_ok=True)
+        _stale_pid_cleanup()
         return False
     if not _process_exists(pid):
-        DAEMON_PID.unlink(missing_ok=True)
+        _stale_pid_cleanup()
         return False
     # PID-reuse detection: the recorded start time must match the live one.
     # Legacy bare-int PID files have no start time and skip this check.
     if not _identity_matches(pid, expected_start):
-        DAEMON_PID.unlink(missing_ok=True)
+        _stale_pid_cleanup()
         return False
     # Zombie detection: process is alive, claimed Ready, but socket is gone.
     # Only kill if the status file says the daemon finished loading — during
     # normal startup the socket doesn't exist yet (created after load).
-    if not IS_NAMED_PIPE and not Path(IPC_ADDRESS).exists():
+    if not Path(IPC_ADDRESS).exists() and _daemon_status_loaded():
         try:
-            status = json.loads(DAEMON_STATUS.read_text(encoding="utf-8"))
-            if status.get("pct", 0) >= 100:
-                os.kill(pid, signal.SIGTERM)
-                DAEMON_PID.unlink(missing_ok=True)
-                return False
+            os.kill(pid, signal.SIGTERM)
+            _stale_pid_cleanup()
+            return False
         except Exception as e:
-            _dbg(f"_daemon_alive zombie check failed: {e}")
+            _dbg(f"_daemon_alive zombie kill failed: {e}")
     return True
 
 
@@ -552,7 +623,18 @@ def _spawn_daemon():
     else:
         kwargs["start_new_session"] = True
     proc = subprocess.Popen(cmd, **kwargs)
-    _write_pid_record(proc.pid)
+    if IS_NAMED_PIPE:
+        # Windows uses the daemon's named mutex instead of a pid file.
+        # Wait briefly for the daemon to acquire it so subsequent
+        # _daemon_alive() calls don't briefly see "not running" and
+        # double-spawn during the race window between Popen and mutex
+        # acquisition. The daemon takes it before any slow work.
+        for _ in range(20):  # ~1 s total
+            if _win_split_daemon_running():
+                break
+            time.sleep(0.05)
+    else:
+        _write_pid_record(proc.pid)
     return proc
 
 

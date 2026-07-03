@@ -23,6 +23,24 @@ except Exception:
 
 
 def _find_unused_pid():
+    # Windows: os.kill(pid, 0) is not a portable existence check — it raises
+    # OSError WinError 87 (ERROR_INVALID_PARAMETER) unconditionally. Use
+    # OpenProcess instead: it fails with ERROR_INVALID_PARAMETER only for
+    # PIDs the OS has never issued, and with ERROR_ACCESS_DENIED for live
+    # PIDs we can't query. We want the "never issued" case.
+    if sys.platform == "win32":
+        import ctypes
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        ERROR_INVALID_PARAMETER = 87
+        kernel32 = ctypes.windll.kernel32
+        for pid in range(_PID_MAX - 1, _PID_MAX - 2000, -1):
+            h = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if h:
+                kernel32.CloseHandle(h)
+                continue
+            if kernel32.GetLastError() == ERROR_INVALID_PARAMETER:
+                return pid
+        raise RuntimeError("could not find an unused pid (windows)")
     for pid in range(_PID_MAX - 1, _PID_MAX - 2000, -1):
         try:
             os.kill(pid, 0)
