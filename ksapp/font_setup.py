@@ -1,9 +1,11 @@
 """Force Tk to render the UI text with a bundled TTF (Linux only).
 
 On some Linux installs Tk falls back to X core bitmap fonts (Helvetica,
-Times, etc.), which render aliased/jagged. Registering the shipped DejaVu
-Sans TTF with fontconfig at process start, and pointing every Tk named
-font at that family, makes the UI text render through Xft with AA/hinting.
+Times, etc.), which render aliased/jagged. Registering the shipped
+Liberation Sans TTF with fontconfig at process start, and pointing every
+Tk named font at that family, makes the UI text render through Xft with
+AA/hinting. Liberation Sans is metric-compatible with Arial/Helvetica so
+UI layout stays visually close to the original.
 
 macOS (Aqua) and Windows already have high-quality default UI fonts, so
 this module is a no-op on those platforms.
@@ -17,9 +19,8 @@ from ksapp.data_assets import ensure_data, _REPO
 from ksapp.log import _dbg
 
 BUNDLED_FONT_DIR = _REPO / "data" / "fonts"
-BUNDLED_SANS_TTF = BUNDLED_FONT_DIR / "DejaVuSans.ttf"
-FAMILY_SANS = "DejaVu Sans"
-FAMILY_MONO = "DejaVu Sans Mono"
+BUNDLED_SANS_TTF = BUNDLED_FONT_DIR / "LiberationSans-Regular.ttf"
+FAMILY_SANS = "Liberation Sans"
 
 # Family every widget in this app should name for its `font=(...)` tuple.
 # Linux Tk otherwise routes "Helvetica" through fontconfig aliases that vary
@@ -27,7 +28,7 @@ FAMILY_MONO = "DejaVu Sans Mono"
 # specific TTF keeps the UI text visually identical everywhere.
 # macOS/Windows already ship high-quality UI fonts, so keep the prior names.
 UI_FAMILY = {
-    "linux":  FAMILY_SANS,   # bundled DejaVu Sans
+    "linux":  FAMILY_SANS,   # bundled Liberation Sans (Arial-metric)
     "darwin": "Helvetica",   # native Aqua sans, renders great
     "win32":  "Segoe UI",    # native Windows UI font
 }.get(sys.platform, FAMILY_SANS)
@@ -60,8 +61,8 @@ def _register_bundled_fonts() -> bool:
 
     ensure_data()
     if not BUNDLED_SANS_TTF.is_file():
-        # Older extraction (pre-DejaVu tarball); nothing to register. Tk
-        # will fall back to whichever family it was going to pick anyway.
+        # Older extraction from before the bundled UI font was shipped;
+        # nothing to register. Tk falls back to its usual family.
         _dbg(f"font_setup: {BUNDLED_SANS_TTF} not present, skipping")
         return False
 
@@ -85,7 +86,7 @@ def _register_bundled_fonts() -> bool:
 
 
 def apply(root) -> None:
-    """Point Tk's named fonts at the bundled DejaVu family (Linux only).
+    """Point Tk's named fonts at the bundled sans family (Linux only).
 
     Call once, right after tk.Tk() (or tk.Toplevel()) is created. Safe to
     call more than once — subsequent calls just re-issue the configure.
@@ -104,6 +105,3 @@ def apply(root) -> None:
 
     for name in _TK_NAMED_FONTS_SANS:
         tkFont.nametofont(name, root=root).configure(family=FAMILY_SANS)
-
-    if FAMILY_MONO in families:
-        tkFont.nametofont("TkFixedFont", root=root).configure(family=FAMILY_MONO)
