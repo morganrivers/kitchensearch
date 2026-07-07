@@ -92,6 +92,19 @@ else
   python "$REPO_DIR/scripts/scrub_paths.py" "$REPO_DIR/nuitka-build/kitchensearch"
   echo "=== Stripping debug symbols ==="
   bash "$REPO_DIR/scripts/strip_dist.sh" "$REPO_DIR/nuitka-build/kitchensearch"
+  echo "=== Relocating runtime files into lib/ ==="
+  cd "$REPO_DIR/nuitka-build/kitchensearch"
+  mkdir lib
+  find . -mindepth 1 -maxdepth 1 \
+    ! -name lib ! -name LICENSE.txt ! -name README ! -name 'README.*' \
+    -exec mv {} lib/ \;
+  cat > kitchensearch <<'WRAP'
+#!/bin/sh
+DIR="$(dirname "$(readlink -f "$0")")"
+exec "$DIR/lib/kitchensearch" "$@"
+WRAP
+  chmod +x kitchensearch
+  cd "$REPO_DIR/nuitka-build"
   tar -czf "$REPO_DIR/kitchensearch-linux-x86_64.tar.gz" kitchensearch/
   echo "=== Done: kitchensearch-linux-x86_64.tar.gz ==="
 fi

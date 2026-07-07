@@ -375,7 +375,11 @@ def _ensure_desktop_integration():
     if venv_python.exists() and script.exists():
         exec_cmd = f"{venv_python} {script}"
     else:
-        ui_entry = _REPO / "kitchensearch"
+        wrapper = _REPO.parent / "kitchensearch"
+        if _REPO.name == "lib" and wrapper.exists():
+            ui_entry = wrapper
+        else:
+            ui_entry = _REPO / "kitchensearch"
         assert ui_entry.exists(), (
             f"kitchensearch UI entry point not found at {ui_entry}; "
             "Nuitka multidist binary would dispatch to a non-UI mode"
