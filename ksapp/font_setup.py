@@ -21,6 +21,17 @@ BUNDLED_SANS_TTF = BUNDLED_FONT_DIR / "DejaVuSans.ttf"
 FAMILY_SANS = "DejaVu Sans"
 FAMILY_MONO = "DejaVu Sans Mono"
 
+# Family every widget in this app should name for its `font=(...)` tuple.
+# Linux Tk otherwise routes "Helvetica" through fontconfig aliases that vary
+# by distro (Nimbus Sans, Liberation Sans, ...) — bundling and naming a
+# specific TTF keeps the UI text visually identical everywhere.
+# macOS/Windows already ship high-quality UI fonts, so keep the prior names.
+UI_FAMILY = {
+    "linux":  FAMILY_SANS,   # bundled DejaVu Sans
+    "darwin": "Helvetica",   # native Aqua sans, renders great
+    "win32":  "Segoe UI",    # native Windows UI font
+}.get(sys.platform, FAMILY_SANS)
+
 _TK_NAMED_FONTS_SANS = (
     "TkDefaultFont",
     "TkTextFont",

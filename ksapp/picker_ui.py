@@ -283,7 +283,7 @@ class TkPicker:
         self._entry = tk.Entry(self._entry_row, textvariable=self._entry_var,
                                bg=self.ENTRY_BG, fg=self.FG,
                                insertbackground=self.FG,
-                               font=("Helvetica", 13),
+                               font=(font_setup.UI_FAMILY, 13),
                                relief="flat", bd=6,
                                highlightthickness=2,
                                highlightbackground="#dddddd",
@@ -297,7 +297,7 @@ class TkPicker:
             bg=self.BG, fg=self.FG,
             selectcolor=self.ENTRY_BG,
             activebackground=self.BG, activeforeground=self.FG,
-            font=("Helvetica", 11),
+            font=(font_setup.UI_FAMILY, 11),
             cursor="hand2",
             relief="flat", bd=0,
             highlightthickness=1,
@@ -332,7 +332,7 @@ class TkPicker:
             wrap="word",
             bg=self.ENTRY_BG, fg=self.FG,
             insertbackground=self.FG,
-            font=("Helvetica", 13),
+            font=(font_setup.UI_FAMILY, 13),
             relief="flat", bd=6,
             highlightthickness=2,
             highlightbackground="#dddddd",
@@ -345,7 +345,7 @@ class TkPicker:
             self._story_frame,
             text="▾",
             bg=self.BG, fg=self.FG_DIM,
-            font=("Helvetica", 14),
+            font=(font_setup.UI_FAMILY, 14),
             cursor="hand2",
         )
         self._story_expand_btn.pack(anchor="center", pady=(0, 2))
@@ -372,7 +372,7 @@ class TkPicker:
             self._story_gen_btn.create_rectangle(_BR, 0, _BW-_BR, _BH, fill=color, outline="")
             self._story_gen_btn.create_rectangle(0, _BR, _BW, _BH-_BR, fill=color, outline="")
             self._story_gen_btn.create_text(_BW//2, _BH//2, text="Generate Story",
-                                            fill="#ffffff", font=("Helvetica", 12, "bold"))
+                                            fill="#ffffff", font=(font_setup.UI_FAMILY, 12, "bold"))
 
         _draw_gen_btn(self.ACCENT)
         self._story_gen_btn.bind("<Enter>",    lambda e: _draw_gen_btn(_darken(self.ACCENT)))
@@ -403,7 +403,7 @@ class TkPicker:
         self._progbar.pack(fill="x", padx=10, pady=(4, 0))
         tk.Label(self._prog_frame, textvariable=self._prog_lbl_var,
                  bg=self.BG, fg=self.FG_DIM,
-                 font=("Helvetica", 9), anchor="e", padx=10
+                 font=(font_setup.UI_FAMILY, 9), anchor="e", padx=10
                  ).pack(fill="x")
 
         # ── scrollable list ───────────────────────────────────────────────
@@ -548,7 +548,7 @@ class TkPicker:
         w, h = self._BACK_W, self._DM_SIZE
         c = self.FG if hover else self.FG_DIM
         btn.create_text(w // 2, h // 2, text="< back",
-                        fill=c, font=("Helvetica", 10), anchor="center")
+                        fill=c, font=(font_setup.UI_FAMILY, 10), anchor="center")
 
     def _show_back_btn(self):
         y = (self.TITLE_H - self._DM_SIZE) // 2
@@ -804,11 +804,11 @@ class TkPicker:
             _dbg(f"_draw_title PIL render failed: {e}")
         c.create_text(W // 2 + 1, H // 2 + 1,
                       text="Kitchen Search",
-                      font=("Helvetica", 18, "bold"),
+                      font=(font_setup.UI_FAMILY, 18, "bold"),
                       fill="#000000", anchor="center")
         c.create_text(W // 2, H // 2,
                       text="Kitchen Search",
-                      font=("Helvetica", 18, "bold"),
+                      font=(font_setup.UI_FAMILY, 18, "bold"),
                       fill="#ffffff", anchor="center")
 
     @staticmethod
@@ -926,7 +926,7 @@ class TkPicker:
         self._prompt_img_refs = []
         widgets = self._pack_rich_label(
             self._prompt_frame, text, self.BG,
-            font=("Helvetica", 11, "bold"), pady=2,
+            font=(font_setup.UI_FAMILY, 11, "bold"), pady=2,
             img_refs=self._prompt_img_refs, wrap=True)
         for w in widgets:
             w.configure(fg=self.ACCENT)
@@ -1334,7 +1334,7 @@ class TkPicker:
             self._inner,
             text=message,
             bg="#1a5c1a", fg="#ffffff",
-            font=("Helvetica", 10, "bold"),
+            font=(font_setup.UI_FAMILY, 10, "bold"),
             anchor="center", pady=7,
         )
         lbl.pack(fill="x", padx=8, pady=(6, 4))
@@ -1458,7 +1458,7 @@ class TkPicker:
         hover  = _darken(self.ACCENT, 0.7) if not self._dark else "#c4aaff"
         link = tk.Label(
             parent, text=url, bg=self.BG, fg=normal,
-            font=("Helvetica", 11, "underline"),
+            font=(font_setup.UI_FAMILY, 11, "underline"),
             cursor="hand2", anchor="w", padx=10, pady=4,
             wraplength=max(200, self.root.winfo_width() - 40),
             justify="left",
@@ -1553,7 +1553,7 @@ class TkPicker:
         desc_lbl = tk.Label(
             self._inner, textvariable=desc_var,
             bg=self.BG, fg=self.FG_DIM,
-            font=("Helvetica", 10), anchor="w", padx=14, pady=4,
+            font=(font_setup.UI_FAMILY, 10), anchor="w", padx=14, pady=4,
         )
         desc_lbl.pack(fill="x")
 
@@ -1613,7 +1613,7 @@ class TkPicker:
         self._set_prompt(text)
         tk.Label(self._inner, text="Press Esc to dismiss",
                  bg=self.BG, fg=self.FG_DIM,
-                 font=("Helvetica", 11, "bold"), anchor="w", padx=10, pady=20
+                 font=(font_setup.UI_FAMILY, 11, "bold"), anchor="w", padx=10, pady=20
                  ).pack(fill="x")
         self._entry_row.pack_forget()
         return self._run()
@@ -1723,7 +1723,7 @@ class TkPicker:
                 0x2B00 <= cp <= 0x2BFF or   # Misc Symbols and Arrows
                 0x1F000 <= cp <= 0x1FFFF)   # Main emoji block
 
-    def _pack_rich_label(self, parent, text, bg, font=("Helvetica", 12), pady=5, img_refs=None, wrap=False):
+    def _pack_rich_label(self, parent, text, bg, font=(font_setup.UI_FAMILY, 12), pady=5, img_refs=None, wrap=False):
         """
         Pack a series of Label widgets into parent for text that may contain
         emoji characters. Emoji are rendered via PIL; plain text uses font.
@@ -1896,13 +1896,13 @@ class TkPicker:
                         else:
                             cid = canvas.create_text(
                                 x, yc, text=ch, anchor="w",
-                                font=("Helvetica", 12), fill=self.FG, tags="vrow")
+                                font=(font_setup.UI_FAMILY, 12), fill=self.FG, tags="vrow")
                             cids.append(cid)
                             x += 18
                 else:
                     cid = canvas.create_text(
                         x, yc, text=content, anchor="w",
-                        font=("Helvetica", 12, "bold"), fill=self.FG, tags="vrow")
+                        font=(font_setup.UI_FAMILY, 12, "bold"), fill=self.FG, tags="vrow")
                     cids.append(cid)
 
             self._virt_items[i] = {"rect": rect, "cids": cids, "photos": photos}
@@ -1955,14 +1955,14 @@ class TkPicker:
                 display = label[4:]
                 fg = self.FG if is_checked else self.FG_DIM
                 lbl = tk.Label(row, text=display, bg=rbg, fg=fg,
-                               font=("Helvetica", 12), anchor="w")
+                               font=(font_setup.UI_FAMILY, 12), anchor="w")
                 lbl.pack(side="left", fill="x", expand=True, pady=10, padx=(0, 12))
 
                 all_widgets = [row, strip, box_cv, lbl]
                 bg_widgets  = [row, box_cv, lbl]
             else:
                 inner_ws    = self._pack_rich_label(row, label, rbg,
-                                                    font=("Helvetica", 12, "bold"), pady=8)
+                                                    font=(font_setup.UI_FAMILY, 12, "bold"), pady=8)
                 all_widgets = [row] + inner_ws
                 bg_widgets  = all_widgets
 
@@ -2022,7 +2022,7 @@ class TkPicker:
                 except Exception:
                     pass
             lbl = tk.Label(hr, text=text, bg=self.BG, fg=color or self.FG_DIM,
-                           font=("Helvetica", 11, "bold"), anchor="w")
+                           font=(font_setup.UI_FAMILY, 11, "bold"), anchor="w")
             lbl.pack(side="left", fill="x", expand=True)
 
         def _append_row(label, photo, score=None):
@@ -2047,9 +2047,9 @@ class TkPicker:
                 name_part = label
                 kw_part   = ""
 
-            font_main    = ("Helvetica", 11, "bold")
-            font_kw      = ("Helvetica", 10)
-            font_kw_bold = ("Helvetica", 10, "bold")
+            font_main    = (font_setup.UI_FAMILY, 11, "bold")
+            font_kw      = (font_setup.UI_FAMILY, 10)
+            font_kw_bold = (font_setup.UI_FAMILY, 10, "bold")
             em_size      = 15
 
             txt = tk.Text(row, height=2, wrap="word",
@@ -2063,7 +2063,7 @@ class TkPicker:
             txt.tag_configure("alt_bold",   font=font_main,    foreground=self.FG)
             txt.tag_configure("kw_normal",  font=font_kw,      foreground=self.FG_DIM)
             txt.tag_configure("kw_bold",    font=font_kw_bold, foreground=self.FG)
-            txt.tag_configure("copied_tag", font=("Helvetica", 10, "bold"),
+            txt.tag_configure("copied_tag", font=(font_setup.UI_FAMILY, 10, "bold"),
                                foreground="#1a7f1a")
             txt.bind("<Key>",      lambda e: "break")
             txt.bind("<Button-2>", lambda e: "break")
@@ -2379,7 +2379,7 @@ class TkPicker:
             btn_canvas.create_rectangle(_R, 0, _W-_R, _H, fill=color, outline="")
             btn_canvas.create_rectangle(0, _R, _W, _H-_R, fill=color, outline="")
             btn_canvas.create_text(_W//2, _H//2, text="Skip for now",
-                                   fill="#ffffff", font=("Helvetica", 13, "bold"))
+                                   fill="#ffffff", font=(font_setup.UI_FAMILY, 13, "bold"))
 
         _HOVER_COLOR  = "#4a1f99"
         _PRESS_COLOR  = "#3a1577"
@@ -2418,7 +2418,7 @@ class TkPicker:
         tk.Label(
             self._inner, textvariable=desc_var,
             bg=self.BG, fg=self.FG,
-            font=("Helvetica", 11), anchor="w", padx=14, pady=14,
+            font=(font_setup.UI_FAMILY, 11), anchor="w", padx=14, pady=14,
         ).pack(fill="x")
 
         cancelled = [False]
@@ -2447,7 +2447,7 @@ class TkPicker:
             btn_canvas.create_rectangle(_R, 0, _W-_R, _H, fill=color, outline="")
             btn_canvas.create_rectangle(0, _R, _W, _H-_R, fill=color, outline="")
             btn_canvas.create_text(_W//2, _H//2, text="Cancel",
-                                   fill="#ffffff", font=("Helvetica", 13, "bold"))
+                                   fill="#ffffff", font=(font_setup.UI_FAMILY, 13, "bold"))
 
         _draw_btn(self.ACCENT)
         btn_canvas.bind("<Enter>",    lambda e: _draw_btn("#4a1f99"))
@@ -2499,7 +2499,7 @@ class TkPicker:
         tk.Label(
             self._inner, textvariable=desc_var,
             bg=self.BG, fg=self.FG,
-            font=("Helvetica", 11), anchor="w", padx=14, pady=14,
+            font=(font_setup.UI_FAMILY, 11), anchor="w", padx=14, pady=14,
         ).pack(fill="x")
 
         total     = [0]
@@ -2628,7 +2628,7 @@ class TkPicker:
         hint_label = tk.Label(self._inner,
                  text="Enter to copy  |  Esc to cancel",
                  bg=self.BG, fg=self.FG_DIM,
-                 font=("Helvetica", 10), anchor="center"
+                 font=(font_setup.UI_FAMILY, 10), anchor="center"
                  )
         hint_label.pack()
 
