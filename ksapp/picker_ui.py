@@ -117,7 +117,8 @@ from ksapp.picker_utils import (
     _cleanup_incomplete_data,
     copy_text_to_clipboard,
 )
-from ksapp.placeholder_entry import PlaceholderManager, DEFAULT_FILTER_PROMPT                                                                                                                                                                      
+from ksapp.placeholder_entry import PlaceholderManager, DEFAULT_FILTER_PROMPT
+from ksapp import font_setup
 
 
 def _darken(hex_color, factor=0.75):
@@ -186,6 +187,7 @@ class TkPicker:
         self._on_dark_toggle  = on_dark_toggle
         self._apply_theme(self.DARK if dark else self.LIGHT)
         root = tk.Tk(className="kitchensearch")
+        font_setup.apply(root)
         root.withdraw()
         root.configure(bg=self.BG)
         root.title("Kitchen Search")

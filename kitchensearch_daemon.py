@@ -421,12 +421,14 @@ def _run():
 def _open_settings():
     import tkinter as tk
     from tkinter import messagebox
+    from ksapp import font_setup
 
     config  = load_config()
     current = config.get("hotkey", DEFAULT_HOTKEY)
     captured = {"hotkey": current, "valid": True}
 
     root = tk.Tk()
+    font_setup.apply(root)
     root.title("KitchenSearch Settings")
     root.resizable(False, False)
 
