@@ -432,21 +432,21 @@ def _open_settings():
     root.title("KitchenSearch Settings")
     root.resizable(False, False)
 
-    tk.Label(root, text="Keyboard shortcut", font=("Segoe UI", 9, "bold")).pack(
+    tk.Label(root, text="Keyboard shortcut", font=(font_setup.UI_FAMILY, 9, "bold")).pack(
         anchor="w", padx=12, pady=(12, 2))
 
     frame = tk.Frame(root, bd=1, relief="sunken", bg="white")
     frame.pack(fill="x", padx=12, pady=0)
 
     hotkey_var = tk.StringVar(value=current)
-    display = tk.Label(frame, textvariable=hotkey_var, font=("Segoe UI", 11),
+    display = tk.Label(frame, textvariable=hotkey_var, font=(font_setup.UI_FAMILY, 11),
                        bg="white", fg="#1a1a1a", anchor="w", padx=8, pady=6)
     display.pack(fill="x")
 
     tk.Label(root, text="Click the box above, then press your shortcut.",
-             font=("Segoe UI", 8), fg="#666666").pack(anchor="w", padx=12, pady=(3, 2))
+             font=(font_setup.UI_FAMILY, 8), fg="#666666").pack(anchor="w", padx=12, pady=(3, 2))
     tk.Label(root, text="The daemon will restart automatically when you save.",
-             font=("Segoe UI", 8), fg="#999999").pack(anchor="w", padx=12, pady=(0, 8))
+             font=(font_setup.UI_FAMILY, 8), fg="#999999").pack(anchor="w", padx=12, pady=(0, 8))
 
     # tkinter on Windows reports Alt via 0x20000; also check 0x0008 as fallback
     _CTRL  = 0x0004
