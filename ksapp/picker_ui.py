@@ -116,6 +116,7 @@ from ksapp.picker_utils import (
     _daemon_alive,
     _daemon_ready,
     _kill_daemon,
+    _client_log,
     _cleanup_incomplete_data,
     copy_text_to_clipboard,
 )
@@ -2609,19 +2610,30 @@ class TkPicker:
         btn_canvas.bind("<Leave>",    lambda e: _draw_btn(self.ACCENT))
         btn_canvas.bind("<Button-1>", lambda e: _do_cancel())
 
+        poll_state = {"n": 0, "t0": time.monotonic(), "last_log": 0.0}
+        _client_log("show_model_loading_progress: START polling")
+
         def _poll():
             if cancelled[0]:
+                _client_log("show_model_loading_progress: CANCELLED by user")
                 return
+            poll_state["n"] += 1
+            n = poll_state["n"]
+            elapsed = time.monotonic() - poll_state["t0"]
             if _daemon_ready():
+                _client_log(f"show_model_loading_progress: DAEMON READY tick={n} elapsed={elapsed:.1f}s")
                 self._prog_var.set(100)
                 desc_var.set("Ready!")
                 self.root.after(350, self.root.quit)
                 return
             if not _daemon_alive():
+                _client_log(f"show_model_loading_progress: DAEMON DEAD tick={n} elapsed={elapsed:.1f}s")
                 desc_var.set("Daemon failed to start.")
                 self._prog_var.set(0)
                 self.root.after(1500, self.root.quit)
                 return
+            pct = 0.0
+            step = "Starting..."
             try:
                 data = json.loads(DAEMON_STATUS.read_text(encoding="utf-8"))
                 pct  = float(data.get("pct", 0))
@@ -2630,6 +2642,16 @@ class TkPicker:
                 desc_var.set(step)
             except Exception as e:
                 _dbg(f"model loading status poll failed: {e}")
+                if elapsed - poll_state["last_log"] >= 2.0:
+                    _client_log(f"show_model_loading_progress: status read FAILED tick={n} elapsed={elapsed:.1f}s err={e}")
+                    poll_state["last_log"] = elapsed
+            # Log first few ticks, then every ~2s if we're still stuck loading
+            if n <= 3 or (elapsed - poll_state["last_log"] >= 2.0):
+                _client_log(
+                    f"show_model_loading_progress: tick={n} elapsed={elapsed:.1f}s "
+                    f"pct={pct} step={step!r} ready=False alive=True"
+                )
+                poll_state["last_log"] = elapsed
             self.root.after(150, _poll)
 
         self.root.after(150, _poll)

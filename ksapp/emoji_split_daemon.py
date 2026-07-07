@@ -160,14 +160,25 @@ def search_combined(query, model, txt_emb, pca_matrix, pca_mean, combo_alts, com
 _last_activity = [0.0]
 
 
+def _dlog(msg):
+    """Always-on daemon-side log line (goes to split-daemon.log via stdout)."""
+    ts = time.strftime("%Y-%m-%d %H:%M:%S") + f".{int(time.time()*1000)%1000:03d}"
+    print(f"[{ts}][tid={threading.get_ident()}] {msg}", flush=True)
+
+
 def handle(conn, model, base_minilm, code_to_idx, combo_map,
            txt_emb, pca_matrix, pca_mean, combo_alts, combo_urls):
+    t0 = time.monotonic()
+    query = "<unread>"
     try:
-        req   = json.loads(conn.recv_bytes().decode())
+        raw = conn.recv_bytes()
+        req   = json.loads(raw.decode())
         query = req["query"]
         limit = req.get("limit", 5000)
         words = query.strip().split()
+        _dlog(f"handle: RECV query={query!r} words={len(words)} limit={limit} req_bytes={len(raw)}")
 
+        t_dec = time.monotonic()
         decomposed = []
         if len(words) == 1:
             decomposed = search_one(words[0], model, base_minilm, code_to_idx, combo_map)
@@ -177,20 +188,31 @@ def handle(conn, model, base_minilm, code_to_idx, combo_map,
                              code_to_idx, combo_map)
             if top:
                 decomposed = [top[0]]
+        _dlog(f"handle: decomposed n={len(decomposed)} elapsed={int((time.monotonic()-t_dec)*1000)}ms")
 
+        t_fb = time.monotonic()
         fallback = search_combined(query, model, txt_emb, pca_matrix, pca_mean,
                                    combo_alts, combo_urls)
+        _dlog(f"handle: fallback n={len(fallback)} elapsed={int((time.monotonic()-t_fb)*1000)}ms")
 
         seen   = {url for _, _, url in decomposed}
         merged = decomposed + [(r, a, u) for r, a, u in fallback if u not in seen]
 
         results = [{"alt": a, "url": u, "rank": r} for r, a, u in merged[:limit]]
-        conn.send_bytes(json.dumps(results).encode())
+        resp = json.dumps(results).encode()
+        t_send = time.monotonic()
+        conn.send_bytes(resp)
+        _dlog(
+            f"handle: SENT n_results={len(results)} bytes={len(resp)} "
+            f"send_ms={int((time.monotonic()-t_send)*1000)} "
+            f"total_ms={int((time.monotonic()-t0)*1000)} query={query!r}"
+        )
     except Exception as e:
+        _dlog(f"handle: EXCEPTION query={query!r} type={type(e).__name__}: {e}")
         try:
             conn.send_bytes(json.dumps({"error": str(e)}).encode())
         except Exception as e2:
-            _dbg(f"handle: failed to send error response: {e2}")
+            _dlog(f"handle: failed to send error response: {e2}")
     finally:
         _last_activity[0] = time.monotonic()
         conn.close()
@@ -239,9 +261,11 @@ def main():
         while True:
             try:
                 conn = listener.accept()
-            except OSError:
+            except OSError as e:
+                _dlog(f"main: listener.accept OSError: {e} — exiting accept loop")
                 break
             _last_activity[0] = time.monotonic()
+            _dlog("main: accepted new connection — dispatching handler thread")
             threading.Thread(
                 target=handle,
                 args=(conn, model, base_minilm, code_to_idx, combo_map,

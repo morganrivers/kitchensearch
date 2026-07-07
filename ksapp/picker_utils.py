@@ -53,6 +53,33 @@ DAEMON_BIN     = (
 )
 DAEMON_PID     = CACHE_DIR / "split-daemon.pid"
 DAEMON_LOG     = CACHE_DIR / "split-daemon.log"
+CLIENT_LOG     = CACHE_DIR / "client.log"
+CLIENT_LOG_MAX = 2 * 1024 * 1024  # 2 MB → rotate to client.log.old
+
+_client_log_lock = threading.Lock()
+
+
+def _client_log(msg):
+    """Always-on persistent log for the picker UI process. Rotates at 2 MB.
+
+    Complements ksapp.log._dbg (which requires --logging and truncates each run)
+    with a durable trail for diagnosing intermittent daemon-comms hangs.
+    """
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        ts = time.strftime("%Y-%m-%d %H:%M:%S") + f".{int(time.time()*1000)%1000:03d}"
+        line = f"[{ts}][pid={os.getpid()}][tid={threading.get_ident()}] {msg}\n"
+        with _client_log_lock:
+            try:
+                if CLIENT_LOG.exists() and CLIENT_LOG.stat().st_size > CLIENT_LOG_MAX:
+                    CLIENT_LOG.replace(CACHE_DIR / "client.log.old")
+            except OSError:
+                pass
+            with open(CLIENT_LOG, "a", encoding="utf-8") as f:
+                f.write(line)
+    except Exception:
+        pass
+
 
 _ensure_data()
 
@@ -521,10 +548,12 @@ def _daemon_alive():
 
 def _spawn_daemon():
     if os.environ.get("KITCHENSEARCH_KILL_DAEMON") == "1":
+        _client_log("_spawn_daemon: KITCHENSEARCH_KILL_DAEMON=1 — killing prior daemon")
         _kill_daemon()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     log = open(DAEMON_LOG, "wb")
     cmd = [str(DAEMON_BIN)] if DAEMON_BIN.exists() else [_PYTHON, str(DAEMON_PY)]
+    _client_log(f"_spawn_daemon: exec cmd={cmd!r}")
     kwargs = {"stdout": log, "stderr": subprocess.STDOUT}
     if sys.platform == "win32":
         kwargs["creationflags"] = (
@@ -534,6 +563,7 @@ def _spawn_daemon():
         kwargs["start_new_session"] = True
     proc = subprocess.Popen(cmd, **kwargs)
     _write_pid_record(proc.pid)
+    _client_log(f"_spawn_daemon: spawned pid={proc.pid}")
     return proc
 
 
@@ -565,26 +595,74 @@ def _wait_for_daemon(timeout):
     return False
 
 
+DAEMON_RECV_HARD_TIMEOUT = 30.0  # seconds — escape hatch to unfreeze the UI
+DAEMON_RECV_LOG_EVERY    = 2.0   # seconds — how often to log "still waiting"
+
+
 def query_daemon(query, limit=MAX_RESULTS):
+    t0 = time.monotonic()
+    _client_log(f"query_daemon: START query={query!r} limit={limit}")
     conn = _try_connect()
     if conn is None:
-        if not _daemon_alive():
+        alive = _daemon_alive()
+        _client_log(f"query_daemon: initial connect failed alive={alive}")
+        if not alive:
+            _client_log("query_daemon: spawning daemon")
             _spawn_daemon()
         if not _wait_for_daemon(1):
-            return "loading" if _daemon_alive() else None
+            still_alive = _daemon_alive()
+            _client_log(f"query_daemon: _wait_for_daemon(1s) timed out alive={still_alive} — returning 'loading'")
+            return "loading" if still_alive else None
         conn = _try_connect()
         if conn is None:
-            return "loading" if _daemon_alive() else None
+            still_alive = _daemon_alive()
+            _client_log(f"query_daemon: reconnect failed alive={still_alive} — returning 'loading'")
+            return "loading" if still_alive else None
+        _client_log(f"query_daemon: connected after respawn at {int((time.monotonic()-t0)*1000)}ms")
+    else:
+        _client_log(f"query_daemon: connected at {int((time.monotonic()-t0)*1000)}ms")
     try:
         try:
-            conn.send_bytes(json.dumps({"query": query, "limit": limit}).encode())
-            results = json.loads(conn.recv_bytes().decode())
-        except Exception:
+            payload = json.dumps({"query": query, "limit": limit}).encode()
+            t_send = time.monotonic()
+            conn.send_bytes(payload)
+            _client_log(f"query_daemon: sent {len(payload)}B in {int((time.monotonic()-t_send)*1000)}ms")
+
+            t_recv = time.monotonic()
+            last_log = t_recv
+            while not conn.poll(0.5):
+                now = time.monotonic()
+                elapsed = now - t_recv
+                if now - last_log >= DAEMON_RECV_LOG_EVERY:
+                    _client_log(
+                        f"query_daemon: STILL WAITING for daemon reply "
+                        f"elapsed={elapsed:.1f}s query={query!r} "
+                        f"daemon_alive={_daemon_alive()}"
+                    )
+                    last_log = now
+                if elapsed >= DAEMON_RECV_HARD_TIMEOUT:
+                    _client_log(
+                        f"query_daemon: HARD TIMEOUT after {elapsed:.1f}s — "
+                        f"giving up on query={query!r}. Check {DAEMON_LOG} for daemon-side state."
+                    )
+                    return "loading" if _daemon_alive() else None
+
+            data = conn.recv_bytes()
+            _client_log(f"query_daemon: recv {len(data)}B in {int((time.monotonic()-t_recv)*1000)}ms")
+            results = json.loads(data.decode())
+        except Exception as e:
+            _client_log(f"query_daemon: EXCEPTION during send/recv: {type(e).__name__}: {e}")
             return "loading" if _daemon_alive() else None
         if isinstance(results, list):
+            _client_log(
+                f"query_daemon: OK n_results={len(results)} "
+                f"total={int((time.monotonic()-t0)*1000)}ms"
+            )
             return [(r["rank"], r["alt"], r["url"], "") for r in results]
         if isinstance(results, dict) and "error" in results:
+            _client_log(f"query_daemon: daemon-reported error: {results['error']!r}")
             raise RuntimeError(results["error"])
+        _client_log(f"query_daemon: unexpected response type={type(results).__name__} value={results!r}")
         return None
     finally:
         conn.close()
