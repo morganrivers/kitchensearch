@@ -31,6 +31,7 @@ Theme toggles: call restore_color() after switching themes so the placeholder
 adopts the new foreground.
 """
 
+import sys
 import tkinter as tk
 
 
@@ -55,6 +56,11 @@ class PlaceholderManager:
         entry.bind("<FocusOut>",        self._on_focus_out,     add="+")
         entry.bind("<<Paste>>",         lambda _e: self.hide(), add="+")
         entry.bind("<<PasteSelection>>",lambda _e: self.hide(), add="+")
+        entry.bind("<Control-a>",       self._on_select_all,    add="+")
+        entry.bind("<Control-A>",       self._on_select_all,    add="+")
+        if sys.platform == "darwin":
+            entry.bind("<Command-a>",   self._on_select_all,    add="+")
+            entry.bind("<Command-A>",   self._on_select_all,    add="+")
 
     def show(self, text=None):
         """Show the placeholder. If `text` is given, remember it as the
@@ -114,6 +120,13 @@ class PlaceholderManager:
         self._text = None
         self._entry.config(fg=self._fg)
         self._var.set("")
+
+    def _on_select_all(self, _e=None):
+        if self._active:
+            return "break"
+        self._entry.selection_range(0, tk.END)
+        self._entry.icursor(tk.END)
+        return "break"
 
     def _on_key(self, e):
         if not self._active:

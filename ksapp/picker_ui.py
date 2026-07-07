@@ -383,6 +383,11 @@ class TkPicker:
         self._story_text.bind("<Control-Return>", lambda e: (self._on_return(e), "break")[1])
         self._story_text.bind("<FocusIn>",  lambda e: self._story_text.configure(highlightthickness=3), add="+")
         self._story_text.bind("<FocusOut>", lambda e: self._story_text.configure(highlightthickness=2), add="+")
+        self._story_text.bind("<Control-a>", self._story_select_all, add="+")
+        self._story_text.bind("<Control-A>", self._story_select_all, add="+")
+        if sys.platform == "darwin":
+            self._story_text.bind("<Command-a>", self._story_select_all, add="+")
+            self._story_text.bind("<Command-A>", self._story_select_all, add="+")
 
         # ── progress bar (hidden until explicitly shown) ──────────────────
         self._prog_frame = tk.Frame(cf, bg=self.BG)
@@ -1523,6 +1528,16 @@ class TkPicker:
     def _expand_story_text(self, e=None):
         self._story_text_height += 4
         self._story_text.configure(height=self._story_text_height)
+
+    def _story_select_all(self, _e=None):
+        end = self._story_text.index("end-1c")
+        assert end, "tk.Text always has at least an empty end-1c index"
+        if end == "1.0":
+            return "break"
+        self._story_text.tag_add("sel", "1.0", end)
+        self._story_text.mark_set("insert", end)
+        self._story_text.see("insert")
+        return "break"
 
     def ask_with_loading_bar(self, prompt, placeholder=None):
         """
