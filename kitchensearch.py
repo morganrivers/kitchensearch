@@ -66,6 +66,7 @@ _DEFAULT_SETTINGS = {
     "frameless":       False,
     "always_on_top":   False,
     "dark_mode":       False,
+    "zoom":            1.0,
 }
 
 _BOOL_SETTINGS_ITEMS = [
@@ -447,12 +448,18 @@ def main():
         settings["dark_mode"] = dark
         save_settings(settings)
 
+    def _on_zoom_change(factor):
+        settings["zoom"] = factor
+        save_settings(settings)
+
     picker = TkPicker(
         floating=settings["floating"],
         frameless=settings["frameless"] and not sys.platform == "win32",
         dark=settings.get("dark_mode", False),
         on_dark_toggle=_on_dark_toggle,
         always_on_top=settings.get("always_on_top", False),
+        zoom=settings.get("zoom", 1.0),
+        on_zoom_change=_on_zoom_change,
     )
     _dbg("APP: TkPicker init done")
 

@@ -12,6 +12,8 @@ import webbrowser
 import tkinter as tk
 from tkinter import ttk
 
+from ksapp.zoom import ZoomManager
+
 class NiceScrollbar(tk.Canvas):
     """Rounded, theme-aware scrollbar — drop-in for CTkScrollbar."""
 
@@ -158,18 +160,18 @@ class TkPicker:
         "ENTRY_BORDER": "#444455",
     }
 
-    THUMB         = 96
+    _BASE_THUMB       = 96
+    _BASE_TITLE_H     = 52
+    _BASE_VIRT_ROW_H  = 34
+    _BASE_DM_SIZE     = 26
+    _BASE_BACK_W      = 58
     RAINBOW_VIVID = ["#FF0000", "#FF8C00", "#FFD700", "#32CD32", "#1E90FF", "#8B00FF"]
-    TITLE_H       = 52
-    _VIRT_ROW_H   = 34
-    _DM_SIZE      = 26
-    _BACK_W       = 58
     # Max image rows packed in _inner at once. X11 has a 32767-pixel rendering
     # limit for canvas-embedded windows; keeping the window under ~200 rows
     # keeps _inner well below that ceiling even when _auto_height makes rows
     # taller than the default 108 px. Rows beyond the window exist in _rows
     # but aren't packed; _slide_window_to() re-packs as selection moves.
-    IMG_WINDOW_MAX = 200
+    _BASE_IMG_WINDOW_MAX = 200
 
     def _apply_theme(self, theme):
         self.BG         = theme["BG"]
@@ -181,10 +183,15 @@ class TkPicker:
         self.SEL_BG     = theme["SEL_BG"]
         self._theme     = theme
 
-    def __init__(self, floating=False, frameless=True, dark=False, on_dark_toggle=None, always_on_top=True):
+    def __init__(self, floating=False, frameless=True, dark=False, on_dark_toggle=None, always_on_top=True, zoom=1.0, on_zoom_change=None):
         self._destroyed       = False
         self._dark            = dark
         self._on_dark_toggle  = on_dark_toggle
+        self._on_zoom_persist    = on_zoom_change
+        self._current_view_rebuilder = None
+        self._zoom_rebuild_after_id  = None
+        self._zoom = ZoomManager(initial=zoom, on_change=self._on_zoom_change)
+        self._recompute_scaled_sizes()
         self._apply_theme(self.DARK if dark else self.LIGHT)
         root = tk.Tk(className="kitchensearch")
         font_setup.apply(root)
@@ -196,7 +203,7 @@ class TkPicker:
         if os.path.exists(_icon_path):
             try:
                 _icon_img = Image.open(_icon_path).convert("RGBA")
-                _icon_img = _icon_img.resize((128, 128), Image.LANCZOS)
+                _icon_img = _icon_img.resize((self._px(128), self._px(128)), Image.LANCZOS)
                 _icon_photo = ImageTk.PhotoImage(_icon_img)
                 root.iconphoto(True, _icon_photo)
                 root._icon_photo_ref = _icon_photo
@@ -255,6 +262,108 @@ class TkPicker:
         self._cancel_hook    = None
         self._on_favorite    = None
         self._build()
+        self._install_zoom_bindings()
+
+    def _px(self, base_px):
+        return self._zoom.scaled(base_px)
+
+    def _font(self, base_pt, *extras):
+        return (font_setup.UI_FAMILY, self._zoom.scaled(base_pt), *extras)
+
+    def _recompute_scaled_sizes(self):
+        self.THUMB       = self._px(self._BASE_THUMB)
+        self.TITLE_H     = self._px(self._BASE_TITLE_H)
+        self._VIRT_ROW_H = self._px(self._BASE_VIRT_ROW_H)
+        self._DM_SIZE    = self._px(self._BASE_DM_SIZE)
+        self._BACK_W     = self._px(self._BASE_BACK_W)
+        # Under high zoom, packed row heights grow and X11 canvas budget
+        # tightens; scale the packed-window cap down proportionally so we stay
+        # well below the 32767-pixel embedded-window ceiling.
+        self.IMG_WINDOW_MAX = max(40, int(self._BASE_IMG_WINDOW_MAX / max(1.0, self._zoom.factor)))
+
+    def _on_zoom_change(self, new_factor):
+        self._recompute_scaled_sizes()
+        self._virt_photo_cache.clear()
+        # _set_prompt's fast path reuses the existing label without touching
+        # its font; force the full-rebuild path by dropping current children.
+        try:
+            for w in self._prompt_frame.winfo_children():
+                w.destroy()
+            self._prompt_img_refs = []
+        except Exception as e:
+            _dbg(f"prompt_frame purge failed: {e}")
+        # Title bar and back button are drawn once in _build; redraw them so
+        # their font sizes track the new zoom factor.
+        try:
+            self._title_canvas.configure(height=self.TITLE_H)
+            self._draw_title(self._title_canvas.winfo_width(), self.TITLE_H)
+        except Exception as e:
+            _dbg(f"title redraw failed: {e}")
+        try:
+            self._back_btn.configure(width=self._BACK_W, height=self._DM_SIZE)
+            self._back_draw(hover=False)
+        except Exception as e:
+            _dbg(f"back button redraw failed: {e}")
+        try:
+            self._dm_btn.configure(width=self._DM_SIZE, height=self._DM_SIZE)
+            self._dm_draw()
+        except Exception as e:
+            _dbg(f"dm button redraw failed: {e}")
+        # Widgets created once in _build() bake in font/size — reconfigure the
+        # ones that survive across views so text grows with zoom.
+        try:
+            self._entry.configure(font=self._font(13))
+            self._story_text.configure(font=self._font(13))
+            self._story_expand_btn.configure(font=self._font(14))
+            self._research_cb.configure(font=self._font(11))
+            self._redraw_story_gen_btn(self.ACCENT)
+        except Exception as e:
+            _dbg(f"live font reconfigure failed: {e}")
+        if self._on_zoom_persist:
+            try:
+                self._on_zoom_persist(new_factor)
+            except Exception as e:
+                _dbg(f"on_zoom_persist failed: {e}")
+        if self._zoom_rebuild_after_id is not None:
+            try:
+                self.root.after_cancel(self._zoom_rebuild_after_id)
+            except Exception:
+                pass
+            self._zoom_rebuild_after_id = None
+        # Debounce rebuild: coalesce rapid wheel notches into one rebuild.
+        self._zoom_rebuild_after_id = self.root.after(50, self._do_zoom_rebuild)
+
+    def _do_zoom_rebuild(self):
+        self._zoom_rebuild_after_id = None
+        # Progress/message views without a rebuilder just get updated sizes
+        # on the next re-entry of a real picker; skip rebuild here.
+        if self._current_view_rebuilder is None:
+            return
+        assert callable(self._current_view_rebuilder), \
+            f"non-callable rebuilder: {self._current_view_rebuilder!r}"
+        self._current_view_rebuilder()
+
+    def _install_zoom_bindings(self):
+        r = self.root
+        r.bind("<Control-plus>",   lambda _e: (self._zoom.zoom_in(),  "break")[1])
+        r.bind("<Control-equal>",  lambda _e: (self._zoom.zoom_in(),  "break")[1])
+        r.bind("<Control-KP_Add>", lambda _e: (self._zoom.zoom_in(),  "break")[1])
+        r.bind("<Control-minus>",  lambda _e: (self._zoom.zoom_out(), "break")[1])
+        r.bind("<Control-KP_Subtract>", lambda _e: (self._zoom.zoom_out(), "break")[1])
+        r.bind("<Control-0>",      lambda _e: (self._zoom.reset(),    "break")[1])
+        r.bind("<Control-KP_0>",   lambda _e: (self._zoom.reset(),    "break")[1])
+        r.bind("<Control-MouseWheel>",
+               lambda e: (self._zoom.wheel(1 if e.delta > 0 else -1), "break")[1])
+        r.bind("<Control-Button-4>", lambda _e: (self._zoom.wheel(+1), "break")[1])
+        r.bind("<Control-Button-5>", lambda _e: (self._zoom.wheel(-1), "break")[1])
+        # Prevent Entry / Text widgets from inserting a literal '=' or '-'
+        # under Ctrl. Zoom already fires via root binding; return "break" so
+        # the widget-class binding doesn't insert a character.
+        for w in (self._entry, self._story_text):
+            w.bind("<Control-plus>",   lambda _e: (self._zoom.zoom_in(),  "break")[1])
+            w.bind("<Control-equal>",  lambda _e: (self._zoom.zoom_in(),  "break")[1])
+            w.bind("<Control-minus>",  lambda _e: (self._zoom.zoom_out(), "break")[1])
+            w.bind("<Control-0>",      lambda _e: (self._zoom.reset(),    "break")[1])
 
     def _build(self):
         root = self.root
@@ -283,7 +392,7 @@ class TkPicker:
         self._entry = tk.Entry(self._entry_row, textvariable=self._entry_var,
                                bg=self.ENTRY_BG, fg=self.FG,
                                insertbackground=self.FG,
-                               font=(font_setup.UI_FAMILY, 13),
+                               font=self._font(13),
                                relief="flat", bd=6,
                                highlightthickness=2,
                                highlightbackground="#dddddd",
@@ -297,7 +406,7 @@ class TkPicker:
             bg=self.BG, fg=self.FG,
             selectcolor=self.ENTRY_BG,
             activebackground=self.BG, activeforeground=self.FG,
-            font=(font_setup.UI_FAMILY, 11),
+            font=self._font(11),
             cursor="hand2",
             relief="flat", bd=0,
             highlightthickness=1,
@@ -332,7 +441,7 @@ class TkPicker:
             wrap="word",
             bg=self.ENTRY_BG, fg=self.FG,
             insertbackground=self.FG,
-            font=(font_setup.UI_FAMILY, 13),
+            font=self._font(13),
             relief="flat", bd=6,
             highlightthickness=2,
             highlightbackground="#dddddd",
@@ -345,14 +454,14 @@ class TkPicker:
             self._story_frame,
             text="▾",
             bg=self.BG, fg=self.FG_DIM,
-            font=(font_setup.UI_FAMILY, 14),
+            font=self._font(14),
             cursor="hand2",
         )
         self._story_expand_btn.pack(anchor="center", pady=(0, 2))
         self._story_expand_btn.bind("<Button-1>", self._expand_story_text)
 
         # ── Generate Story button ─────────────────────────────────────────
-        _BW, _BH, _BR = 160, 36, 18
+        _BW, _BH, _BR = self._px(160), self._px(36), self._px(18)
         self._story_gen_btn = tk.Canvas(
             self._story_frame, width=_BW, height=_BH,
             bg=self.BG, highlightthickness=0, bd=0, cursor="hand2",
@@ -372,7 +481,7 @@ class TkPicker:
             self._story_gen_btn.create_rectangle(_BR, 0, _BW-_BR, _BH, fill=color, outline="")
             self._story_gen_btn.create_rectangle(0, _BR, _BW, _BH-_BR, fill=color, outline="")
             self._story_gen_btn.create_text(_BW//2, _BH//2, text="Generate Story",
-                                            fill="#ffffff", font=(font_setup.UI_FAMILY, 12, "bold"))
+                                            fill="#ffffff", font=self._font(12, "bold"))
 
         _draw_gen_btn(self.ACCENT)
         self._story_gen_btn.bind("<Enter>",    lambda e: _draw_gen_btn(_darken(self.ACCENT)))
@@ -408,7 +517,7 @@ class TkPicker:
         self._progbar.pack(fill="x", padx=10, pady=(4, 0))
         tk.Label(self._prog_frame, textvariable=self._prog_lbl_var,
                  bg=self.BG, fg=self.FG_DIM,
-                 font=(font_setup.UI_FAMILY, 9), anchor="e", padx=10
+                 font=self._font(9), anchor="e", padx=10
                  ).pack(fill="x")
 
         # ── scrollable list ───────────────────────────────────────────────
@@ -553,7 +662,7 @@ class TkPicker:
         w, h = self._BACK_W, self._DM_SIZE
         c = self.FG if hover else self.FG_DIM
         btn.create_text(w // 2, h // 2, text="< back",
-                        fill=c, font=(font_setup.UI_FAMILY, 10), anchor="center")
+                        fill=c, font=self._font(10), anchor="center")
 
     def _show_back_btn(self):
         y = (self.TITLE_H - self._DM_SIZE) // 2
@@ -794,7 +903,7 @@ class TkPicker:
             i += 1
         font_path = _REPO / "data" / "fonts" / "BubblegumSans-Regular.ttf"
         try:
-            pil_font = _ImageFont.truetype(str(font_path), 30)
+            pil_font = _ImageFont.truetype(str(font_path), self._px(30))
             img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
             draw = ImageDraw.Draw(img)
             draw.text((W // 2, H // 2), "Kitchen Search",
@@ -809,11 +918,11 @@ class TkPicker:
             _dbg(f"_draw_title PIL render failed: {e}")
         c.create_text(W // 2 + 1, H // 2 + 1,
                       text="Kitchen Search",
-                      font=(font_setup.UI_FAMILY, 18, "bold"),
+                      font=self._font(18, "bold"),
                       fill="#000000", anchor="center")
         c.create_text(W // 2, H // 2,
                       text="Kitchen Search",
-                      font=(font_setup.UI_FAMILY, 18, "bold"),
+                      font=self._font(18, "bold"),
                       fill="#ffffff", anchor="center")
 
     @staticmethod
@@ -931,7 +1040,7 @@ class TkPicker:
         self._prompt_img_refs = []
         widgets = self._pack_rich_label(
             self._prompt_frame, text, self.BG,
-            font=(font_setup.UI_FAMILY, 11, "bold"), pady=2,
+            font=self._font(11, "bold"), pady=2,
             img_refs=self._prompt_img_refs, wrap=True)
         for w in widgets:
             w.configure(fg=self.ACCENT)
@@ -1339,7 +1448,7 @@ class TkPicker:
             self._inner,
             text=message,
             bg="#1a5c1a", fg="#ffffff",
-            font=(font_setup.UI_FAMILY, 10, "bold"),
+            font=self._font(10, "bold"),
             anchor="center", pady=7,
         )
         lbl.pack(fill="x", padx=8, pady=(6, 4))
@@ -1463,7 +1572,7 @@ class TkPicker:
         hover  = _darken(self.ACCENT, 0.7) if not self._dark else "#c4aaff"
         link = tk.Label(
             parent, text=url, bg=self.BG, fg=normal,
-            font=(font_setup.UI_FAMILY, 11, "underline"),
+            font=self._font(11, "underline"),
             cursor="hand2", anchor="w", padx=10, pady=4,
             wraplength=max(200, self.root.winfo_width() - 40),
             justify="left",
@@ -1568,7 +1677,7 @@ class TkPicker:
         desc_lbl = tk.Label(
             self._inner, textvariable=desc_var,
             bg=self.BG, fg=self.FG_DIM,
-            font=(font_setup.UI_FAMILY, 10), anchor="w", padx=14, pady=4,
+            font=self._font(10), anchor="w", padx=14, pady=4,
         )
         desc_lbl.pack(fill="x")
 
@@ -1623,32 +1732,42 @@ class TkPicker:
 
     def message(self, text):
         """Display a message. Escape dismisses."""
-        self._reset()
-        self._mode = "message"
-        self._set_prompt(text)
-        tk.Label(self._inner, text="Press Esc to dismiss",
-                 bg=self.BG, fg=self.FG_DIM,
-                 font=(font_setup.UI_FAMILY, 11, "bold"), anchor="w", padx=10, pady=20
-                 ).pack(fill="x")
-        self._entry_row.pack_forget()
+        def _enter():
+            self._reset()
+            self._mode = "message"
+            self._set_prompt(text)
+            tk.Label(self._inner, text="Press Esc to dismiss",
+                     bg=self.BG, fg=self.FG_DIM,
+                     font=self._font(11, "bold"), anchor="w", padx=10, pady=20
+                     ).pack(fill="x")
+            self._entry_row.pack_forget()
+        self._current_view_rebuilder = _enter
+        _enter()
         return self._run()
 
     def pick(self, prompt, options, filter=True, initial_sel=0):
         _dbg(f"PICK start prompt={prompt!r} n_options={len(options)}")
-        self._reset()
-        self._mode        = "list"
-        self._options     = list(options)
-        self._filter_mode = filter
-        self._set_prompt(prompt)
-        self._show_back_btn()
-        _dbg(f"PICK: _build_text_rows start n={len(self._options)}")
-        self._build_text_rows(self._options)
-        _dbg(f"PICK: _build_text_rows done n_rows={len(self._rows)}")
-        if self._rows:
-            self._select(min(initial_sel, len(self._rows) - 1))
-        if filter:
-            self._trace_id = self._entry_var.trace_add("write", self._filter_cb)
-            self._ph.show()
+        def _enter():
+            prev_sel = self._sel if self._sel >= 0 else initial_sel
+            prev_q   = "" if self._ph.is_active() else self._entry_var.get()
+            self._reset()
+            self._mode        = "list"
+            self._options     = list(options)
+            self._filter_mode = filter
+            self._set_prompt(prompt)
+            self._show_back_btn()
+            _dbg(f"PICK: _build_text_rows start n={len(self._options)}")
+            self._build_text_rows(self._options)
+            _dbg(f"PICK: _build_text_rows done n_rows={len(self._rows)}")
+            if self._rows:
+                self._select(min(prev_sel, len(self._rows) - 1))
+            if filter:
+                self._trace_id = self._entry_var.trace_add("write", self._filter_cb)
+                self._ph.show()
+            if prev_q:
+                self._entry_var.set(prev_q)
+        self._current_view_rebuilder = _enter
+        _enter()
         _dbg("PICK: _run start")
         result = self._run()
         _dbg(f"PICK: _run done result={result!r}")
@@ -1738,7 +1857,7 @@ class TkPicker:
                 0x2B00 <= cp <= 0x2BFF or   # Misc Symbols and Arrows
                 0x1F000 <= cp <= 0x1FFFF)   # Main emoji block
 
-    def _pack_rich_label(self, parent, text, bg, font=(font_setup.UI_FAMILY, 12), pady=5, img_refs=None, wrap=False):
+    def _pack_rich_label(self, parent, text, bg, font=None, pady=5, img_refs=None, wrap=False):
         """
         Pack a series of Label widgets into parent for text that may contain
         emoji characters. Emoji are rendered via PIL; plain text uses font.
@@ -1746,6 +1865,8 @@ class TkPicker:
         width so long prompts don't get clipped.
         Returns a list of all created widgets (for click-binding).
         """
+        if font is None:
+            font = self._font(12)
         if img_refs is None:
             img_refs = self._img_refs
         # Segment the string into alternating text/emoji runs
@@ -1861,7 +1982,7 @@ class TkPicker:
                 canvas.delete(cid)
 
         # Create rows newly entering the buffered window
-        EM = 20
+        EM = self._px(20)
         for i in range(first_vis, last_vis + 1):
             if i in self._virt_items:
                 continue
@@ -1911,13 +2032,13 @@ class TkPicker:
                         else:
                             cid = canvas.create_text(
                                 x, yc, text=ch, anchor="w",
-                                font=(font_setup.UI_FAMILY, 12), fill=self.FG, tags="vrow")
+                                font=self._font(12), fill=self.FG, tags="vrow")
                             cids.append(cid)
                             x += 18
                 else:
                     cid = canvas.create_text(
                         x, yc, text=content, anchor="w",
-                        font=(font_setup.UI_FAMILY, 12, "bold"), fill=self.FG, tags="vrow")
+                        font=self._font(12, "bold"), fill=self.FG, tags="vrow")
                     cids.append(cid)
 
             self._virt_items[i] = {"rect": rect, "cids": cids, "photos": photos}
@@ -1970,14 +2091,14 @@ class TkPicker:
                 display = label[4:]
                 fg = self.FG if is_checked else self.FG_DIM
                 lbl = tk.Label(row, text=display, bg=rbg, fg=fg,
-                               font=(font_setup.UI_FAMILY, 12), anchor="w")
+                               font=self._font(12), anchor="w")
                 lbl.pack(side="left", fill="x", expand=True, pady=10, padx=(0, 12))
 
                 all_widgets = [row, strip, box_cv, lbl]
                 bg_widgets  = [row, box_cv, lbl]
             else:
                 inner_ws    = self._pack_rich_label(row, label, rbg,
-                                                    font=(font_setup.UI_FAMILY, 12, "bold"), pady=8)
+                                                    font=self._font(12, "bold"), pady=8)
                 all_widgets = [row] + inner_ws
                 bg_widgets  = all_widgets
 
@@ -1991,18 +2112,38 @@ class TkPicker:
                 w.bind("<Button-5>",   self._on_scroll)
 
     def pick_settings(self, prompt, options, initial_sel=0):
-        self._reset()
-        self._mode        = "list"
-        self._options     = list(options)
-        self._filter_mode = False
-        self._set_prompt(prompt)
-        self._show_back_btn()
-        self._build_settings_rows(self._options)
-        if self._rows:
-            self._select(min(initial_sel, len(self._rows) - 1))
+        def _enter():
+            prev_sel = self._sel if self._sel >= 0 else initial_sel
+            self._reset()
+            self._mode        = "list"
+            self._options     = list(options)
+            self._filter_mode = False
+            self._set_prompt(prompt)
+            self._show_back_btn()
+            self._build_settings_rows(self._options)
+            if self._rows:
+                self._select(min(prev_sel, len(self._rows) - 1))
+        self._current_view_rebuilder = _enter
+        _enter()
         return self._run()
 
     def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None):
+        # Materialize entries once so a rebuild uses the same order (and image
+        # workers on the reruns don't re-consume a generator).
+        entries = list(entries)
+        args = dict(prompt=prompt, entries=entries, on_url=on_url,
+                    on_select=on_select, thumb_size=thumb_size, patterns=patterns,
+                    preload=preload, placeholder=placeholder, filter=filter,
+                    show_dark_btn=show_dark_btn, show_back_btn=show_back_btn,
+                    show_research_cb=show_research_cb, prompt_fn=prompt_fn,
+                    on_favorite=on_favorite)
+        self._current_view_rebuilder = lambda: self._enter_pick_with_images(**args)
+        self._enter_pick_with_images(**args)
+        result = self._run()
+        _dbg(f"PICK_WITH_IMAGES: _run done result={result!r}")
+        return result
+
+    def _enter_pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
         self._on_favorite = on_favorite
@@ -2028,7 +2169,7 @@ class TkPicker:
             self._all_image_children.append(("h", hr))
             if image_path:
                 try:
-                    img_size = 30
+                    img_size = self._px(30)
                     img = Image.open(image_path).convert("RGBA")
                     img = img.resize((img_size, img_size), Image.LANCZOS)
                     photo = ImageTk.PhotoImage(img)
@@ -2037,7 +2178,7 @@ class TkPicker:
                 except Exception:
                     pass
             lbl = tk.Label(hr, text=text, bg=self.BG, fg=color or self.FG_DIM,
-                           font=(font_setup.UI_FAMILY, 11, "bold"), anchor="w")
+                           font=self._font(11, "bold"), anchor="w")
             lbl.pack(side="left", fill="x", expand=True)
 
         def _append_row(label, photo, score=None):
@@ -2062,10 +2203,10 @@ class TkPicker:
                 name_part = label
                 kw_part   = ""
 
-            font_main    = (font_setup.UI_FAMILY, 11, "bold")
-            font_kw      = (font_setup.UI_FAMILY, 10)
-            font_kw_bold = (font_setup.UI_FAMILY, 10, "bold")
-            em_size      = 15
+            font_main    = self._font(11, "bold")
+            font_kw      = self._font(10)
+            font_kw_bold = self._font(10, "bold")
+            em_size      = self._px(15)
 
             txt = tk.Text(row, height=2, wrap="word",
                           bg=rbg, fg=self.FG,
@@ -2078,7 +2219,7 @@ class TkPicker:
             txt.tag_configure("alt_bold",   font=font_main,    foreground=self.FG)
             txt.tag_configure("kw_normal",  font=font_kw,      foreground=self.FG_DIM)
             txt.tag_configure("kw_bold",    font=font_kw_bold, foreground=self.FG)
-            txt.tag_configure("copied_tag", font=(font_setup.UI_FAMILY, 10, "bold"),
+            txt.tag_configure("copied_tag", font=self._font(10, "bold"),
                                foreground="#1a7f1a")
             txt.bind("<Key>",      lambda e: "break")
             txt.bind("<Button-2>", lambda e: "break")
@@ -2315,9 +2456,6 @@ class TkPicker:
                         self._select(0)
             self._trace_id = self._entry_var.trace_add("write", _no_filter_cb)
         self._ph.show(_ph_to_show)
-        result = self._run()
-        _dbg(f"PICK_WITH_IMAGES: _run done gen={gen} result={result!r}")
-        return result
 
     def show_download_progress(self, title, download_fn):
         """
@@ -2325,6 +2463,7 @@ class TkPicker:
         progress bar. progress_cb(downloaded_bytes, total_bytes).
         Returns None on success, or an error string.
         """
+        self._current_view_rebuilder = None
         self._reset()
         self._mode = "download"
         self._set_prompt(title)
@@ -2369,7 +2508,7 @@ class TkPicker:
                 self.root.after(600, self.root.quit)
             self.root.after(0, _finish)
 
-        _W, _H, _R = 160, 42, 21
+        _W, _H, _R = self._px(160), self._px(42), self._px(21)
 
         def _do_skip():
             skipped[0] = True
@@ -2394,7 +2533,7 @@ class TkPicker:
             btn_canvas.create_rectangle(_R, 0, _W-_R, _H, fill=color, outline="")
             btn_canvas.create_rectangle(0, _R, _W, _H-_R, fill=color, outline="")
             btn_canvas.create_text(_W//2, _H//2, text="Skip for now",
-                                   fill="#ffffff", font=(font_setup.UI_FAMILY, 13, "bold"))
+                                   fill="#ffffff", font=self._font(13, "bold"))
 
         _HOVER_COLOR  = "#4a1f99"
         _PRESS_COLOR  = "#3a1577"
@@ -2419,6 +2558,7 @@ class TkPicker:
 
     def show_model_loading_progress(self):
         """Poll the daemon status file and show a progress bar until the daemon is ready."""
+        self._current_view_rebuilder = None
         self._reset()
         self._mode = "loading"
         self._set_prompt("Loading search models...")
@@ -2433,7 +2573,7 @@ class TkPicker:
         tk.Label(
             self._inner, textvariable=desc_var,
             bg=self.BG, fg=self.FG,
-            font=(font_setup.UI_FAMILY, 11), anchor="w", padx=14, pady=14,
+            font=self._font(11), anchor="w", padx=14, pady=14,
         ).pack(fill="x")
 
         cancelled = [False]
@@ -2444,7 +2584,7 @@ class TkPicker:
             _kill_daemon()
             self.root.quit()
 
-        _W, _H, _R = 120, 42, 21
+        _W, _H, _R = self._px(120), self._px(42), self._px(21)
         btn_canvas = tk.Canvas(self._inner, width=_W, height=_H,
                                bg=self.BG, highlightthickness=0, bd=0)
         btn_canvas.pack(pady=(10, 20))
@@ -2462,7 +2602,7 @@ class TkPicker:
             btn_canvas.create_rectangle(_R, 0, _W-_R, _H, fill=color, outline="")
             btn_canvas.create_rectangle(0, _R, _W, _H-_R, fill=color, outline="")
             btn_canvas.create_text(_W//2, _H//2, text="Cancel",
-                                   fill="#ffffff", font=(font_setup.UI_FAMILY, 13, "bold"))
+                                   fill="#ffffff", font=self._font(13, "bold"))
 
         _draw_btn(self.ACCENT)
         btn_canvas.bind("<Enter>",    lambda e: _draw_btn("#4a1f99"))
@@ -2498,6 +2638,7 @@ class TkPicker:
 
     def show_story_progress(self, cmd):
         """Run a story command and show phrase-by-phrase progress. Returns None or error string."""
+        self._current_view_rebuilder = None
         self._reset()
         self._mode = "story_progress"
         self._set_prompt("Generating emoji story...")
@@ -2514,7 +2655,7 @@ class TkPicker:
         tk.Label(
             self._inner, textvariable=desc_var,
             bg=self.BG, fg=self.FG,
-            font=(font_setup.UI_FAMILY, 11), anchor="w", padx=14, pady=14,
+            font=self._font(11), anchor="w", padx=14, pady=14,
         ).pack(fill="x")
 
         total     = [0]
@@ -2620,39 +2761,42 @@ class TkPicker:
         Display an image full-size in the content area.
         Enter → returns 'copy'.  Esc → returns None.
         """
-        self._reset()
-        self._mode = "showimage"
-        self._set_prompt(prompt)
-        self._show_back_btn()
-        self._entry_row.pack_forget()
+        def _enter():
+            self._reset()
+            self._mode = "showimage"
+            self._set_prompt(prompt)
+            self._show_back_btn()
+            self._entry_row.pack_forget()
 
-        self.root.update_idletasks()
-        avail_w = max(self.root.winfo_width() - 20, 100)
-        img = Image.open(image_path)
-        if img.width > avail_w:
-            img = img.resize(
-                (avail_w, int(img.height * avail_w / img.width)),
-                Image.LANCZOS,
-            )
-        photo = ImageTk.PhotoImage(img)
-        self._img_refs.append(photo)
-        img_label = tk.Label(self._inner, image=photo, bg=self.BG, cursor="hand2")
-        img_label.pack(pady=(10, 6))
-        img_label.bind("<Button-1>", self._on_return)
+            self.root.update_idletasks()
+            avail_w = max(self.root.winfo_width() - 20, 100)
+            img = Image.open(image_path)
+            if img.width > avail_w:
+                img = img.resize(
+                    (avail_w, int(img.height * avail_w / img.width)),
+                    Image.LANCZOS,
+                )
+            photo = ImageTk.PhotoImage(img)
+            self._img_refs.append(photo)
+            img_label = tk.Label(self._inner, image=photo, bg=self.BG, cursor="hand2")
+            img_label.pack(pady=(10, 6))
+            img_label.bind("<Button-1>", self._on_return)
 
-        hint_label = tk.Label(self._inner,
-                 text="Enter to copy  |  Esc to cancel",
-                 bg=self.BG, fg=self.FG_DIM,
-                 font=(font_setup.UI_FAMILY, 10), anchor="center"
-                 )
-        hint_label.pack()
+            hint_label = tk.Label(self._inner,
+                     text="Enter to copy  |  Esc to cancel",
+                     bg=self.BG, fg=self.FG_DIM,
+                     font=self._font(10), anchor="center"
+                     )
+            hint_label.pack()
 
-        for _w in (img_label, hint_label):
-            _w.bind("<MouseWheel>", self._on_scroll)
-            _w.bind("<Button-4>",   self._on_scroll)
-            _w.bind("<Button-5>",   self._on_scroll)
+            for _w in (img_label, hint_label):
+                _w.bind("<MouseWheel>", self._on_scroll)
+                _w.bind("<Button-4>",   self._on_scroll)
+                _w.bind("<Button-5>",   self._on_scroll)
 
-        self.root.update_idletasks()
+            self.root.update_idletasks()
+        self._current_view_rebuilder = _enter
+        _enter()
         return self._run()
 
     def destroy(self):
