@@ -6,7 +6,7 @@ Results appear one-by-one as thumbnails download. Borderless, half-screen, cente
 Bind in i3 config:
   bindsym $mod+shift+e exec --no-startup-id python3 ~/.local/bin/kitchensearch.py
 """
-import os, sys, re, json, hashlib, webbrowser
+import os, sys, re, json, hashlib
 from pathlib import Path
 from PIL import Image
 from ksapp.picker_utils import (
@@ -23,7 +23,7 @@ from ksapp.picker_utils import (
     alt_from_label, copy_url_at_size,
     query_daemon,
     _trim_thumb_cache, _spawn_daemon, _daemon_alive,
-    load_favorites, remove_favorite, toggle_favorite,
+    load_favorites, remove_favorite, toggle_favorite, top_copied,
 )
 from ksapp.picker_ui import (
     TkPicker, pick_base_emoji,
@@ -175,7 +175,7 @@ def _menu_icon(name1, name2):
 
 def _open_hotkey_settings():
     import subprocess
-    daemon_exe = _REPO / "kitchensearch_daemon.exe"
+    daemon_exe = _REPO / "kitchensearch-daemon.exe"
     daemon_py  = _REPO / "kitchensearch_daemon.py"
     if daemon_exe.exists():
         subprocess.run([str(daemon_exe), "--settings"])
@@ -252,6 +252,7 @@ def _run_settings(picker, settings, lic):
         if key == _SETTINGS_KEY_LICENSE_BUY:
             url = lic.checkout_url()
             if url:
+                import webbrowser
                 webbrowser.open(url)
                 entered = picker.ask(
                     "Opening the license checkout in your browser.\n\n"
@@ -286,45 +287,78 @@ def _run_settings(picker, settings, lic):
         save_settings(settings)
 
 
-def _run_favorites(picker, settings):
-    """Show the favorites list. A right-click removes a favorite and re-renders
-    the list inline (via a `removed` flag on the closure) so the user sees the
-    change without having to reopen the menu."""
+def _run_favorites(picker, settings, entries):
+    """Show favorites (starred) + top-100 most-copied below a separator.
+    Clicking ♥ toggles the favorite state; the list re-renders on any change."""
+    alt_to_entry = {alt: (url, text) for url, alt, text in entries}
+
     while True:
-        favs = load_favorites()
-        if not favs:
+        favs      = load_favorites()
+        fav_alts  = {f["alt"] for f in favs}
+        fav_urls  = {f["url"] for f in favs}
+
+        # ── explicit favorites ──────────────────────────────────────────
+        fav_section = [(format_label(f["alt"], f["url"], f.get("text", "")), f["url"], 0)
+                       for f in favs]
+
+        # ── top 100 most copied (excluding those already starred) ───────
+        top_section = []
+        for count, alt in top_copied(100):
+            if alt in fav_alts:
+                continue
+            entry = alt_to_entry.get(alt)
+            if not entry:
+                continue
+            url, text = entry
+            top_section.append((format_label(alt, url, text), url, count))
+
+        if not fav_section and not top_section:
             picker.message("No favorites yet.\n\n"
                            "Click the heart on any search or combo result to add it here.")
             return
 
-        fav_entries = [(format_label(f["alt"], f["url"], f.get("text", "")), f["url"], i)
-                       for i, f in enumerate(favs)]
+        all_entries = list(fav_section)
+        if top_section:
+            if fav_section:
+                all_entries.append(("", HEADER_MARKER, "__SEPARATOR__"))
+            all_entries.append(("Most copied", HEADER_MARKER, "#888888"))
+            all_entries.extend(top_section)
 
-        alt_to_url = {f["alt"]: f["url"] for f in favs}
+        alt_to_url = {alt: url for url, alt, text in entries}
+        for f in favs:
+            alt_to_url[f["alt"]] = f["url"]
         copy_at, default_px = _make_copy_at(picker, settings, alt_to_url)
-        _copy_fav = lambda label: copy_at(label, default_px)
+        _copy_item = lambda label: copy_at(label, default_px)
 
-        removed = [False]
-        def _remove_fav(label):
-            url = alt_to_url.get(alt_from_label(label))
-            if url is None:
-                return
-            remove_favorite(url)
-            removed[0] = True
-            picker.queue_toast("removed from favorites")
-            # Close the current pick so the outer loop re-renders the list.
+        changed = [False]
+        def _toggle_fav(label):
+            alt = alt_from_label(label)
+            f   = next((f for f in favs if f["alt"] == alt), None)
+            if f:
+                url, text = f["url"], f.get("text", "")
+            else:
+                entry = alt_to_entry.get(alt)
+                if not entry:
+                    return
+                url, text = entry
+            now_fav = toggle_favorite(alt, url, text)
+            picker.queue_toast("added to favorites" if now_fav else "removed from favorites")
+            changed[0] = True
             picker.cancel()
 
-        on_sel = None if settings["exit_on_select"] else _copy_fav
+        def _is_fav(label, _fa=fav_alts):
+            return alt_from_label(label) in _fa
+
+        on_sel = None if settings["exit_on_select"] else _copy_item
         result = picker.pick_with_images(
-            "Favorites  (right-click to remove):", fav_entries, get_thumb,
-            on_select=on_sel, on_favorite=_remove_fav,
+            "Favorites  (♥ to add/remove):", all_entries, get_thumb,
+            on_select=on_sel, on_favorite=_toggle_fav, is_favorite_fn=_is_fav,
             on_copy_size=copy_at, copy_sizes=COPY_SIZES,
             button_sizes=BUTTON_SIZES, default_copy_px=default_px)
-        if removed[0]:
+        if changed[0]:
             continue
         if result and settings["exit_on_select"]:
-            _copy_fav(result)
+            _copy_item(result)
         return
 
 
@@ -443,7 +477,7 @@ def main():
         if not _hotkey_daemon_alive():
             import subprocess as _sp
             _flags = _sp.CREATE_NO_WINDOW | _sp.CREATE_NEW_PROCESS_GROUP
-            _hotkey_exe = _REPO / "kitchensearch_daemon.exe"
+            _hotkey_exe = _REPO / "kitchensearch-daemon.exe"
             _hotkey_py  = _REPO / "kitchensearch_daemon.py"
             if _hotkey_exe.exists():
                 _sp.Popen([str(_hotkey_exe)], creationflags=_flags)
@@ -522,7 +556,7 @@ def main():
             # active. Kept fully hidden (not greyed out) when unlicensed.
             _licensed = lic.is_licensed()
             if _licensed:
-                raw_menu.append((_MODE_FAVORITES, "favorites", "⭐"))
+                raw_menu.append((_MODE_FAVORITES, "favorites", "❤"))
             raw_menu.append((_MODE_SETTINGS, "settings",
                              _menu_icon("computer", "face_with_raised_eyebrow")))
 
@@ -552,7 +586,7 @@ def main():
             # ── favorites (paid) ─────────────────────────────────────────
             if mode_key == _MODE_FAVORITES:
                 if lic.is_licensed():
-                    _run_favorites(picker, settings)
+                    _run_favorites(picker, settings, entries)
                 continue
 
             # ── search helpers ────────────────────────────────────────────
@@ -693,6 +727,13 @@ def main():
 
                 on_sel_combo = None if settings["exit_on_select"] else _copy_combo
                 on_fav_combo = _toggle_fav_combo if lic.is_licensed() else None
+                if lic.is_licensed():
+                    _fav_alts_combo = {f["alt"] for f in load_favorites()}
+                    def _is_fav_combo(label, _fa=_fav_alts_combo):
+                        m = re.match(r'^\S+', label)
+                        return (m.group(0) if m else label) in _fa
+                else:
+                    _is_fav_combo = None
                 rest_entries = [(format_label(alt, url, text), url, ts)
                                 for ts, alt, url, text in rest]
                 if exact:
@@ -726,6 +767,7 @@ def main():
                     f"{query_label} {count}:", combo_entries, get_thumb,
                     on_select=on_sel_combo, patterns=patterns,
                     prompt_fn=_combo_prompt, on_favorite=on_fav_combo,
+                    is_favorite_fn=_is_fav_combo,
                     on_copy_size=copy_at_combo, copy_sizes=COPY_SIZES,
                     button_sizes=BUTTON_SIZES, default_copy_px=default_px)
                 _dbg(f"COMBO: pick_with_images done result={result!r}")
@@ -789,6 +831,13 @@ def main():
 
                 on_sel = None if settings["exit_on_select"] else _copy_selected
                 on_fav = _toggle_fav_result if lic.is_licensed() else None
+                if lic.is_licensed():
+                    _fav_alts_res = {f["alt"] for f in load_favorites()}
+                    def _is_fav_res(label, _fa=_fav_alts_res):
+                        m = re.match(r'^\S+', label)
+                        return (m.group(0) if m else label) in _fa
+                else:
+                    _is_fav_res = None
                 _ql = query_label
                 def _make_prompt(loaded, total, _ql=_ql):
                     return f"{_ql} (1-{loaded} of {total}):"
@@ -796,6 +845,7 @@ def main():
                     f"{query_label} {count}:", icon_entries, get_thumb,
                     on_select=on_sel, patterns=patterns, show_research_cb=True,
                     prompt_fn=_make_prompt, on_favorite=on_fav,
+                    is_favorite_fn=_is_fav_res,
                     on_copy_size=copy_at, copy_sizes=COPY_SIZES,
                     button_sizes=BUTTON_SIZES, default_copy_px=default_px)
 

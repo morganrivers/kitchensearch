@@ -80,22 +80,52 @@ Filename: "{app}\kitchensearch.exe"; \
 
 [Code]
 
-function GetUninstallString(): String;
+function GetUninstallRegValue(ValueName: String): String;
 var
   sKey: String;
   sVal: String;
 begin
   sKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F3A2B1C-9D4E-4F87-B532-1A2C3D4E5F60}_is1';
   sVal := '';
-  if not RegQueryStringValue(HKCU, sKey, 'UninstallString', sVal) then
-    RegQueryStringValue(HKLM, sKey, 'UninstallString', sVal);
+  if not RegQueryStringValue(HKCU, sKey, ValueName, sVal) then
+    RegQueryStringValue(HKLM, sKey, ValueName, sVal);
   Result := sVal;
+end;
+
+function GetUninstallString(): String;
+begin
+  Result := GetUninstallRegValue('UninstallString');
+end;
+
+function GetUninstallInstallDir(): String;
+begin
+  Result := GetUninstallRegValue('InstallLocation');
+end;
+
+procedure ForceCleanPriorInstall(InstallDir: String);
+var
+  Key: String;
+begin
+  { Belt-and-suspenders cleanup when the prior uninstaller can't be trusted
+    (missing, failed to extract its temp, AV-blocked, etc.). Only nuke dirs
+    that look like Inno Setup installs of this app — checks for unins000.exe. }
+  if (InstallDir <> '') and (Length(InstallDir) > 6) and DirExists(InstallDir) then
+  begin
+    if FileExists(InstallDir + '\unins000.exe')
+       or FileExists(InstallDir + '\kitchensearch.exe') then
+      DelTree(InstallDir, True, True, True);
+  end;
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F3A2B1C-9D4E-4F87-B532-1A2C3D4E5F60}_is1';
+  RegDeleteKeyIncludingSubkeys(HKCU, Key);
+  RegDeleteKeyIncludingSubkeys(HKLM, Key);
 end;
 
 function InitializeSetup(): Boolean;
 var
   UninstallStr: String;
+  InstallDir: String;
   ResultCode: Integer;
+  UninstallerOk: Boolean;
 begin
   if CheckForMutexes('Global\KitchenSearchDaemon') then
   begin
@@ -109,20 +139,33 @@ begin
   end;
 
   UninstallStr := GetUninstallString();
+  InstallDir   := GetUninstallInstallDir();
   if UninstallStr <> '' then
   begin
-    if MsgBox(
-      'A previous installation of Kitchen Search was found.' + #13#10 +
-      'It must be uninstalled before installing this version.' + #13#10#13#10 +
-      'Uninstall it now and continue?',
-      mbConfirmation, MB_YESNO
-    ) <> IDYES then
+    UninstallerOk := False;
+    if FileExists(RemoveQuotes(UninstallStr)) then
     begin
-      Result := False;
-      Exit;
+      if MsgBox(
+        'A previous installation of Kitchen Search was found.' + #13#10 +
+        'It must be uninstalled before installing this version.' + #13#10#13#10 +
+        'Uninstall it now and continue?',
+        mbConfirmation, MB_YESNO
+      ) <> IDYES then
+      begin
+        Result := False;
+        Exit;
+      end;
+      { /VERYSILENT + /SUPPRESSMSGBOXES so the old uninstaller can't pop a
+        blocking dialog (e.g. its "temp dir create failed, retry?" prompt).
+        ResultCode 0 means clean exit; anything else means the uninstaller
+        failed and we must clean up manually below. }
+      if Exec(RemoveQuotes(UninstallStr),
+              '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART',
+              '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+        UninstallerOk := (ResultCode = 0);
     end;
-    Exec(RemoveQuotes(UninstallStr), '/SILENT', '', SW_HIDE,
-         ewWaitUntilTerminated, ResultCode);
+    if not UninstallerOk then
+      ForceCleanPriorInstall(InstallDir);
   end;
 
   Result := True;

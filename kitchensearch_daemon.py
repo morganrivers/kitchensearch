@@ -35,7 +35,7 @@ _PYTHONW = _PYTHON.parent / "pythonw.exe"
 
 _PICKER_EXE = _HERE / "kitchensearch.exe"
 _PICKER_PY  = _HERE / "kitchensearch.py"
-_DAEMON_EXE = _HERE / "kitchensearch_daemon.exe"
+_DAEMON_EXE = _HERE / "kitchensearch-daemon.exe"
 
 APP_NAME       = "KitchenSearch"
 DEFAULT_HOTKEY = "Ctrl+Alt+K"
@@ -49,7 +49,14 @@ def _find_tray_icon() -> Path:
             return p
     except Exception:
         pass
-    return _HERE / "ksapp" / "data" / "ui_assets" / "tray-icon.png"
+    # dev layout: tray-icon.png sits in top-level data/, not inside the ksapp package
+    for candidate in (
+        _HERE / "data" / "ui_assets" / "tray-icon.png",
+        _HERE / "ksapp" / "data" / "ui_assets" / "tray-icon.png",
+    ):
+        if candidate.exists():
+            return candidate
+    return _HERE / "data" / "ui_assets" / "tray-icon.png"
 
 
 _TRAY_ICON_PATH = _find_tray_icon()

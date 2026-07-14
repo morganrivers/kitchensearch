@@ -30,7 +30,10 @@ from ksapp.log import _dbg
 from ksapp.data_assets import ensure_data, _REPO, UI_ASSETS_DIR
 
 DATA_DIR      = _REPO / "data" / "embeddings"
-CACHE_DIR     = Path(user_cache_dir("kitchensearch"))
+# KITCHENSEARCH_CACHE_DIR lets tests redirect the cache without depending on
+# platformdirs env-var behavior (on Windows it reads Win32 CSIDL directly and
+# ignores LOCALAPPDATA/XDG_CACHE_HOME env changes).
+CACHE_DIR     = Path(os.environ.get("KITCHENSEARCH_CACHE_DIR") or user_cache_dir("kitchensearch"))
 
 
 def _ipc_address() -> str:
@@ -226,7 +229,37 @@ def _idle_watchdog():
             os._exit(0)
 
 
+# Module-level reference to keep the Win32 mutex handle alive for the
+# daemon's full lifetime. CreateMutex returns a handle owned by this
+# process; the mutex is auto-released by the kernel on process exit, so
+# there's no stale-file cleanup the way pid files require.
+_WIN_SINGLETON_HANDLE = None
+_WIN_SINGLETON_MUTEX  = r"Global\KitchenSearchSplitDaemon"
+
+
+def _acquire_windows_singleton() -> bool:
+    """Acquire the per-machine daemon mutex. False if another daemon owns it."""
+    global _WIN_SINGLETON_HANDLE
+    import ctypes
+    ERROR_ALREADY_EXISTS = 183
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.CreateMutexW(None, True, _WIN_SINGLETON_MUTEX)
+    if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
+        if handle:
+            kernel32.CloseHandle(handle)
+        return False
+    _WIN_SINGLETON_HANDLE = handle
+    return True
+
+
 def main():
+    # Windows: the picker checks this mutex to know the daemon is alive
+    # (replaces the legacy pid file, which was prone to AV-induced
+    # PermissionError on unlink). Acquired BEFORE the slow model load so
+    # liveness is visible from the moment subprocess.Popen returns.
+    if sys.platform == "win32" and not _acquire_windows_singleton():
+        print("Daemon already running (mutex held). Exiting.", flush=True)
+        sys.exit(0)
     ensure_data()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     STATUS_PATH.unlink(missing_ok=True)
