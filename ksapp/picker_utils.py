@@ -1110,7 +1110,7 @@ def copy_url_at_size(url, alt, px):
 
 
 _PIL_EMOJI_FONT  = None   # PIL ImageFont, loaded once
-_PIL_EMOJI_CACHE = {}     # char -> PIL Image (or None on failure)
+_PIL_EMOJI_CACHE = {}     # (char, size) -> PIL Image (or None on failure)
 
 
 def _find_emoji_ttf():
@@ -1166,12 +1166,13 @@ def _get_pil_emoji_font():
 
 def render_emoji_pil(char, size=20):
     """Render an emoji char to a PIL Image using the system color emoji font."""
-    if char in _PIL_EMOJI_CACHE:
-        return _PIL_EMOJI_CACHE[char]
+    key = (char, size)
+    if key in _PIL_EMOJI_CACHE:
+        return _PIL_EMOJI_CACHE[key]
     font = _get_pil_emoji_font()
     if not font:
         _dbg(f"render_emoji_pil: no font available; returning None for char={char!r}")
-        _PIL_EMOJI_CACHE[char] = None
+        _PIL_EMOJI_CACHE[key] = None
         return None
     try:
         from PIL import Image, ImageDraw
@@ -1180,14 +1181,14 @@ def render_emoji_pil(char, size=20):
         bbox = canvas.getbbox()
         if not bbox:
             _dbg(f"render_emoji_pil: empty bbox for char={char!r} — font rendered nothing")
-            _PIL_EMOJI_CACHE[char] = None
+            _PIL_EMOJI_CACHE[key] = None
             return None
         img = canvas.crop(bbox).resize((size, size), Image.LANCZOS)
-        _PIL_EMOJI_CACHE[char] = img
+        _PIL_EMOJI_CACHE[key] = img
         return img
     except Exception as e:
         _dbg(f"render_emoji_pil failed char={char!r}: {e}")
-        _PIL_EMOJI_CACHE[char] = None
+        _PIL_EMOJI_CACHE[key] = None
         return None
 
 def _has_semantic_models():

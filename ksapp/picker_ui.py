@@ -619,8 +619,15 @@ class TkPicker:
         for w in self._size_bar.winfo_children():
             w.destroy()
         self._size_btns = []
-        clip = render_emoji_pil("\U0001F4CB", size=self._px(16))  # 📋
+        tk.Label(self._size_bar, text="copy:", bg=self.BG, fg=self.FG,
+                 font=self._font(11, "bold")).pack(side="left", padx=(10, 2))
+        pxs = [p for _, p in button_sizes]
+        lo, span = min(pxs), (max(pxs) - min(pxs)) or 1
         for name, px in button_sizes:
+            # Render the clipboard icon at a size proportional to the copy size
+            # so small/medium/large visually preview how big the copied image is.
+            emoji_px = self._px(round(16 + (px - lo) / span * 24))
+            clip = render_emoji_pil("\U0001F4CB", size=emoji_px)  # 📋
             b = tk.Frame(self._size_bar, bg=self.ACCENT, cursor="hand2")
             kids = [b]
             if clip:
@@ -644,6 +651,20 @@ class TkPicker:
                 w.bind("<Enter>",    lambda e, _c=_darken(self.ACCENT): _recolor(_c))
                 w.bind("<Leave>",    lambda e: _recolor(self.ACCENT))
             self._size_btns.append(b)
+
+        tk.Label(self._size_bar, text="(keys 1-5 copy different sizes)",
+                 bg=self.BG, fg=self.FG_DIM, font=self._font(10)).pack(
+                     side="left", padx=(8, 0))
+
+        close = tk.Label(self._size_bar, text="✕", bg=self.BG, fg=self.FG_DIM,
+                         font=self._font(13, "bold"), cursor="hand2")
+        close.pack(side="right", padx=(0, 10))
+        close.bind("<Button-1>", lambda e: self._hide_size_bar())
+        close.bind("<Enter>",    lambda e: close.configure(fg=self.FG))
+        close.bind("<Leave>",    lambda e: close.configure(fg=self.FG_DIM))
+
+    def _hide_size_bar(self):
+        self._size_bar.pack_forget()
 
     def _selected_copyable_label(self):
         """The label of the currently selected result row, or None when nothing

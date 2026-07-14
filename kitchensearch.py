@@ -71,6 +71,7 @@ _DEFAULT_SETTINGS = {
     "dark_mode":       False,
     "zoom":            1.0,
     "copy_size":       DEFAULT_COPY_SIZE,
+    "show_copy_bar":   True,
 }
 
 _BOOL_SETTINGS_ITEMS = [
@@ -81,6 +82,7 @@ _BOOL_SETTINGS_ITEMS = [
     ("show_combo",     "Show combo search on front menu"),
     ("show_story",     "Show emoji story on front menu"),
     ("exit_on_select", "Exit app when emoji selected"),
+    ("show_copy_bar",  "Show copy size bar in results"),
     ("always_on_top",  "Always on top (takes effect on restart)"),
 ]
 
@@ -354,7 +356,7 @@ def _run_favorites(picker, settings, entries):
             "Favorites  (♥ to add/remove):", all_entries, get_thumb,
             on_select=on_sel, on_favorite=_toggle_fav, is_favorite_fn=_is_fav,
             on_copy_size=copy_at, copy_sizes=COPY_SIZES,
-            button_sizes=BUTTON_SIZES, default_copy_px=default_px)
+            button_sizes=(BUTTON_SIZES if settings["show_copy_bar"] else None), default_copy_px=default_px)
         if changed[0]:
             continue
         if result and settings["exit_on_select"]:
@@ -769,7 +771,7 @@ def main():
                     prompt_fn=_combo_prompt, on_favorite=on_fav_combo,
                     is_favorite_fn=_is_fav_combo,
                     on_copy_size=copy_at_combo, copy_sizes=COPY_SIZES,
-                    button_sizes=BUTTON_SIZES, default_copy_px=default_px)
+                    button_sizes=(BUTTON_SIZES if settings["show_copy_bar"] else None), default_copy_px=default_px)
                 _dbg(f"COMBO: pick_with_images done result={result!r}")
                 if result and settings["exit_on_select"]:
                     _copy_combo(result)
@@ -847,7 +849,7 @@ def main():
                     prompt_fn=_make_prompt, on_favorite=on_fav,
                     is_favorite_fn=_is_fav_res,
                     on_copy_size=copy_at, copy_sizes=COPY_SIZES,
-                    button_sizes=BUTTON_SIZES, default_copy_px=default_px)
+                    button_sizes=(BUTTON_SIZES if settings["show_copy_bar"] else None), default_copy_px=default_px)
 
                 if picker.result_typed and result:
                     query = result
