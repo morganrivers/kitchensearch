@@ -1,0 +1,59 @@
+name: Graphviz diagram
+
+# Rebuilds the docs/graphviz program-flow diagram whenever its sources change.
+# The generators (build_kitchensearch_drawio.py, drawio_to_png.py) use only the
+# Python standard library plus the `dot` and `rsvg-convert` system binaries, so
+# nothing here touches the app's production requirements — Graphviz is a CI-only
+# build dependency. The rendered .drawio/.svg/.png are uploaded as artifacts
+# (they are gitignored, never committed).
+
+on:
+  push:
+    paths:
+      - 'docs/graphviz/**'
+      - '.github/workflows/graphviz-diagram.yml'
+  pull_request:
+    paths:
+      - 'docs/graphviz/**'
+      - '.github/workflows/graphviz-diagram.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-diagram:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Install Graphviz + librsvg (CI-only; not a runtime dependency)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends graphviz librsvg2-bin
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build .drawio from the flow JSON
+        working-directory: docs/graphviz
+        run: python build_kitchensearch_drawio.py
+
+      - name: Render SVG + PNG
+        working-directory: docs/graphviz
+        run: python drawio_to_png.py kitchensearch_flow_diagram.drawio --scale 2
+
+      - name: Upload rendered diagram
+        uses: actions/upload-artifact@v4
+        with:
+          name: kitchensearch-flow-diagram
+          path: |
+            docs/graphviz/kitchensearch_flow_diagram.drawio
+            docs/graphviz/kitchensearch_flow_diagram.svg
+            docs/graphviz/kitchensearch_flow_diagram.png
+          if-no-files-found: error

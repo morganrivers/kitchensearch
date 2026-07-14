@@ -785,19 +785,25 @@ def _save_copy_counts(d):
 
 def record_copy(url, alt):
     key = hashlib.md5(url.encode()).hexdigest()
+    variant_keys = _size_variant_hashes(url)   # includes the native (large) key
     with _copy_counts_lock:
         d = _load_copy_counts()
         rec = d.get(key, {"count": 0, "alt": alt})
         rec["count"] = int(rec.get("count", 0)) + 1
         rec["alt"] = alt or rec.get("alt", "")
+        # Remember which on-disk size variants belong to this combo so the trim
+        # can share this count across them. The base (native) file is tracked by
+        # `key` itself, so it is excluded from the nested list.
+        rec["variants"] = sorted(variant_keys - {key})
         d[key] = rec
         _save_copy_counts(d)
-    path = THUMB_DIR / (key + ".png")
-    if path.exists():
-        try:
-            path.touch()
-        except OSError:
-            pass
+    for k in {key, *variant_keys}:
+        path = THUMB_DIR / (k + ".png")
+        if path.exists():
+            try:
+                path.touch()
+            except OSError:
+                pass
 
 
 def top_copied(n=10):
@@ -867,10 +873,18 @@ def toggle_favorite(alt, url, text=""):
 
 def _trim_thumb_cache():
     counts = _load_copy_counts()
+    # Every size variant of a combo inherits the combo's copy count, so a
+    # frequently-copied combo keeps all its sizes warm under LRU pressure.
+    variant_count = {}
+    for base_key, rec in counts.items():
+        c = int(rec.get("count", 0))
+        variant_count[base_key] = max(variant_count.get(base_key, 0), c)
+        for vk in rec.get("variants", []):
+            variant_count[vk] = max(variant_count.get(vk, 0), c)
     entries, total = [], 0
     for p in THUMB_DIR.glob("*.png"):
         st = p.stat()
-        c = int(counts.get(p.stem, {}).get("count", 0))
+        c = variant_count.get(p.stem, 0)
         entries.append(((c, st.st_mtime), st.st_size, p))
         total += st.st_size
     if total <= _THUMB_LIMIT:
@@ -907,6 +921,63 @@ def get_thumb(url):
             if attempt == 0:
                 time.sleep(0.3)
     return None
+
+
+# ── copy sizes ──────────────────────────────────────────────────────────────
+# gstatic serves each emoji-kitchen PNG at a native 534px and downscales via a
+# `=sN` suffix; it never upscales, so 534 is the ceiling. The ladder below spans
+# the useful range from roughly emoji-sized up to native. Keys 1-5 map to these
+# in order; the small/medium/large buttons are the BUTTON_SIZES subset.
+NATIVE_SIZE       = 534
+DEFAULT_COPY_SIZE = "medium"
+COPY_SIZES = [
+    ("small",        72),
+    ("medium-small", 128),
+    ("medium",       256),
+    ("medium-large", 384),
+    ("large",        NATIVE_SIZE),
+]
+_SIZE_PX = dict(COPY_SIZES)
+BUTTON_SIZES = [(n, _SIZE_PX[n]) for n in ("small", "medium", "large")]
+
+
+def size_px(name):
+    return _SIZE_PX.get(name, _SIZE_PX[DEFAULT_COPY_SIZE])
+
+
+def sized_url(url, px):
+    """Return `url` with gstatic's `=sN` size suffix. Native/oversized requests
+    return the bare URL since gstatic will not upscale past NATIVE_SIZE."""
+    assert px > 0, f"bad size px={px!r}"
+    if px >= NATIVE_SIZE:
+        return url
+    return f"{url}=s{px}"
+
+
+def _size_variant_hashes(url):
+    """The thumbnail-cache stems (md5 of the sized URL) for every copy size of a
+    combo. Used so the LRU trim can treat a combo's size variants as one unit."""
+    return {hashlib.md5(sized_url(url, px).encode()).hexdigest()
+            for _, px in COPY_SIZES}
+
+
+def alt_from_label(label):
+    """A result row's label is `alt  <emoji>  (keywords...)`; the alt is the
+    first whitespace-delimited token. Shared by every result view's copy path."""
+    m = re.match(r'^\S+', label)
+    return m.group(0) if m else label
+
+
+def copy_url_at_size(url, alt, px):
+    """Download (thumbnail-cached) the gstatic image for `url` at `px` pixels and
+    place it on the clipboard. Returns True on success. Copy counts are keyed by
+    the base `url` so a combo's tally is shared across sizes."""
+    path = get_thumb(sized_url(url, px))
+    if not path:
+        return False
+    copy_image_to_clipboard(path)
+    record_copy(url, alt)
+    return True
 
 
 

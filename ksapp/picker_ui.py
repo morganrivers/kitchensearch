@@ -262,6 +262,9 @@ class TkPicker:
         self._toast_after_id = None
         self._cancel_hook    = None
         self._on_favorite    = None
+        self._on_copy_size   = None   # (label, px) -> copy selected row at px
+        self._copy_sizes     = None   # [(name, px), ...] for number keys 1-5
+        self._default_copy_px = None  # px for Ctrl+C / default click
         self._build()
         self._install_zoom_bindings()
 
@@ -590,6 +593,96 @@ class TkPicker:
 
         self._make_dm_button()
         self._make_back_btn()
+        self._make_size_bar()
+
+        # Copy-size shortcuts for the results views: number keys 1-5 copy the
+        # selected row at that size (only when the search box is empty, so typing
+        # a query still works), and Ctrl+C copies at the default size.
+        for _n, _digit in enumerate("12345", start=1):
+            self._entry.bind(f"<KeyPress-{_digit}>",
+                             lambda e, n=_n: self._on_size_digit(n))
+        self._entry.bind("<Control-c>", self._on_ctrl_copy)
+        self._entry.bind("<Control-C>", self._on_ctrl_copy)
+
+    # ── copy-size controls ────────────────────────────────────────────────────
+
+    def _make_size_bar(self):
+        """A row of small/medium/large copy buttons shown under the result list.
+        Populated on demand by pick_with_images; a no-op until then."""
+        self._size_bar = tk.Frame(self._content_frame, bg=self.BG)
+        self._size_btns = []
+
+    def _populate_size_bar(self, button_sizes):
+        for w in self._size_bar.winfo_children():
+            w.destroy()
+        self._size_btns = []
+        clip = render_emoji_pil("\U0001F4CB", size=self._px(16))  # 📋
+        for name, px in button_sizes:
+            b = tk.Frame(self._size_bar, bg=self.ACCENT, cursor="hand2")
+            kids = [b]
+            if clip:
+                photo = ImageTk.PhotoImage(clip)
+                self._img_refs.append(photo)
+                il = tk.Label(b, image=photo, bg=self.ACCENT)
+                il.pack(side="left", padx=(8, 4), pady=4)
+                kids.append(il)
+            tl = tk.Label(b, text=name.capitalize(), bg=self.ACCENT, fg="#ffffff",
+                          font=self._font(11, "bold"))
+            tl.pack(side="left", padx=(0, 8), pady=4)
+            kids.append(tl)
+            b.pack(side="left", padx=(6, 0), pady=6)
+
+            def _recolor(color, _kids=kids):
+                for w in _kids:
+                    try: w.configure(bg=color)
+                    except tk.TclError: pass
+            for w in kids:
+                w.bind("<Button-1>", lambda e, p=px: self._size_btn_click(p))
+                w.bind("<Enter>",    lambda e, _c=_darken(self.ACCENT): _recolor(_c))
+                w.bind("<Leave>",    lambda e: _recolor(self.ACCENT))
+            self._size_btns.append(b)
+
+    def _selected_copyable_label(self):
+        """The label of the currently selected result row, or None when nothing
+        is selected or the row is the load-more sentinel."""
+        if self._mode != "imagelist" or not self._on_copy_size:
+            return None
+        if not (0 <= self._sel < len(self._rows)):
+            return None
+        label = self._rows[self._sel]["label"]
+        return None if label == LOAD_MORE else label
+
+    def _size_btn_click(self, px):
+        label = self._selected_copyable_label()
+        if label is None:
+            return
+        self._on_copy_size(label, px)
+        self._mark_copied(self._sel)
+
+    def _on_size_digit(self, n):
+        if not self._copy_sizes or n > len(self._copy_sizes):
+            return  # allow the digit to type normally
+        # Only act as a copy shortcut while the search box is empty; once the
+        # user starts typing a query/filter, digits must reach the entry.
+        box_empty = self._ph.is_active() or not self._entry_var.get().strip()
+        if not box_empty:
+            return
+        label = self._selected_copyable_label()
+        if label is None:
+            return
+        self._on_copy_size(label, self._copy_sizes[n - 1][1])
+        self._mark_copied(self._sel)
+        return "break"
+
+    def _on_ctrl_copy(self, e=None):
+        if self._default_copy_px is None:
+            return
+        label = self._selected_copyable_label()
+        if label is None:
+            return
+        self._on_copy_size(label, self._default_copy_px)
+        self._mark_copied(self._sel)
+        return "break"
 
     # ── dark mode button ──────────────────────────────────────────────────────
 
@@ -1562,8 +1655,12 @@ class TkPicker:
         self._dm_btn.place_forget()
         self._dismiss_toast()
         self._back_btn.place_forget()
+        self._size_bar.pack_forget()
         self._cancel_hook = None
         self._on_favorite = None
+        self._on_copy_size = None
+        self._copy_sizes = None
+        self._default_copy_px = None
 
     def _pack_clickable_link(self, parent, url):
         """Render `url` as an underlined accent-coloured label. Left-click opens
@@ -2128,7 +2225,7 @@ class TkPicker:
         _enter()
         return self._run()
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None):
+    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None, on_copy_size=None, copy_sizes=None, button_sizes=None, default_copy_px=None):
         # Materialize entries once so a rebuild uses the same order (and image
         # workers on the reruns don't re-consume a generator).
         entries = list(entries)
@@ -2137,17 +2234,25 @@ class TkPicker:
                     preload=preload, placeholder=placeholder, filter=filter,
                     show_dark_btn=show_dark_btn, show_back_btn=show_back_btn,
                     show_research_cb=show_research_cb, prompt_fn=prompt_fn,
-                    on_favorite=on_favorite)
+                    on_favorite=on_favorite, on_copy_size=on_copy_size,
+                    copy_sizes=copy_sizes, button_sizes=button_sizes,
+                    default_copy_px=default_copy_px)
         self._current_view_rebuilder = lambda: self._enter_pick_with_images(**args)
         self._enter_pick_with_images(**args)
         result = self._run()
         _dbg(f"PICK_WITH_IMAGES: _run done result={result!r}")
         return result
 
-    def _enter_pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None):
+    def _enter_pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None, on_copy_size=None, copy_sizes=None, button_sizes=None, default_copy_px=None):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
         self._on_favorite = on_favorite
+        self._on_copy_size = on_copy_size
+        self._copy_sizes = copy_sizes
+        self._default_copy_px = default_copy_px
+        if on_copy_size and button_sizes:
+            self._populate_size_bar(button_sizes)
+            self._size_bar.pack(side="bottom", fill="x")
         if show_dark_btn:
             self._dm_btn.place(relx=1.0, rely=1.0, anchor="se", x=-6, y=-6)
             self.root.tk.call('raise', self._dm_btn._w)

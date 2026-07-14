@@ -1,0 +1,110 @@
+{
+  "nodes": [
+    {"id": "daemon", "grp": "E", "type": "script", "robot": false, "file": "kitchensearch_daemon.py", "lbl": "kitchensearch_daemon\n(hotkey / tray)", "desc": "Background launcher. Windows: registers a global hotkey (default Ctrl+Alt+K) + system-tray icon and adds itself to Run for auto-start. macOS: hosts a rumps menu-bar icon. Both spawn kitchensearch.py as a subprocess when the user triggers it. Linux binds a shortcut via the .desktop file instead. Shares picker-settings.json with the app for the hotkey value."},
+    {"id": "app", "grp": "E", "type": "script", "robot": false, "file": "kitchensearch.py", "lbl": "kitchensearch.py\nmain() menu loop", "desc": "Application entry point. main() loads settings, builds the LicenseManager, constructs the TkPicker, loads the search index once, and runs the front-menu loop dispatching to keyword / semantic / combo / story / favorites / settings. Owns all mode handlers and the copy/copy-at-size/favorite closures passed into the picker (copy-at-size resolves alt→url and calls copy_url_at_size at the requested render size, defaulting to the copy_size setting)."},
+
+    {"id": "ui", "grp": "U", "type": "script", "robot": false, "file": "ksapp/picker_ui.py", "lbl": "picker_ui\nTkPicker", "desc": "The whole Tk GUI (2800+ lines): borderless half-screen picker, virtualized image result rows with lazy thumbnail loading, dark-mode + zoom, loading/progress bars, story preview, and a small/medium/large copy-size button bar under result views (plus 1-5 digit keys and Ctrl+C) for copying the selected combo at a chosen size. pick_with_images(entries, on_url, on_select, on_favorite, on_copy_size) is the workhorse; on_url is picker_utils.get_thumb, on_select/on_favorite/on_copy_size are closures from kitchensearch.py."},
+    {"id": "placeholder", "grp": "U", "type": "script", "robot": false, "file": "ksapp/placeholder_entry.py", "lbl": "placeholder_entry", "desc": "PlaceholderManager: greyed placeholder text for the search Entry, restored on blur. Imported by picker_ui for the filter/search box."},
+    {"id": "zoom", "grp": "U", "type": "script", "robot": false, "file": "ksapp/zoom.py", "lbl": "zoom\nZoomManager", "desc": "ZoomManager: Ctrl+= / Ctrl+- / Ctrl+0 / Ctrl+MouseWheel zoom factor for the picker UI. Reports the new factor back through on_zoom_change so kitchensearch.py persists it in settings."},
+    {"id": "fontsetup", "grp": "U", "type": "script", "robot": false, "file": "ksapp/font_setup.py", "lbl": "font_setup", "desc": "apply(root): on Linux registers the bundled Liberation Sans TTF with fontconfig (FcConfigAppFontAddFile) and points every Tk named font at it so UI text renders anti-aliased through Xft. No-op on macOS/Windows which ship good UI fonts."},
+
+    {"id": "utils", "grp": "C", "type": "script", "robot": false, "file": "ksapp/picker_utils.py", "lbl": "picker_utils\nsearch · thumbs · clipboard · IPC", "desc": "Shared core hub. load_index() -> entries (url, alt, text); search() keyword ranking; build_base_emoji_index(); get_thumb() download+cache; copy_image_to_clipboard(); copy_url_at_size()/sized_url()/COPY_SIZES for copying a combo at a chosen render size (=sN, native 534 ceiling); record_copy(); favorites read/write; and the split-daemon lifecycle (_spawn_daemon, _daemon_alive, query_daemon over IPC). Calls data_assets.ensure_data() at import."},
+    {"id": "dataassets", "grp": "C", "type": "script", "robot": false, "file": "ksapp/data_assets.py", "lbl": "data_assets\nensure_data", "desc": "ensure_data(): on first run, if data/ui_assets/search-index.tsv is missing, unpacks the committed app_assets.tar.gz into ksapp/ (ui_assets/ text corpora + fonts/). Invoked at picker_utils import, by font_setup, and by the split daemon."},
+    {"id": "license", "grp": "C", "type": "script", "robot": false, "file": "ksapp/license.py", "lbl": "license\nLicenseManager", "desc": "LicenseManager: gates Favorites + dark-mode behind a Polar.sh license key. is_licensed() is a fast offline check against cached license.json; activate/validate/deactivate hit Polar's customer-portal API. refresh_async() re-validates in a background thread."},
+    {"id": "sslctx", "grp": "C", "type": "script", "robot": false, "file": "ksapp/ssl_ctx.py", "lbl": "ssl_ctx\n(shared TLS)", "desc": "ssl_ctx(): single source of truth for the TLS SSLContext used by every outbound HTTPS call (thumbnail downloads in picker_utils and emoji_story, license API in license.py)."},
+
+    {"id": "split", "grp": "S", "type": "script", "robot": true, "file": "ksapp/emoji_split_daemon.py", "lbl": "emoji_split_daemon\n(IPC search server)", "desc": "Long-lived semantic-search daemon. load() reads the MiniLM model + all embedding arrays once; then serves newline-JSON requests over a Unix socket / Windows named pipe. 1 word -> squared combo; 2 words -> cross-ranked base combos; then text-embedding cosine fallback. Idle-exits after 600s. Writes a loading-% status file during startup."},
+    {"id": "minilm", "grp": "S", "type": "script", "robot": true, "file": "ksapp/minilm_text.py", "lbl": "minilm_text\n(ONNX MiniLM)", "desc": "MiniLMText: ONNX-runtime wrapper for sentence-transformers/all-MiniLM-L6-v2. load() finds the model in the bundled data/models dir (or the fastembed cache); embed(texts) mean-pools + L2-normalises to 384-d float32 vectors. Used by the split daemon only."},
+
+    {"id": "story", "grp": "T", "type": "script", "robot": false, "file": "ksapp/emoji_story.py", "lbl": "emoji_story", "desc": "Standalone tool (also spawned as a subprocess by the app). Splits text into phrases, queries the split daemon over IPC for the best combo per phrase, downloads each thumbnail, and composes a phrase-per-row PNG via Pillow written to --output."},
+
+    {"id": "tar", "grp": "asset", "type": "data", "robot": false, "file": "ksapp/data/app_assets.tar.gz", "lbl": "app_assets.tar.gz\n(bundled UI assets)", "desc": "Committed tarball shipped with the source. Contains the ui_assets/ text corpora (search-index.tsv, base-emoji-codes/names, embedding-urls/alts, urls.txt) and the fonts/ TTFs. Extracted lazily by data_assets.ensure_data on first run so a fresh checkout has no loose data files."},
+    {"id": "searchidx", "grp": "asset", "type": "data", "robot": false, "file": "", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/data/app_assets.tar.gz", "lbl": "search-index.tsv\n(ui_assets/, in tarball)", "desc": "The keyword-search corpus: one row per emoji-kitchen combo as url \\t alt \\t text. load_index() parses it into entries for keyword/combo search, and the split daemon parses it into combo_map keyed by the two base-emoji code points. Unpacked from app_assets.tar.gz."},
+    {"id": "basecodes", "grp": "asset", "type": "data", "robot": false, "file": "", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/data/app_assets.tar.gz", "lbl": "base-emoji-codes.txt / -names.txt\n(ui_assets/, in tarball)", "desc": "Ordered base-emoji hex code points (codes.txt) with their names (names.txt). The daemon builds code_to_idx from codes.txt so a rank vector over base emojis lines up with base-emoji-minilm.npy. Unpacked from app_assets.tar.gz."},
+    {"id": "emburlsalts", "grp": "asset", "type": "data", "robot": false, "file": "", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/data/app_assets.tar.gz", "lbl": "embedding-urls.txt / -alts.txt\n(ui_assets/, in tarball)", "desc": "Parallel arrays aligned row-for-row with minilm-pca340.npy: each embedded combo's thumbnail URL (urls.txt) and alt name (alts.txt). The daemon zips them with the cosine scores to return ranked results. Unpacked from app_assets.tar.gz."},
+    {"id": "font", "grp": "asset", "type": "data", "robot": false, "file": "", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/data/app_assets.tar.gz", "lbl": "Liberation + Bubblegum Sans\n(fonts/, in tarball)", "desc": "Bundled TTFs. Liberation Sans is registered as the anti-aliased Linux UI font by font_setup; Bubblegum Sans is loaded directly by picker_ui for the rainbow title. Unpacked from app_assets.tar.gz."},
+
+    {"id": "baseminilm", "grp": "model", "type": "data", "robot": false, "file": "ksapp/data/embeddings/base-emoji-minilm.npy", "lbl": "base-emoji-minilm.npy", "desc": "MiniLM embeddings of each base emoji's name, row-aligned with base-emoji-codes.txt. Dotted with the query embedding to rank base emojis for 1- and 2-word searches. Committed directly (part of the semantic-search data tier, separate from the tarball)."},
+    {"id": "txtemb", "grp": "model", "type": "data", "robot": false, "file": "ksapp/data/embeddings/minilm-pca340.npy", "lbl": "minilm-pca340.npy", "desc": "PCA-reduced (340-d) MiniLM text embeddings for every embedded combo, used for the cosine text-similarity fallback ranking. Row-aligned with embedding-urls/alts. Committed directly."},
+    {"id": "pca", "grp": "model", "type": "data", "robot": false, "file": "ksapp/data/embeddings/minilm-pca340-matrix.npy", "lbl": "minilm-pca340-matrix.npy\n+ -mean.npy", "desc": "The PCA projection: subtract -mean.npy then multiply by -matrix.npy to map a fresh 384-d query embedding into the same 340-d space as minilm-pca340.npy before scoring. Committed directly."},
+    {"id": "onnx", "grp": "model", "type": "data", "robot": false, "file": "ksapp/data/models/all-MiniLM-L6-v2-onnx/model.onnx", "lbl": "model.onnx\n+ tokenizer.json", "desc": "The all-MiniLM-L6-v2 sentence encoder in ONNX form plus its tokenizer/config, loaded by minilm_text at daemon startup. Committed directly under ksapp/data/models/."},
+
+    {"id": "settings", "grp": "state", "type": "data", "robot": false, "file": "", "lbl": "picker-settings.json\n(user config dir)", "desc": "Persisted UI + behaviour settings (menu layout, dark mode, zoom, floating, exit-on-select, default copy size, and the Windows hotkey). Written by kitchensearch.py save_settings and by the daemon's settings dialog; read by both, so it is the single shared config."},
+    {"id": "favorites", "grp": "state", "type": "data", "robot": false, "file": "", "lbl": "favorites.json\n(user config dir)", "desc": "User's saved combos as {alt, url, text}, most-recent-first, deduped by url. Written by toggle/add/remove_favorite; read by load_favorites for the Favorites menu. Lives in the config dir (user data), so it survives cache trims."},
+    {"id": "licjson", "grp": "state", "type": "data", "robot": false, "file": "", "lbl": "license.json\n(user config dir)", "desc": "Cached license state: key, activation_id, valid flag, last_validated_at. LicenseManager.is_licensed() reads it offline; activate/validate/deactivate rewrite it atomically."},
+    {"id": "copycounts", "grp": "state", "type": "data", "robot": false, "file": "", "lbl": "copy_counts.json\n(user cache dir)", "desc": "Per-URL copy tallies (md5(url) -> {count, alt, variants}) written by record_copy on every clipboard copy. variants lists the md5s of the same combo's other size renders (=sN URLs) so _trim_thumb_cache biases eviction toward keeping frequently-copied images and keeps all size variants of a hot combo warm together."},
+    {"id": "thumbs", "grp": "state", "type": "data", "robot": false, "file": "", "lbl": "thumbs/  (downloaded PNGs)\n(user cache dir)", "desc": "On-disk cache of downloaded combo thumbnails, named md5(url).png. Each copy size renders a distinct =sN URL, so one combo can have several cached PNGs. Filled by get_thumb (in picker_utils and emoji_story); trimmed to ~200 MB by _trim_thumb_cache, which keeps high copy-count / recently-used images and shares a combo's copy count across all its size variants."},
+    {"id": "ipc", "grp": "state", "type": "data", "robot": false, "file": "", "lbl": "split-daemon.sock / .pid /\n-loading.json (cache dir)", "desc": "The daemon's runtime coordination files: the Unix socket / named pipe it listens on, the PID record (with start-time for reuse detection) written by _spawn_daemon, and the loading-% status file the picker polls while showing the model-loading bar."},
+    {"id": "storypng", "grp": "state", "type": "data", "robot": false, "file": "", "lbl": "emoji-story.png\n(user cache dir)", "desc": "The composed emoji-story image emoji_story writes to --output. kitchensearch.py previews it via picker.show_image and, on Enter, copies it to the clipboard."},
+
+    {"id": "cdn", "grp": "ext", "type": "ext", "robot": false, "file": "", "link": "https://emojikitchen.dev", "lbl": "Emoji Kitchen CDN\n(gstatic.com)", "desc": "Google's Emoji Kitchen image host. get_thumb fetches each combo PNG on demand from the gstatic URL recorded in the search index, then caches it under thumbs/. The only bulk-image source; nothing is pre-bundled."},
+    {"id": "polar", "grp": "ext", "type": "ext", "robot": false, "file": "", "link": "https://polar.sh", "lbl": "Polar.sh\nlicense API", "desc": "Polar.sh customer-portal license-key endpoints (activate / validate / deactivate). Public, no API token. LicenseManager posts here to reserve/free an activation slot and to periodically re-validate."},
+    {"id": "clip", "grp": "ext", "type": "ext", "robot": false, "file": "", "lbl": "OS clipboard\n(image/PNG)", "desc": "The system clipboard, the app's primary output. copy_image_to_clipboard writes the combo/story PNG via the platform path: CF_DIB+PNG on Windows (ctypes), osascript on macOS, an X11 selection owner (python-xlib) or wl-copy/xclip on Linux."},
+
+    {"id": "pu_ui",         "grp": "proxy", "type": "proxy", "robot": false, "lbl": "picker_utils", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/picker_utils.py", "desc": "picker_utils utility, drawn as a local connector stub instead of a central hub. See the picker_utils node in CORE."},
+    {"id": "pu_searchidx",  "grp": "proxy", "type": "proxy", "robot": false, "lbl": "picker_utils", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/picker_utils.py", "desc": "picker_utils utility, drawn as a local connector stub instead of a central hub. See the picker_utils node in CORE."},
+    {"id": "pu_cdn",        "grp": "proxy", "type": "proxy", "robot": false, "lbl": "picker_utils", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/picker_utils.py", "desc": "picker_utils utility, drawn as a local connector stub instead of a central hub. See the picker_utils node in CORE."},
+    {"id": "pu_sslctx",     "grp": "proxy", "type": "proxy", "robot": false, "lbl": "picker_utils", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/picker_utils.py", "desc": "picker_utils utility, drawn as a local connector stub instead of a central hub. See the picker_utils node in CORE."},
+    {"id": "pu_ipc",        "grp": "proxy", "type": "proxy", "robot": false, "lbl": "picker_utils", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/picker_utils.py", "desc": "picker_utils utility, drawn as a local connector stub instead of a central hub. See the picker_utils node in CORE."},
+    {"id": "pu_dataassets", "grp": "proxy", "type": "proxy", "robot": false, "lbl": "picker_utils", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/picker_utils.py", "desc": "picker_utils utility, drawn as a local connector stub instead of a central hub. See the picker_utils node in CORE."},
+    {"id": "pu_thumbs",     "grp": "proxy", "type": "proxy", "robot": false, "lbl": "picker_utils", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/picker_utils.py", "desc": "picker_utils utility, drawn as a local connector stub instead of a central hub. See the picker_utils node in CORE."},
+    {"id": "pu_app",        "grp": "proxy", "type": "proxy", "robot": false, "lbl": "picker_utils", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/picker_utils.py", "desc": "picker_utils utility, drawn as a local connector stub instead of a central hub. See the picker_utils node in CORE."},
+    {"id": "pu_clip",       "grp": "proxy", "type": "proxy", "robot": false, "lbl": "picker_utils", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/picker_utils.py", "desc": "picker_utils utility, drawn as a local connector stub instead of a central hub. See the picker_utils node in CORE."},
+    {"id": "pu_split",      "grp": "proxy", "type": "proxy", "robot": false, "lbl": "picker_utils", "link": "https://github.com/morganrivers/kitchensearch/blob/main/ksapp/picker_utils.py", "desc": "picker_utils utility, drawn as a local connector stub instead of a central hub. See the picker_utils node in CORE."}
+  ],
+  "edges": [
+    {"from": "daemon", "to": "app",       "label": "hotkey / tray → spawn picker", "kind": "nav"},
+    {"from": "app",    "to": "ui",        "label": "TkPicker(floating, dark, zoom, callbacks)", "kind": "handoff"},
+    {"from": "app",    "to": "pu_app",     "label": "load_index · search · get_thumb · query_daemon", "kind": "handoff"},
+    {"from": "app",    "to": "license",   "label": "LicenseManager · is_licensed()", "kind": "handoff"},
+    {"from": "settings","to": "app",      "label": "load_settings() → dict", "kind": "loader"},
+    {"from": "app",    "to": "settings",  "label": "save_settings(dict)", "kind": "cache"},
+    {"from": "daemon", "to": "settings",  "label": "hotkey (shared config)", "kind": "cache"},
+
+    {"from": "ui", "to": "placeholder", "label": "search-entry placeholder", "kind": "handoff"},
+    {"from": "ui", "to": "zoom",        "label": "Ctrl +/- zoom factor",    "kind": "handoff"},
+    {"from": "ui", "to": "fontsetup",   "label": "apply(root)",             "kind": "handoff"},
+    {"from": "fontsetup", "to": "font",  "label": "Liberation Sans TTF (Xft)", "kind": "loader"},
+    {"from": "ui", "to": "font",         "label": "Bubblegum Sans (title)", "kind": "loader"},
+    {"from": "ui", "to": "pu_ui",        "label": "get_thumb · render_emoji_pil · _daemon_alive", "kind": "handoff"},
+
+    {"from": "pu_dataassets", "to": "dataassets", "label": "ensure_data() at import", "kind": "nav"},
+    {"from": "tar",   "to": "dataassets", "label": "read app_assets.tar.gz",  "kind": "loader"},
+    {"from": "dataassets", "to": "searchidx", "label": "unpack ui_assets/ + fonts/", "kind": "cache"},
+    {"from": "searchidx", "to": "pu_searchidx",  "label": "load_index() → entries (url, alt, text)", "kind": "loader"},
+    {"from": "cdn",   "to": "pu_cdn",      "label": "GET combo PNG",           "kind": "loader"},
+    {"from": "pu_thumbs", "to": "thumbs",     "label": "get_thumb → cache md5(url).png", "kind": "cache"},
+    {"from": "utils", "to": "copycounts", "label": "record_copy() → counts", "kind": "cache"},
+    {"from": "utils", "to": "favorites",  "label": "toggle / add / remove",   "kind": "cache"},
+    {"from": "favorites", "to": "utils",  "label": "load_favorites() → list", "kind": "loader"},
+    {"from": "pu_clip", "to": "clip",       "label": "copy_image_to_clipboard (PNG)", "kind": "handoff"},
+    {"from": "sslctx","to": "pu_sslctx",      "label": "TLS context",             "kind": "loader"},
+    {"from": "sslctx","to": "license",    "label": "TLS context",             "kind": "loader"},
+    {"from": "sslctx","to": "story",      "label": "TLS context",             "kind": "loader"},
+
+    {"from": "license", "to": "licjson", "label": "cache activation state", "kind": "cache"},
+    {"from": "licjson", "to": "license", "label": "load cached state",      "kind": "loader"},
+    {"from": "license", "to": "polar",   "label": "activate · validate · deactivate", "kind": "loader"},
+
+    {"from": "pu_split", "to": "split",  "label": "spawn + query {q, limit} (IPC)", "kind": "handoff"},
+    {"from": "split", "to": "pu_split",  "label": "[(rank, alt, url)] JSON",        "kind": "handoff"},
+    {"from": "split", "to": "ipc",    "label": "socket + -loading.json (+ pid)", "kind": "cache"},
+    {"from": "ipc",   "to": "pu_ipc",  "label": "poll load %, liveness",         "kind": "loader"},
+    {"from": "minilm","to": "split",  "label": "load(); embed(texts) → 384-d vecs", "kind": "handoff"},
+    {"from": "onnx",  "to": "minilm", "label": "model.onnx + tokenizer.json",   "kind": "loader"},
+    {"from": "searchidx",   "to": "split", "label": "combo_map (c1,c2)→(url,alt)", "kind": "loader"},
+    {"from": "basecodes",   "to": "split", "label": "base-emoji hex codes",     "kind": "loader"},
+    {"from": "baseminilm",  "to": "split", "label": "base-emoji vectors",       "kind": "loader"},
+    {"from": "txtemb",      "to": "split", "label": "combo text embeddings",    "kind": "loader"},
+    {"from": "pca",         "to": "split", "label": "PCA matrix + mean",        "kind": "loader"},
+    {"from": "emburlsalts", "to": "split", "label": "combo urls + alts (parallel)", "kind": "loader"},
+
+    {"from": "app",   "to": "story",    "label": "run emoji_story(text) --output", "kind": "nav"},
+    {"from": "story", "to": "split",    "label": "query_daemon(phrase) → urls (IPC)", "kind": "handoff"},
+    {"from": "cdn",   "to": "story",    "label": "GET combo PNG",       "kind": "loader"},
+    {"from": "story", "to": "thumbs",   "label": "get_thumb → cache PNG", "kind": "cache"},
+    {"from": "story", "to": "storypng", "label": "build_png() → emoji-story.png", "kind": "cache"},
+    {"from": "storypng", "to": "app",   "label": "picker.show_image()", "kind": "loader"},
+    {"from": "app",   "to": "pu_clip",  "label": "copy_image_to_clipboard (story png)", "kind": "handoff"}
+  ]
+}

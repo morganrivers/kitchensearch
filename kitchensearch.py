@@ -18,7 +18,9 @@ from ksapp.picker_utils import (
     _has_semantic_models, _notify, _dbg,
     load_index, search, build_base_emoji_index, format_label,
     get_thumb, render_emoji_pil,
-    copy_image_to_clipboard, record_copy,
+    copy_image_to_clipboard,
+    COPY_SIZES, BUTTON_SIZES, DEFAULT_COPY_SIZE, size_px,
+    alt_from_label, copy_url_at_size,
     query_daemon,
     _trim_thumb_cache, _spawn_daemon, _daemon_alive,
     load_favorites, remove_favorite, toggle_favorite,
@@ -41,6 +43,7 @@ _MODE_FAVORITES = "favorites"
 _MODE_SETTINGS  = "settings"
 
 _SETTINGS_KEY_HOTKEY             = "__hotkey__"
+_SETTINGS_KEY_COPY_SIZE          = "__copy_size__"
 _SETTINGS_KEY_LICENSE_BUY        = "__license_buy__"
 _SETTINGS_KEY_LICENSE_ENTER      = "__license_enter__"
 _SETTINGS_KEY_LICENSE_INFO       = "__license_info__"
@@ -67,6 +70,7 @@ _DEFAULT_SETTINGS = {
     "always_on_top":   False,
     "dark_mode":       False,
     "zoom":            1.0,
+    "copy_size":       DEFAULT_COPY_SIZE,
 }
 
 _BOOL_SETTINGS_ITEMS = [
@@ -96,6 +100,25 @@ def save_settings(s):
         SETTINGS_FILE.write_text(json.dumps(s, indent=2), encoding="utf-8")
     except Exception as e:
         _dbg(f"save_settings failed: {e}")
+
+
+def _make_copy_at(picker, settings, alt_to_url):
+    """Single copy path shared by every result view (search, combo, favorites).
+
+    `alt_to_url` maps a result's alt name to its base gstatic URL. Returns
+    (copy_at, default_px): `copy_at(label, px)` resolves the label's alt, copies
+    the image at `px`, and notifies; `default_px` is the configured default size
+    used by a plain click/Enter and Ctrl+C."""
+    default_px = size_px(settings.get("copy_size", DEFAULT_COPY_SIZE))
+
+    def copy_at(label, px):
+        url = alt_to_url.get(alt_from_label(label))
+        if url is None:
+            return
+        if copy_url_at_size(url, alt_from_label(label), px) and settings["notify_on_copy"]:
+            _notify("Copied to clipboard")
+
+    return copy_at, default_px
 
 
 
@@ -175,6 +198,10 @@ def _run_settings(picker, settings, lic):
         item_keys     = [key for key, _ in base]
         display_items = [f"{'[x]' if settings[key] else '[ ]'} {text}" for key, text in base]
 
+        cur_size = settings.get("copy_size", DEFAULT_COPY_SIZE)
+        display_items.append(f"Default copy size: {cur_size}  (click to change)")
+        item_keys.append(_SETTINGS_KEY_COPY_SIZE)
+
         if sys.platform == "win32":
             hotkey = settings.get("hotkey", "Ctrl+Alt+K")
             display_items.append(f"Keyboard shortcut: {hotkey}  (click to change)")
@@ -207,6 +234,13 @@ def _run_settings(picker, settings, lic):
             sel_idx = 0
 
         key = item_keys[sel_idx]
+        if key == _SETTINGS_KEY_COPY_SIZE:
+            names = [n for n, _ in COPY_SIZES]
+            cur = settings.get("copy_size", DEFAULT_COPY_SIZE)
+            i = names.index(cur) if cur in names else names.index(DEFAULT_COPY_SIZE)
+            settings["copy_size"] = names[(i + 1) % len(names)]
+            save_settings(settings)
+            continue
         if key == _SETTINGS_KEY_HOTKEY:
             _open_hotkey_settings()
             try:
@@ -266,31 +300,16 @@ def _run_favorites(picker, settings):
         fav_entries = [(format_label(f["alt"], f["url"], f.get("text", "")), f["url"], i)
                        for i, f in enumerate(favs)]
 
-        def _resolve(label, _favs=favs):
-            m = re.match(r'^\S+', label)
-            sel_alt = m.group(0) if m else label
-            for f in _favs:
-                if f["alt"] == sel_alt:
-                    return f
-            return None
-
-        def _copy_fav(label):
-            f = _resolve(label)
-            if not f:
-                return
-            path = get_thumb(f["url"])
-            if path:
-                copy_image_to_clipboard(path)
-                record_copy(f["url"], f["alt"])
-                if settings["notify_on_copy"]:
-                    _notify("Copied to clipboard")
+        alt_to_url = {f["alt"]: f["url"] for f in favs}
+        copy_at, default_px = _make_copy_at(picker, settings, alt_to_url)
+        _copy_fav = lambda label: copy_at(label, default_px)
 
         removed = [False]
         def _remove_fav(label):
-            f = _resolve(label)
-            if not f:
+            url = alt_to_url.get(alt_from_label(label))
+            if url is None:
                 return
-            remove_favorite(f["url"])
+            remove_favorite(url)
             removed[0] = True
             picker.queue_toast("removed from favorites")
             # Close the current pick so the outer loop re-renders the list.
@@ -299,7 +318,9 @@ def _run_favorites(picker, settings):
         on_sel = None if settings["exit_on_select"] else _copy_fav
         result = picker.pick_with_images(
             "Favorites  (right-click to remove):", fav_entries, get_thumb,
-            on_select=on_sel, on_favorite=_remove_fav)
+            on_select=on_sel, on_favorite=_remove_fav,
+            on_copy_size=copy_at, copy_sizes=COPY_SIZES,
+            button_sizes=BUTTON_SIZES, default_copy_px=default_px)
         if removed[0]:
             continue
         if result and settings["exit_on_select"]:
@@ -657,23 +678,12 @@ def main():
                 _match_img    = str(_ui_assets / "face_holding_back_tears_turtle.png")
                 _no_match_img = str(_ui_assets / "cry_turtle.png")
                 all_combo = exact + rest
-
-                def _copy_combo(label, _all=all_combo):
-                    m = re.match(r'^\S+', label)
-                    sel_alt = m.group(0) if m else label
-                    for _, alt, url, _ in _all:
-                        if alt == sel_alt:
-                            path = get_thumb(url)
-                            if path:
-                                copy_image_to_clipboard(path)
-                                record_copy(url, alt)
-                                if settings["notify_on_copy"]:
-                                    _notify("Copied to clipboard")
-                            break
+                combo_by_alt = {alt: url for _, alt, url, _ in all_combo}
+                copy_at_combo, default_px = _make_copy_at(picker, settings, combo_by_alt)
+                _copy_combo = lambda label: copy_at_combo(label, default_px)
 
                 def _toggle_fav_combo(label, _all=all_combo):
-                    m = re.match(r'^\S+', label)
-                    sel_alt = m.group(0) if m else label
+                    sel_alt = alt_from_label(label)
                     for _, alt, url, text in _all:
                         if alt == sel_alt:
                             now_fav = toggle_favorite(alt, url, text)
@@ -715,7 +725,9 @@ def main():
                 result = picker.pick_with_images(
                     f"{query_label} {count}:", combo_entries, get_thumb,
                     on_select=on_sel_combo, patterns=patterns,
-                    prompt_fn=_combo_prompt, on_favorite=on_fav_combo)
+                    prompt_fn=_combo_prompt, on_favorite=on_fav_combo,
+                    on_copy_size=copy_at_combo, copy_sizes=COPY_SIZES,
+                    button_sizes=BUTTON_SIZES, default_copy_px=default_px)
                 _dbg(f"COMBO: pick_with_images done result={result!r}")
                 if result and settings["exit_on_select"]:
                     _copy_combo(result)
@@ -762,22 +774,12 @@ def main():
                 icon_entries = [(format_label(alt, url, text), url, ts)
                                 for ts, alt, url, text in results]
 
-                def _copy_selected(label, _results=results):
-                    m = re.match(r'^\S+', label)
-                    sel_alt = m.group(0) if m else label
-                    for _, alt, url, _ in _results:
-                        if alt == sel_alt:
-                            path = get_thumb(url)
-                            if path:
-                                copy_image_to_clipboard(path)
-                                record_copy(url, alt)
-                                if settings["notify_on_copy"]:
-                                    _notify("Copied to clipboard")
-                            break
+                results_by_alt = {alt: url for _, alt, url, _ in results}
+                copy_at, default_px = _make_copy_at(picker, settings, results_by_alt)
+                _copy_selected = lambda label: copy_at(label, default_px)
 
                 def _toggle_fav_result(label, _results=results):
-                    m = re.match(r'^\S+', label)
-                    sel_alt = m.group(0) if m else label
+                    sel_alt = alt_from_label(label)
                     for _, alt, url, text in _results:
                         if alt == sel_alt:
                             now_fav = toggle_favorite(alt, url, text)
@@ -793,7 +795,9 @@ def main():
                 result = picker.pick_with_images(
                     f"{query_label} {count}:", icon_entries, get_thumb,
                     on_select=on_sel, patterns=patterns, show_research_cb=True,
-                    prompt_fn=_make_prompt, on_favorite=on_fav)
+                    prompt_fn=_make_prompt, on_favorite=on_fav,
+                    on_copy_size=copy_at, copy_sizes=COPY_SIZES,
+                    button_sizes=BUTTON_SIZES, default_copy_px=default_px)
 
                 if picker.result_typed and result:
                     query = result
