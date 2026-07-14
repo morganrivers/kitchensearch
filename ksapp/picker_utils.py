@@ -426,7 +426,27 @@ def _process_exists(pid: int) -> bool:
         return True
     except OSError:
         return False
+    # A crashed-but-unreaped child is a zombie: os.kill(pid, 0) still succeeds
+    # and /proc/<pid>/stat is still readable, yet it is a corpse, not a running
+    # daemon. Treating it as alive is what left the loading screen spinning on a
+    # dead daemon forever.
+    if _proc_is_zombie(pid):
+        return False
     return True
+
+
+def _proc_is_zombie(pid: int) -> bool:
+    """True if pid is a Linux zombie/defunct process. False elsewhere or if the
+    state can't be read (in which case callers fall back to os.kill semantics)."""
+    try:
+        data = Path(f"/proc/{pid}/stat").read_bytes()
+    except OSError:
+        return False
+    try:
+        # Fields after the final ')' are space-separated; state is the first.
+        return data.rsplit(b")", 1)[1].split()[0] == b"Z"
+    except IndexError:
+        return False
 
 
 def _proc_start_time(pid):
@@ -631,6 +651,9 @@ def _spawn_daemon():
         _client_log("_spawn_daemon: KITCHENSEARCH_KILL_DAEMON=1 — killing prior daemon")
         _kill_daemon()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    # Drop a previous daemon's "Ready 100%" status so the loading screen shows
+    # the new daemon's real progress from the first tick, never a stale Ready.
+    DAEMON_STATUS.unlink(missing_ok=True)
     log = open(DAEMON_LOG, "wb")
     if DAEMON_BIN.exists():
         cmd = [str(DAEMON_BIN)]

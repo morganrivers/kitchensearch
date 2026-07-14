@@ -20,6 +20,12 @@ import urllib.request
 from multiprocessing.connection import Client
 from pathlib import Path
 
+# Spawned by file path (picker_utils.STORY_PY), so the repo root is not on
+# sys.path unless ksapp happens to be pip-installed. Put it there before any
+# `ksapp` import so the script runs regardless of how it was launched.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from PIL import Image, ImageDraw, ImageFont
 from platformdirs import user_cache_dir
 from ksapp.log import _dbg

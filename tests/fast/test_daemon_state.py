@@ -101,6 +101,28 @@ class _DaemonStateBase(unittest.TestCase):
         p.stdout.close()
         return p
 
+    def _spawn_zombie(self):
+        """A child that has exited but not been reaped: state 'Z' (defunct).
+
+        os.kill(pid, 0) still succeeds and /proc/<pid>/stat stays readable, so a
+        naive liveness check mistakes the corpse for a running daemon. This is
+        exactly the state a daemon leaves behind when it crashes at import time.
+        Linux-only (relies on /proc).
+        """
+        p = subprocess.Popen([sys.executable, "-c", "import sys; sys.exit(0)"])
+        self._children.append(p)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            try:
+                state = (Path(f"/proc/{p.pid}/stat")
+                         .read_text().rsplit(")", 1)[1].split()[0])
+            except OSError:
+                break
+            if state == "Z":
+                return p
+            time.sleep(0.01)
+        self.fail("could not create a zombie child")
+
     def _write_pid(self, value):
         self._pid_path.write_text(str(value), encoding="utf-8")
 
@@ -195,6 +217,21 @@ class DaemonAliveTest(_DaemonStateBase):
         self._socket_path.touch()
         self.assertTrue(picker_utils._daemon_alive())
         self.assertIsNone(p.poll())
+
+    @unittest.skipUnless(sys.platform.startswith("linux"),
+                         "zombie detection via /proc is linux-only")
+    def test_zombie_with_stale_socket_is_not_alive(self):
+        # Reproduces the production hang: the daemon crashed at import time,
+        # leaving a defunct (zombie) process plus a stale socket file and a
+        # stale "Ready" status from a prior run. os.kill(pid, 0) succeeds on the
+        # zombie, so the old liveness check reported the dead daemon as alive and
+        # the loading screen spun forever on a fake "Ready 100%".
+        p = self._spawn_zombie()
+        self._record_daemon(p.pid)
+        self._status_path.write_text(json.dumps({"pct": 100}), encoding="utf-8")
+        self._socket_path.touch()
+        self.assertFalse(picker_utils._daemon_alive())
+        self.assertFalse(self._pid_path.exists())
 
 
 class ProcIdentityTest(_DaemonStateBase):
@@ -306,6 +343,77 @@ class QueryDaemonTest(_DaemonStateBase):
         self.assertFalse(self._pid_path.exists())
         self.assertFalse(self._socket_path.exists())
         self.assertIsNone(p.poll(), "unrelated process must not be signalled")
+
+
+class DaemonScriptImportTest(unittest.TestCase):
+    """Entry-point scripts under ksapp/ are spawned by file path (see
+    picker_utils.DAEMON_PY / STORY_PY). Invoked that way, the repo root is not
+    on sys.path, so `from ksapp import ...` fails with ModuleNotFoundError
+    unless the package happens to be pip-installed. The scripts must self-heal
+    so they run regardless of how they are launched or whether `pip install -e`
+    was ever run."""
+
+    def _ksapp_import_error(self, script):
+        env = dict(os.environ)
+        env["PYTHONPATH"] = ""  # simulate a launch where ksapp isn't installed
+        with TemporaryDirectory() as cwd:
+            proc = subprocess.Popen(
+                [sys.executable, str(script)],
+                cwd=cwd, env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                _, err = proc.communicate(timeout=10)
+            except subprocess.TimeoutExpired:
+                # Survived the import phase and reached the slow model load /
+                # real work — that is the success case for this test.
+                proc.terminate()
+                try:
+                    _, err = proc.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    _, err = proc.communicate()
+        return err or ""
+
+    def test_split_daemon_importable_when_run_by_path(self):
+        err = self._ksapp_import_error(picker_utils.DAEMON_PY)
+        self.assertNotIn("No module named 'ksapp'", err)
+
+    def test_story_importable_when_run_by_path(self):
+        err = self._ksapp_import_error(picker_utils.STORY_PY)
+        self.assertNotIn("No module named 'ksapp'", err)
+
+
+class SpawnDaemonHygieneTest(_DaemonStateBase):
+    """A fresh spawn must not let a previous daemon's leftovers make the loading
+    screen lie. Otherwise a stale 'Ready 100%' status from an earlier run is
+    shown while the new daemon is still starting (or has crashed)."""
+
+    def setUp(self):
+        super().setUp()
+        self._log_path = Path(self._pid_path.parent) / "split-daemon.log"
+        p = mock.patch.object(picker_utils, "DAEMON_LOG", self._log_path)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_spawn_clears_stale_loading_status(self):
+        self._status_path.write_text(
+            json.dumps({"step": "Ready", "pct": 100.0}), encoding="utf-8")
+        live = self._spawn_dummy()  # a real, live pid for _write_pid_record
+        fake = mock.Mock()
+        fake.pid = live.pid
+        with mock.patch.object(picker_utils.subprocess, "Popen", return_value=fake) as popen:
+            picker_utils._spawn_daemon()
+        # Popen is mocked, so the real process never inherits the daemon log fd;
+        # close it here so it doesn't leak as a ResourceWarning.
+        popen.call_args.kwargs["stdout"].close()
+        self.assertFalse(
+            self._status_path.exists(),
+            "stale loading status must be cleared so the UI shows the new "
+            "daemon's real progress, not a previous run's 'Ready'")
 
 
 if __name__ == "__main__":

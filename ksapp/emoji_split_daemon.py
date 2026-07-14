@@ -22,6 +22,12 @@ import time
 from multiprocessing.connection import Listener
 from pathlib import Path
 
+# Spawned by file path (picker_utils.DAEMON_PY), so the repo root is not on
+# sys.path unless ksapp happens to be pip-installed. Put it there before any
+# `ksapp` import so the daemon runs regardless of how it was launched.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
 from ksapp import minilm_text as _minilm_text
 
