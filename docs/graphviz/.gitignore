@@ -1,6 +1,8 @@
-# Generated diagram artifacts — only the .json sources and .py generators are
-# committed here; the .drawio / .svg / .png are rebuilt from them (locally and
-# by the graphviz-diagram CI workflow).
+# Generated diagram artifacts — the .json sources and .py generators are
+# committed here, as is the editable .drawio (so draw.io's viewer can fetch it
+# by raw URL); the rendered .svg / .png are rebuilt from them (locally and by
+# the graphviz-diagram CI workflow).
 *.drawio
+!kitchensearch_flow_diagram.drawio
 *.svg
 *.png
