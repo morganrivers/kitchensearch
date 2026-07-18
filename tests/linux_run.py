@@ -108,6 +108,7 @@ def main():
 
     print(f"\n  Running {args.test_name} on Linux/X11 …")
     failed = False
+    driver_errors: list[str] = []
     try:
         with harness as h:
             mod.run(h)
@@ -115,7 +116,9 @@ def main():
             h.make_gif(gif)
             print(f"  GIF → {gif}")
     except Exception as exc:
-        print(f"  ERROR: {exc}", file=sys.stderr)
+        msg = f"{type(exc).__name__}: {exc}"
+        print(f"  ERROR: {msg}", file=sys.stderr)
+        driver_errors.append(msg)
         failed = True
 
     clip = dump_clipboard(out_dir)
@@ -124,11 +127,12 @@ def main():
     else:
         print("  Clipboard was empty")
         if args.require_clipboard:
+            driver_errors.append("clipboard required but empty after test")
             failed = True
 
-    stderr = harness.meaningful_stderr
-    if stderr:
-        print(f"  STDERR:\n{stderr}")
+    app_stderr = harness.meaningful_stderr
+    if app_stderr:
+        print(f"  STDERR:\n{app_stderr}")
 
     if args.check_clipboard:
         from check_clipboard import check_test, _print_report
@@ -137,10 +141,15 @@ def main():
         print()
         _print_report(result)
         if result["expected"] and not result["passed"]:
+            driver_errors.append("clipboard does not match approved baseline")
             failed = True
 
+    # Record the driver-level error (raised exception / clipboard mismatch)
+    # alongside the app's own stderr so the render-health gate reports the real
+    # cause instead of "no stderr captured".
+    status_detail = "\n".join(driver_errors + ([app_stderr] if app_stderr else []))
     from run_common import write_status
-    write_status(out_dir, failed, stderr)
+    write_status(out_dir, failed, status_detail)
     sys.exit(1 if failed else 0)
 
 
