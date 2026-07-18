@@ -24,10 +24,12 @@ from ksapp.picker_utils import (
     query_daemon,
     _trim_thumb_cache, _spawn_daemon, _daemon_alive,
     load_favorites, remove_favorite, toggle_favorite, top_copied,
+    open_url_background,
 )
 from ksapp.picker_ui import (
     TkPicker, pick_base_emoji,
 )
+from ksapp import system_theme
 from ksapp.license import LicenseManager
 
 _REPO = Path(__file__).resolve().parent
@@ -44,10 +46,13 @@ _MODE_SETTINGS  = "settings"
 
 _SETTINGS_KEY_HOTKEY             = "__hotkey__"
 _SETTINGS_KEY_COPY_SIZE          = "__copy_size__"
+_SETTINGS_KEY_THEME              = "__theme__"
 _SETTINGS_KEY_LICENSE_BUY        = "__license_buy__"
 _SETTINGS_KEY_LICENSE_ENTER      = "__license_enter__"
 _SETTINGS_KEY_LICENSE_INFO       = "__license_info__"
 _SETTINGS_KEY_LICENSE_DEACTIVATE = "__license_deactivate__"
+
+_LOCKED_FAV_TOOLTIP = "Click to purchase a license enabling favorites and dark mode."
 
 # ── settings ──────────────────────────────────────────────────────────────────
 
@@ -68,7 +73,7 @@ _DEFAULT_SETTINGS = {
     "floating":        _is_tiling_wm(),
     "frameless":       False,
     "always_on_top":   False,
-    "dark_mode":       False,
+    "theme_pref":      "light",
     "zoom":            1.0,
     "copy_size":       DEFAULT_COPY_SIZE,
     "show_copy_bar":   True,
@@ -90,10 +95,18 @@ _BOOL_SETTINGS_ITEMS = [
 def load_settings():
     try:
         data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-        return {**_DEFAULT_SETTINGS, **data}
     except Exception as e:
         _dbg(f"load_settings failed: {e}")
         return dict(_DEFAULT_SETTINGS)
+    merged = {**_DEFAULT_SETTINGS, **data}
+    # Migrate the legacy boolean dark_mode to the three-way theme_pref so the
+    # preference has a single source of truth.
+    if "theme_pref" not in data and "dark_mode" in data:
+        merged["theme_pref"] = "dark" if data.get("dark_mode") else "light"
+    merged.pop("dark_mode", None)
+    if merged.get("theme_pref") not in system_theme.THEME_PREFS:
+        merged["theme_pref"] = "light"
+    return merged
 
 
 def save_settings(s):
@@ -204,6 +217,12 @@ def _run_settings(picker, settings, lic):
         display_items.append(f"Default copy size: {cur_size}  (click to change)")
         item_keys.append(_SETTINGS_KEY_COPY_SIZE)
 
+        # Dark-mode default is a paid feature, matching the dark-mode toggle.
+        if lic.is_licensed():
+            cur_theme = settings.get("theme_pref", "light")
+            display_items.append(f"Default theme: {cur_theme}  (click to change)")
+            item_keys.append(_SETTINGS_KEY_THEME)
+
         if sys.platform == "win32":
             hotkey = settings.get("hotkey", "Ctrl+Alt+K")
             display_items.append(f"Keyboard shortcut: {hotkey}  (click to change)")
@@ -219,7 +238,7 @@ def _run_settings(picker, settings, lic):
             else:
                 if lic.checkout_url():
                     display_items.append(
-                        "Unlock favorites & dark mode — buy a license")
+                        "Unlock favorites & dark mode (buy a license)")
                     item_keys.append(_SETTINGS_KEY_LICENSE_BUY)
                 display_items.append(
                     f"Enter license key  ({lic.status_summary()})")
@@ -227,7 +246,28 @@ def _run_settings(picker, settings, lic):
 
         assert len(item_keys) == len(display_items)
 
-        choice = picker.pick_settings("Settings", display_items, initial_sel=sel_idx)
+        bool_text = dict(base)
+
+        def _inplace_change(idx):
+            """Apply toggles and copy-size cycling in place so the settings
+            list does not reload and jump to the top. Returns the row's new
+            label, or None for action rows the outer loop must handle."""
+            k = item_keys[idx]
+            if k == _SETTINGS_KEY_COPY_SIZE:
+                names = [n for n, _ in COPY_SIZES]
+                cur = settings.get("copy_size", DEFAULT_COPY_SIZE)
+                i = names.index(cur) if cur in names else names.index(DEFAULT_COPY_SIZE)
+                settings["copy_size"] = names[(i + 1) % len(names)]
+                save_settings(settings)
+                return f"Default copy size: {settings['copy_size']}  (click to change)"
+            if k in bool_text:
+                settings[k] = not settings[k]
+                save_settings(settings)
+                return f"{'[x]' if settings[k] else '[ ]'} {bool_text[k]}"
+            return None
+
+        choice = picker.pick_settings("Settings", display_items,
+                                      initial_sel=sel_idx, on_select=_inplace_change)
         if not choice:
             return
         try:
@@ -236,12 +276,14 @@ def _run_settings(picker, settings, lic):
             sel_idx = 0
 
         key = item_keys[sel_idx]
-        if key == _SETTINGS_KEY_COPY_SIZE:
-            names = [n for n, _ in COPY_SIZES]
-            cur = settings.get("copy_size", DEFAULT_COPY_SIZE)
-            i = names.index(cur) if cur in names else names.index(DEFAULT_COPY_SIZE)
-            settings["copy_size"] = names[(i + 1) % len(names)]
+        if key == _SETTINGS_KEY_THEME:
+            order = list(system_theme.THEME_PREFS)
+            cur = settings.get("theme_pref", "light")
+            i = order.index(cur) if cur in order else 0
+            new = order[(i + 1) % len(order)]
+            settings["theme_pref"] = new
             save_settings(settings)
+            picker.set_theme_pref(new)
             continue
         if key == _SETTINGS_KEY_HOTKEY:
             _open_hotkey_settings()
@@ -254,8 +296,7 @@ def _run_settings(picker, settings, lic):
         if key == _SETTINGS_KEY_LICENSE_BUY:
             url = lic.checkout_url()
             if url:
-                import webbrowser
-                webbrowser.open(url)
+                open_url_background(url)
                 entered = picker.ask(
                     "Opening the license checkout in your browser.\n\n"
                     "If it didn't open, click the link below "
@@ -282,11 +323,21 @@ def _run_settings(picker, settings, lic):
                 "activation for another machine.")
             continue
         if key == _SETTINGS_KEY_LICENSE_DEACTIVATE:
-            _ok, msg = lic.deactivate()
-            picker.message(msg)
+            confirm = picker.ask(
+                "Deactivate this device's license?\n\n"
+                "This frees the activation so it can be used on another "
+                "machine. To confirm, type  deactivate kitchensearch  "
+                "exactly, then press Enter (or Esc to cancel):",
+                placeholder="deactivate kitchensearch")
+            if confirm is None:
+                continue
+            if confirm.strip() == "deactivate kitchensearch":
+                _ok, msg = lic.deactivate()
+                picker.message(msg)
+            else:
+                picker.message("Deactivation cancelled: the confirmation "
+                               "text did not match.")
             continue
-        settings[key] = not settings[key]
-        save_settings(settings)
 
 
 def _run_favorites(picker, settings, entries):
@@ -470,7 +521,7 @@ def main():
     _dbg("APP_START")
     # KITCHENSEARCH_NO_DAEMON lets the GUI run fully self-contained: skip the
     # background search/hotkey daemons entirely. The picker only needs them for
-    # semantic search (looked up lazily, on demand), not to start up — so the
+    # semantic search (looked up lazily, on demand), not to start up - so the
     # window comes up the same with or without them. Used by the test harnesses.
     _no_daemon = bool(os.environ.get("KITCHENSEARCH_NO_DAEMON"))
     if sys.platform == "win32" and not _no_daemon:
@@ -486,7 +537,7 @@ def main():
             elif _hotkey_py.exists():
                 _sp.Popen([_PYTHON, str(_hotkey_py)], creationflags=_flags)
     # macOS: tray daemon auto-spawn is disabled. Earlier attempt to spawn it
-    # from here broke subsequent picker launches under the mac-smoke harness —
+    # from here broke subsequent picker launches under the mac-smoke harness -
     # tests 02+ couldn't find the Tk window by pid, likely because rumps's
     # NSApplication and Tk Aqua collide when both run under the same app name.
     # Users can launch `kitchensearch_daemon` manually for now; we'll re-enable
@@ -494,6 +545,15 @@ def main():
     settings = load_settings()
     lic = LicenseManager()
     lic.refresh_async()
+
+    def _locked_fav_url():
+        """Checkout URL for the greyed heart/lock shown to unlicensed users in
+        the favorites column. Returns None when favorites are already unlocked or
+        no purchase URL is configured (so the lock is not drawn)."""
+        if lic.is_licensed():
+            return None
+        return lic.checkout_url() or None
+
     if (sys.platform != "win32"
             and not _no_daemon
             and settings.get("semantic_first", True)
@@ -501,10 +561,6 @@ def main():
             and not _daemon_alive()):
         _spawn_daemon()
     _dbg("APP: TkPicker init start")
-    def _on_dark_toggle(dark):
-        settings["dark_mode"] = dark
-        save_settings(settings)
-
     def _on_zoom_change(factor):
         settings["zoom"] = factor
         save_settings(settings)
@@ -512,8 +568,7 @@ def main():
     picker = TkPicker(
         floating=settings["floating"],
         frameless=settings["frameless"] and not sys.platform == "win32",
-        dark=settings.get("dark_mode", False),
-        on_dark_toggle=_on_dark_toggle,
+        theme_pref=settings.get("theme_pref", "light"),
         always_on_top=settings.get("always_on_top", False),
         zoom=settings.get("zoom", 1.0),
         on_zoom_change=_on_zoom_change,
@@ -770,6 +825,8 @@ def main():
                     on_select=on_sel_combo, patterns=patterns,
                     prompt_fn=_combo_prompt, on_favorite=on_fav_combo,
                     is_favorite_fn=_is_fav_combo,
+                    locked_url=_locked_fav_url(),
+                    locked_tooltip=_LOCKED_FAV_TOOLTIP,
                     on_copy_size=copy_at_combo, copy_sizes=COPY_SIZES,
                     button_sizes=(BUTTON_SIZES if settings["show_copy_bar"] else None), default_copy_px=default_px)
                 _dbg(f"COMBO: pick_with_images done result={result!r}")
@@ -848,6 +905,8 @@ def main():
                     on_select=on_sel, patterns=patterns, show_research_cb=True,
                     prompt_fn=_make_prompt, on_favorite=on_fav,
                     is_favorite_fn=_is_fav_res,
+                    locked_url=_locked_fav_url(),
+                    locked_tooltip=_LOCKED_FAV_TOOLTIP,
                     on_copy_size=copy_at, copy_sizes=COPY_SIZES,
                     button_sizes=(BUTTON_SIZES if settings["show_copy_bar"] else None), default_copy_px=default_px)
 

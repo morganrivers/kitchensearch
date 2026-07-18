@@ -51,7 +51,7 @@ IS_NAMED_PIPE  = IPC_ADDRESS.startswith(r"\\.\pipe")
 DAEMON_STATUS  = CACHE_DIR / "split-daemon-loading.json"
 DAEMON_PY      = _REPO / "emoji_split_daemon.py"
 # Nuitka 4.x sets __file__ for package modules to <dist>/ksapp/…, so _REPO
-# resolves to <dist>/ksapp/ — not the dist root where the binaries live.
+# resolves to <dist>/ksapp/ - not the dist root where the binaries live.
 # Use sys.executable's directory instead; it's correct in both frozen and dev
 # mode (dev: Python interpreter dir has no daemon exe, so _spawn_daemon falls
 # back to DAEMON_PY automatically).
@@ -226,13 +226,22 @@ def _copy_image_xlib(png_data):
         os._exit(0)
 
 
+def _flatten_on_white(img_rgba):
+    """RGBA -> RGB composited over white. Formats without an alpha channel
+    (CF_DIB) must land transparent pixels on some solid color; a bare
+    convert("RGB") leaves them black, so composite over white instead."""
+    flat = Image.new("RGB", img_rgba.size, (255, 255, 255))
+    flat.paste(img_rgba, mask=img_rgba.split()[3])
+    return flat
+
+
 def copy_image_to_clipboard(path):
     png_data = Path(path).read_bytes()
 
     # Test hook: when KITCHENSEARCH_COPY_LOG is set, record a content hash of
     # the image we're about to copy. The source PNG is identical on every OS
     # (same downloaded combo), so this gives a platform-independent record of
-    # *which* image was copied — unlike the clipboard itself, whose encoding
+    # *which* image was copied - unlike the clipboard itself, whose encoding
     # differs per platform (CF_DIB on Windows, raw PNG on macOS/Linux).
     _copy_log = os.environ.get("KITCHENSEARCH_COPY_LOG")
     if _copy_log:
@@ -254,7 +263,7 @@ def copy_image_to_clipboard(path):
         _notify("Clipboard failed (osascript error)")
         return
 
-    # Windows — use Win32 API directly via ctypes to avoid PowerShell startup lag.
+    # Windows - use Win32 API directly via ctypes to avoid PowerShell startup lag.
     # CF_DIB (8) is the most compatible image format; paste into any Windows app.
     if sys.platform == "win32":
         try:
@@ -285,7 +294,7 @@ def copy_image_to_clipboard(path):
             img_rgba = Image.open(path).convert("RGBA")
 
             dib_buf = io.BytesIO()
-            img_rgba.convert("RGB").save(dib_buf, "BMP")
+            _flatten_on_white(img_rgba).save(dib_buf, "BMP")
             dib = dib_buf.getvalue()[14:]
 
             png_buf = io.BytesIO()
@@ -330,6 +339,18 @@ def copy_image_to_clipboard(path):
         return
     with open(path, "rb") as f:
         subprocess.run(cmd, stdin=f, check=True)
+
+
+def open_url_background(url):
+    """Open URL in the default browser without blocking the caller.
+
+    webbrowser.open() can stall for several seconds while it spawns/attaches to
+    the browser process; on the Tk UI thread that freezes the whole app and, in
+    frameless mode, holds input long enough that i3 cannot switch focus to the
+    new window. Spawning it on a daemon thread keeps the UI responsive."""
+    assert isinstance(url, str) and url, "url must be a non-empty string"
+    import webbrowser
+    threading.Thread(target=lambda: webbrowser.open(url), daemon=True).start()
 
 
 def copy_text_to_clipboard(text):
@@ -483,7 +504,7 @@ def _proc_start_time(pid):
         if not out:
             return None
         try:
-            # ps -o lstart= yields "Thu Jun  6 01:11:45 2026" — collapse runs
+            # ps -o lstart= yields "Thu Jun  6 01:11:45 2026" - collapse runs
             # of whitespace so a single-digit day parses with %d.
             normalised = " ".join(out.split())
             return int(_datetime.strptime(
@@ -538,7 +559,7 @@ def _identity_matches(pid, expected_start):
 def _stale_pid_cleanup():
     """Invalidate a stale daemon pid record (POSIX path only).
 
-    On Windows the pid file isn't used at all — liveness is tracked via a
+    On Windows the pid file isn't used at all - liveness is tracked via a
     named mutex owned by the daemon process (auto-released by the kernel
     on exit). Defensive truncate-on-PermissionError fallback is kept for
     POSIX edge cases (e.g. read-only fs after cache corruption).
@@ -556,7 +577,7 @@ def _stale_pid_cleanup():
 
 # Windows-only: daemon liveness is determined by a named mutex the daemon
 # acquires at startup (see ksapp/emoji_split_daemon._acquire_windows_singleton).
-# Mutexes are kernel objects, so they auto-release on process death — no
+# Mutexes are kernel objects, so they auto-release on process death - no
 # stale-file cleanup, no AV/indexer-induced PermissionError on unlink, no
 # pid-reuse race. Must match the mutex name in the daemon.
 _WIN_SPLIT_DAEMON_MUTEX = r"Global\KitchenSearchSplitDaemon"
@@ -583,7 +604,7 @@ def _daemon_status_loaded() -> bool:
 
 
 def _kill_daemon():
-    # Windows: no pid available (we never wrote one) — kill by image name.
+    # Windows: no pid available (we never wrote one) - kill by image name.
     # Both kebab and snake variants exist depending on the Nuitka/Python
     # build combination (see scripts/build_nuitka.sh).
     if IS_NAMED_PIPE:
@@ -614,7 +635,7 @@ def _daemon_alive():
         if not _win_split_daemon_running():
             return False
         # Zombie check: status says loaded but the pipe won't accept a
-        # connection — daemon is wedged, kill so a fresh one can spawn.
+        # connection - daemon is wedged, kill so a fresh one can spawn.
         if _daemon_status_loaded() and _try_connect() is None:
             _kill_daemon()
             return False
@@ -634,7 +655,7 @@ def _daemon_alive():
         _stale_pid_cleanup()
         return False
     # Zombie detection: process is alive, claimed Ready, but socket is gone.
-    # Only kill if the status file says the daemon finished loading — during
+    # Only kill if the status file says the daemon finished loading - during
     # normal startup the socket doesn't exist yet (created after load).
     if not Path(IPC_ADDRESS).exists() and _daemon_status_loaded():
         try:
@@ -648,7 +669,7 @@ def _daemon_alive():
 
 def _spawn_daemon():
     if os.environ.get("KITCHENSEARCH_KILL_DAEMON") == "1":
-        _client_log("_spawn_daemon: KITCHENSEARCH_KILL_DAEMON=1 — killing prior daemon")
+        _client_log("_spawn_daemon: KITCHENSEARCH_KILL_DAEMON=1 - killing prior daemon")
         _kill_daemon()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     # Drop a previous daemon's "Ready 100%" status so the loading screen shows
@@ -719,8 +740,8 @@ def _wait_for_daemon(timeout):
     return False
 
 
-DAEMON_RECV_HARD_TIMEOUT = 30.0  # seconds — escape hatch to unfreeze the UI
-DAEMON_RECV_LOG_EVERY    = 2.0   # seconds — how often to log "still waiting"
+DAEMON_RECV_HARD_TIMEOUT = 30.0  # seconds - escape hatch to unfreeze the UI
+DAEMON_RECV_LOG_EVERY    = 2.0   # seconds - how often to log "still waiting"
 
 
 def query_daemon(query, limit=MAX_RESULTS):
@@ -735,12 +756,12 @@ def query_daemon(query, limit=MAX_RESULTS):
             _spawn_daemon()
         if not _wait_for_daemon(1):
             still_alive = _daemon_alive()
-            _client_log(f"query_daemon: _wait_for_daemon(1s) timed out alive={still_alive} — returning 'loading'")
+            _client_log(f"query_daemon: _wait_for_daemon(1s) timed out alive={still_alive} - returning 'loading'")
             return "loading" if still_alive else None
         conn = _try_connect()
         if conn is None:
             still_alive = _daemon_alive()
-            _client_log(f"query_daemon: reconnect failed alive={still_alive} — returning 'loading'")
+            _client_log(f"query_daemon: reconnect failed alive={still_alive} - returning 'loading'")
             return "loading" if still_alive else None
         _client_log(f"query_daemon: connected after respawn at {int((time.monotonic()-t0)*1000)}ms")
     else:
@@ -766,7 +787,7 @@ def query_daemon(query, limit=MAX_RESULTS):
                     last_log = now
                 if elapsed >= DAEMON_RECV_HARD_TIMEOUT:
                     _client_log(
-                        f"query_daemon: HARD TIMEOUT after {elapsed:.1f}s — "
+                        f"query_daemon: HARD TIMEOUT after {elapsed:.1f}s - "
                         f"giving up on query={query!r}. Check {DAEMON_LOG} for daemon-side state."
                     )
                     return "loading" if _daemon_alive() else None
@@ -1053,16 +1074,16 @@ def get_thumb(url):
 # ── copy sizes ──────────────────────────────────────────────────────────────
 # gstatic serves each emoji-kitchen PNG at a native 534px and downscales via a
 # `=sN` suffix; it never upscales, so 534 is the ceiling. The ladder below spans
-# the useful range from roughly emoji-sized up to native. Keys 1-5 map to these
-# in order; the small/medium/large buttons are the BUTTON_SIZES subset.
+# the useful range from roughly emoji-sized up to a large paste. Keys 1-5 map to
+# these in order; the small/medium/large buttons are the BUTTON_SIZES subset.
 NATIVE_SIZE       = 534
 DEFAULT_COPY_SIZE = "medium"
 COPY_SIZES = [
-    ("small",        72),
-    ("medium-small", 128),
-    ("medium",       256),
-    ("medium-large", 384),
-    ("large",        NATIVE_SIZE),
+    ("small",        48),
+    ("medium-small", 72),
+    ("medium",       128),
+    ("medium-large", 256),
+    ("large",        512),
 ]
 _SIZE_PX = dict(COPY_SIZES)
 BUTTON_SIZES = [(n, _SIZE_PX[n]) for n in ("small", "medium", "large")]
@@ -1180,7 +1201,7 @@ def render_emoji_pil(char, size=20):
         ImageDraw.Draw(canvas).text((10, 10), char, font=font, embedded_color=True)
         bbox = canvas.getbbox()
         if not bbox:
-            _dbg(f"render_emoji_pil: empty bbox for char={char!r} — font rendered nothing")
+            _dbg(f"render_emoji_pil: empty bbox for char={char!r} - font rendered nothing")
             _PIL_EMOJI_CACHE[key] = None
             return None
         img = canvas.crop(bbox).resize((size, size), Image.LANCZOS)

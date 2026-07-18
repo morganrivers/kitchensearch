@@ -24,7 +24,7 @@ FAMILY_SANS = "Liberation Sans"
 
 # Family every widget in this app should name for its `font=(...)` tuple.
 # Linux Tk otherwise routes "Helvetica" through fontconfig aliases that vary
-# by distro (Nimbus Sans, Liberation Sans, ...) — bundling and naming a
+# by distro (Nimbus Sans, Liberation Sans, ...) - bundling and naming a
 # specific TTF keeps the UI text visually identical everywhere.
 # macOS/Windows already ship high-quality UI fonts, so keep the prior names.
 UI_FAMILY = {
@@ -89,7 +89,7 @@ def apply(root) -> None:
     """Point Tk's named fonts at the bundled sans family (Linux only).
 
     Call once, right after tk.Tk() (or tk.Toplevel()) is created. Safe to
-    call more than once — subsequent calls just re-issue the configure.
+    call more than once - subsequent calls just re-issue the configure.
     """
     if sys.platform != "linux":
         return

@@ -13,9 +13,10 @@ import tkinter as tk
 from tkinter import ttk
 
 from ksapp.zoom import ZoomManager
+from ksapp import system_theme
 
 class NiceScrollbar(tk.Canvas):
-    """Rounded, theme-aware scrollbar — drop-in for CTkScrollbar."""
+    """Rounded, theme-aware scrollbar - drop-in for CTkScrollbar."""
 
     def __init__(self, master, command=None, width=14,
                  fg_color="#e0e0e0", button_color="#888888",
@@ -119,6 +120,7 @@ from ksapp.picker_utils import (
     _client_log,
     _cleanup_incomplete_data,
     copy_text_to_clipboard,
+    open_url_background,
 )
 from ksapp.placeholder_entry import PlaceholderManager, DEFAULT_FILTER_PROMPT
 from ksapp import font_setup
@@ -184,16 +186,19 @@ class TkPicker:
         self.SEL_BG     = theme["SEL_BG"]
         self._theme     = theme
 
-    def __init__(self, floating=False, frameless=True, dark=False, on_dark_toggle=None, always_on_top=True, zoom=1.0, on_zoom_change=None):
+    def __init__(self, floating=False, frameless=True, theme_pref="light", always_on_top=True, zoom=1.0, on_zoom_change=None):
         self._destroyed       = False
-        self._dark            = dark
-        self._on_dark_toggle  = on_dark_toggle
+        self._theme_pref      = theme_pref if theme_pref in system_theme.THEME_PREFS else "light"
+        self._session_override = None
+        self._system_scheme   = system_theme.current_scheme()
+        self._theme_watcher   = None
+        self._dark            = self._resolve_dark()
         self._on_zoom_persist    = on_zoom_change
         self._current_view_rebuilder = None
         self._zoom_rebuild_after_id  = None
         self._zoom = ZoomManager(initial=zoom, on_change=self._on_zoom_change)
         self._recompute_scaled_sizes()
-        self._apply_theme(self.DARK if dark else self.LIGHT)
+        self._apply_theme(self.DARK if self._dark else self.LIGHT)
         root = tk.Tk(className="kitchensearch")
         font_setup.apply(root)
         root.withdraw()
@@ -235,6 +240,7 @@ class TkPicker:
         self.root       = root
         self._result       = None
         self.result_typed  = False
+        self._suppress_grab = False
         self._mode      = "input"
         self._rows      = []
         self._sel       = -1
@@ -246,6 +252,7 @@ class TkPicker:
         self._filter_after_id = None
         self._filter_mode = False
         self._on_select  = None
+        self._on_list_select = None
         self._gen_id      = 0  # incremented on each _reset() to detect stale callbacks
         self._active_popup = None
         self._shown             = False
@@ -264,6 +271,10 @@ class TkPicker:
         self._on_favorite         = None
         self._is_favorite_fn      = None
         self._selected_heart_btn  = None
+        self._locked_url          = None  # unlicensed: checkout URL for locked heart/lock
+        self._locked_tooltip      = None  # hover text for the locked heart/lock
+        self._tooltip_win         = None
+        self._tooltip_after       = None
         self._on_copy_size    = None  # (label, px) -> copy selected row at px
         self._copy_sizes      = None  # [(name, px), ...] for number keys 1-5
         self._default_copy_px = None  # px for Ctrl+C / default click
@@ -315,7 +326,7 @@ class TkPicker:
             self._dm_draw()
         except Exception as e:
             _dbg(f"dm button redraw failed: {e}")
-        # Widgets created once in _build() bake in font/size — reconfigure the
+        # Widgets created once in _build() bake in font/size - reconfigure the
         # ones that survive across views so text grows with zoom.
         try:
             self._entry.configure(font=self._font(13))
@@ -564,7 +575,7 @@ class TkPicker:
             w.bind("<Next>",          self._next_page)
             w.bind("<Prior>",         self._prev_page)
         # On Windows, MouseWheel is delivered to the focused widget (the entry),
-        # not the widget under the cursor — so bind directly on the entry too.
+        # not the widget under the cursor - so bind directly on the entry too.
         self._entry.bind("<MouseWheel>", self._on_scroll)
         self._entry.bind("<Button-4>",   self._on_scroll)
         self._entry.bind("<Button-5>",   self._on_scroll)
@@ -606,6 +617,72 @@ class TkPicker:
                              lambda e, n=_n: self._on_size_digit(n))
         self._entry.bind("<Control-c>", self._on_ctrl_copy)
         self._entry.bind("<Control-C>", self._on_ctrl_copy)
+
+        self._start_theme_watcher_if_needed()
+
+    # ── theme preference (light / dark / system) ──────────────────────────────
+
+    def _resolve_dark(self):
+        """Effective dark boolean from pref, live OS scheme, and any temporary
+        manual override set via the toggle button."""
+        if self._session_override is not None:
+            return self._session_override
+        if self._theme_pref == "dark":
+            return True
+        if self._theme_pref == "light":
+            return False
+        return self._system_scheme == "dark"
+
+    def _start_theme_watcher_if_needed(self):
+        want = (self._theme_pref == "system")
+        if want and self._theme_watcher is None:
+            self._theme_watcher = system_theme.SystemThemeWatcher(self._enqueue_scheme_change)
+            self._theme_watcher.start()
+        elif not want and self._theme_watcher is not None:
+            self._theme_watcher.stop()
+            self._theme_watcher = None
+
+    def _enqueue_scheme_change(self, scheme):
+        # Runs on the watcher thread; marshal onto the Tk main thread. after(0)
+        # only fires while a mainloop is active (i.e. a window is shown), which
+        # is exactly when a live retheme is needed; idle gaps are reconciled by
+        # _sync_theme_before_show at the next window.
+        if self._destroyed:
+            return
+        try:
+            self.root.after(0, lambda s=scheme: self._on_system_scheme_change(s))
+        except Exception:
+            pass
+
+    def _on_system_scheme_change(self, scheme):
+        self._system_scheme = scheme
+        if self._theme_pref == "system":
+            # A background OS switch cancels any temporary manual override.
+            self._session_override = None
+            self._apply_dark(self._resolve_dark())
+
+    def set_theme_pref(self, pref):
+        """Persisted preference changed from the settings menu. Persistent
+        chrome (entry, prompt band, copy-size bar, title) is built once and
+        only recoloured by the full retheme walk, so route through _apply_dark
+        rather than relying on a partial rebuild."""
+        assert pref in system_theme.THEME_PREFS, pref
+        self._theme_pref = pref
+        self._session_override = None
+        self._system_scheme = system_theme.current_scheme()
+        self._start_theme_watcher_if_needed()
+        self._apply_dark(self._resolve_dark())
+
+    def _sync_theme_before_show(self):
+        """Reconcile the effective theme just before a window's mainloop runs,
+        picking up any OS change that happened while the app sat idle."""
+        if self._theme_pref == "system" and self._session_override is None:
+            self._system_scheme = system_theme.current_scheme()
+        self._apply_dark(self._resolve_dark())
+
+    def _run_mainloop(self):
+        self._sync_theme_before_show()
+        self.root.mainloop()
 
     # ── copy-size controls ────────────────────────────────────────────────────
 
@@ -652,16 +729,24 @@ class TkPicker:
                 w.bind("<Leave>",    lambda e: _recolor(self.ACCENT))
             self._size_btns.append(b)
 
-        tk.Label(self._size_bar, text="(keys 1-5 copy different sizes)",
-                 bg=self.BG, fg=self.FG_DIM, font=self._font(10)).pack(
-                     side="left", padx=(8, 0))
-
+        # Pack the close first so it always reserves its right-edge slot and can
+        # never be pushed off-screen by the buttons or the hint text.
         close = tk.Label(self._size_bar, text="✕", bg=self.BG, fg=self.FG_DIM,
                          font=self._font(13, "bold"), cursor="hand2")
-        close.pack(side="right", padx=(0, 10))
+        close.pack(side="right", padx=(6, 10))
         close.bind("<Button-1>", lambda e: self._hide_size_bar())
         close.bind("<Enter>",    lambda e: close.configure(fg=self.FG))
         close.bind("<Leave>",    lambda e: close.configure(fg=self.FG_DIM))
+        self._bind_tooltip(close, "copy size bar can be disabled in the settings menu")
+
+        # Fills the space between the buttons and the close; wraplength tracks its
+        # own width so the hint wraps instead of overflowing on a narrow window.
+        hint = tk.Label(self._size_bar, text="(keys 1-5 copy different sizes)",
+                        bg=self.BG, fg=self.FG_DIM, font=self._font(10),
+                        justify="left", anchor="w")
+        hint.pack(side="left", fill="x", expand=True, padx=(8, 0))
+        hint.bind("<Configure>",
+                  lambda e, _l=hint: _l.configure(wraplength=max(e.width, 1)))
 
     def _hide_size_bar(self):
         self._size_bar.pack_forget()
@@ -734,7 +819,7 @@ class TkPicker:
         c = s // 2
         btn.configure(bg=self.BG)
         if self._dark:
-            # Sun — gold disc + 8 short rays
+            # Sun - gold disc + 8 short rays
             r = s // 4
             btn.create_oval(c - r, c - r, c + r, c + r,
                             fill="#FFD700", outline="")
@@ -747,7 +832,7 @@ class TkPicker:
                 btn.create_line(x1, y1, x2, y2,
                                 fill="#FFD700", width=2, capstyle="round")
         else:
-            # Moon — crescent via two overlapping circles
+            # Moon - crescent via two overlapping circles
             r = s // 2 - 3
             btn.create_oval(c - r, c - r, c + r, c + r,
                             fill="#7755bb", outline="")
@@ -827,8 +912,20 @@ class TkPicker:
             self._walk_retheme(child, color_map, _stats)
 
     def _toggle_dark_mode(self):
+        # Manual toggle is a temporary session override: it wins until the OS
+        # scheme changes (in system mode) or the app is relaunched.
+        self._session_override = not self._dark
+        self._apply_dark(self._session_override)
+
+    def _apply_dark(self, new_dark):
+        """Live-retheme every widget to the target dark boolean. No-op when the
+        effective theme is already correct. Shared by the manual toggle, live
+        OS scheme changes, and the pre-show reconcile."""
+        new_dark = bool(new_dark)
+        if new_dark == bool(self._dark):
+            return
         old_theme = self.DARK if self._dark else self.LIGHT
-        new_theme = self.LIGHT if self._dark else self.DARK
+        new_theme = self.DARK if new_dark else self.LIGHT
 
         # Unified old→new color map (includes ROW_COLORS list entries)
         color_map = {}
@@ -840,7 +937,7 @@ class TkPicker:
             else:
                 color_map[old_val] = new_val
 
-        self._dark = not self._dark
+        self._dark = new_dark
         self._apply_theme(new_theme)
 
         _dbg(f"TOGGLE_DARK entering: dark_now={self._dark} virt_mode={self._virt_mode} "
@@ -962,9 +1059,6 @@ class TkPicker:
         if self._back_btn.winfo_ismapped():
             self.root.tk.call('raise', self._back_btn._w)
 
-        if self._on_dark_toggle:
-            self._on_dark_toggle(self._dark)
-
     def _make_rainbow_border(self, root):
         colors = self.RAINBOW_VIVID
 
@@ -1048,7 +1142,7 @@ class TkPicker:
         if always_on_top:
             root.attributes("-topmost", True)
         if floating:
-            # Bypasses WM entirely — no title bar on any WM including i3.
+            # Bypasses WM entirely - no title bar on any WM including i3.
             # focus_force + grab_set_global in _run() handle keyboard focus.
             # root.overrideredirect(True)
             try:
@@ -1117,7 +1211,7 @@ class TkPicker:
                     _dbg(f"SetForegroundWindow failed: {e}")
             self.root.focus_force()
             try:
-                if not os.environ.get("KITCHENSEARCH_NO_GRAB"):
+                if not os.environ.get("KITCHENSEARCH_NO_GRAB") and not self._suppress_grab:
                     if self._frameless:
                         self.root.grab_set_global()
                     else:
@@ -1138,7 +1232,7 @@ class TkPicker:
         if self._pending_toast:
             _msg, self._pending_toast = self._pending_toast, None
             self.root.after(400, lambda m=_msg: self._show_toast(m))
-        self.root.mainloop()
+        self._run_mainloop()
         try:
             self.root.grab_release()
         except tk.TclError:
@@ -1223,7 +1317,7 @@ class TkPicker:
         # Don't gate the delta check on e.num==0: on Windows e.num may not be 0.
         going_down = e.num == 5 or e.delta < 0
         if not self._rows:
-            # No list rows — pan the canvas directly (story/image view)
+            # No list rows - pan the canvas directly (story/image view)
             self._canvas.yview_scroll(1 if going_down else -1, "units")
         elif going_down:
             self._down()
@@ -1305,7 +1399,7 @@ class TkPicker:
         self.root.quit()
 
     def cancel(self):
-        """Public alias for _cancel — lets callers programmatically dismiss the
+        """Public alias for _cancel - lets callers programmatically dismiss the
         current pick (e.g. after mutating the underlying list and wanting to
         re-render)."""
         self._cancel()
@@ -1317,10 +1411,10 @@ class TkPicker:
             self.root.quit()
         elif self._mode == "list":
             if self._sel >= 0 and self._rows:
-                self._result = self._rows[self._sel]["label"]
+                self._activate_list_row(self._sel)
             else:
                 self._result = self._ph.real_text().strip() or None
-            self.root.quit()
+                self.root.quit()
         elif self._mode == "imagelist":
             val = self._ph.real_text().strip()
             if val and self._sel < 0:
@@ -1643,10 +1737,26 @@ class TkPicker:
         if self._mode == "imagelist" and self._on_select is not None and label != LOAD_MORE:
             self._on_select(label)
             self._mark_copied(idx)
-        else:
-            self._result = label
-            self.result_typed = False
-            self.root.quit()
+            return
+        if self._mode == "list":
+            self._activate_list_row(idx)
+            return
+        self._result = label
+        self.result_typed = False
+        self.root.quit()
+
+    def _activate_list_row(self, idx):
+        """Activate a settings-list row. If an on_select callback returns a new
+        label, the change is applied in place (no reload); otherwise the row is
+        treated as a final selection and the picker returns it to the caller."""
+        if self._on_list_select is not None:
+            new_label = self._on_list_select(idx)
+            if new_label is not None:
+                self._update_settings_row(idx, new_label)
+                return
+        self._result = self._rows[idx]["label"]
+        self.result_typed = False
+        self.root.quit()
 
     # ── state management ──────────────────────────────────────────────────────
 
@@ -1676,6 +1786,8 @@ class TkPicker:
         self._img_refs           = []
         self._sel                = -1
         self._result             = None
+        self._suppress_grab      = False
+        self._on_list_select     = None
         self._filter_mode        = False
         self._all_image_children = []
         self._window_start       = 0
@@ -1702,9 +1814,111 @@ class TkPicker:
         self._on_favorite        = None
         self._is_favorite_fn     = None
         self._selected_heart_btn = None
+        self._locked_url         = None
+        self._locked_tooltip     = None
+        self._hide_tooltip()
         self._on_copy_size    = None
         self._copy_sizes      = None
         self._default_copy_px = None
+
+    def _bind_tooltip(self, widget, text):
+        """Show `text` in a small popup while the pointer hovers `widget`.
+        One tooltip window is reused for the whole picker."""
+        def _enter(_e=None):
+            if self._tooltip_after:
+                try: self.root.after_cancel(self._tooltip_after)
+                except Exception: pass
+            self._tooltip_after = self.root.after(
+                400, lambda: self._show_tooltip(widget, text))
+        widget.bind("<Enter>", _enter, add="+")
+        widget.bind("<Leave>", lambda e: self._hide_tooltip(), add="+")
+        widget.bind("<Button-1>", lambda e: self._hide_tooltip(), add="+")
+
+    def _show_tooltip(self, widget, text):
+        self._hide_tooltip()
+        try:
+            x = widget.winfo_rootx() + widget.winfo_width() // 2
+            y = widget.winfo_rooty() + widget.winfo_height() + 4
+        except tk.TclError:
+            return
+        win = tk.Toplevel(self.root)
+        win.wm_overrideredirect(True)
+        win.attributes("-topmost", True)
+        lbl = tk.Label(win, text=text, bg="#222222", fg="#ffffff",
+                       font=self._font(10), padx=8, pady=4,
+                       justify="left", wraplength=260, bd=0)
+        lbl.pack()
+        win.update_idletasks()
+        win.wm_geometry(f"+{max(0, x - win.winfo_width() // 2)}+{y}")
+        self._tooltip_win = win
+
+    def _hide_tooltip(self):
+        if self._tooltip_after:
+            try: self.root.after_cancel(self._tooltip_after)
+            except Exception: pass
+            self._tooltip_after = None
+        if self._tooltip_win is not None:
+            try: self._tooltip_win.destroy()
+            except tk.TclError: pass
+            self._tooltip_win = None
+
+    def _make_lock_icon(self, parent, bg, color, size=16):
+        """Draw a small greyed padlock on a Canvas (reliable at any size,
+        unlike an astral lock glyph that many fonts lack)."""
+        cv = tk.Canvas(parent, width=size, height=size, bg=bg,
+                       highlightthickness=0, bd=0, cursor="hand2")
+        s = size
+        cv.create_arc(s * 0.28, s * 0.10, s * 0.72, s * 0.62,
+                      start=0, extent=180, style="arc", outline=color, width=2)
+        cv.create_rectangle(s * 0.20, s * 0.42, s * 0.80, s * 0.88,
+                            fill=color, outline=color)
+        return cv
+
+    def _pack_locked_favorite(self, row, rbg):
+        """For unlicensed users: a greyed heart with a greyed padlock beneath it
+        in the favorites column. Hover shows the purchase tooltip; left-click opens
+        the checkout URL; right-click offers Open/Copy. Returns the widgets so the
+        caller can theme/scroll-bind them with the rest of the row."""
+        url = self._locked_url
+        cluster = tk.Frame(row, bg=rbg, cursor="hand2")
+        cluster.pack(side="right", padx=(0, 6))
+        heart = tk.Label(cluster, text="♡", bg=rbg, fg=self.FG_DIM,
+                         font=("Helvetica", 14), cursor="hand2",
+                         padx=0, pady=0, highlightthickness=0)
+        heart.pack()
+        lock = self._make_lock_icon(cluster, rbg, self.FG_DIM, size=14)
+        lock.pack()
+        widgets = [cluster, heart, lock]
+
+        def _open(_e=None):
+            self._hide_tooltip()
+            open_url_background(url)
+            return "break"
+
+        def _copy(_e=None):
+            if not copy_text_to_clipboard(url):
+                self.root.clipboard_clear()
+                self.root.clipboard_append(url)
+
+        def _menu(e):
+            self._hide_tooltip()
+            self._dismiss_popup()
+            menu = tk.Menu(self.root, tearoff=0)
+            menu.add_command(label="Open in browser",   command=_open)
+            menu.add_command(label="Copy link address", command=_copy)
+            self._active_popup = menu
+            try:
+                menu.tk_popup(e.x_root, e.y_root)
+            finally:
+                menu.grab_release()
+            return "break"
+
+        for w in widgets:
+            w.bind("<Button-1>", _open)
+            w.bind("<Button-3>", _menu)
+            if self._locked_tooltip:
+                self._bind_tooltip(w, self._locked_tooltip)
+        return widgets
 
     def _pack_clickable_link(self, parent, url):
         """Render `url` as an underlined accent-coloured label. Left-click opens
@@ -1722,7 +1936,11 @@ class TkPicker:
         link.pack(fill="x")
 
         def _open(_e=None):
-            webbrowser.open(url)
+            try:
+                self.root.grab_release()
+            except tk.TclError:
+                pass
+            open_url_background(url)
         def _copy(_e=None):
             ok = copy_text_to_clipboard(url)
             if not ok:
@@ -1755,27 +1973,41 @@ class TkPicker:
 
         If `link_url` is given, render the URL as a clickable/copyable link
         between the prompt and the entry."""
-        self._reset()
-        self._mode = "input"
-        self._set_prompt(prompt)
-        self._show_back_btn()
-        if link_url:
-            self._pack_clickable_link(self._inner, link_url)
-        if placeholder is not None:
-            self._ph.show(placeholder)
+        def _enter():
+            prev_q = "" if self._ph.is_active() else self._entry_var.get()
+            self._reset()
+            self._mode = "input"
+            self._suppress_grab = bool(link_url)
+            self._set_prompt(prompt)
+            self._show_back_btn()
+            if link_url:
+                self._pack_clickable_link(self._inner, link_url)
+            if placeholder is not None:
+                self._ph.show(placeholder)
+            if prev_q:
+                self._entry_var.set(prev_q)
+        self._current_view_rebuilder = _enter
+        _enter()
         return self._run()
 
     def ask_story(self, prompt):
         """Multiline text input for story prompts. Returns typed text or None."""
-        self._reset()
-        self._mode = "story_input"
-        self._set_prompt(prompt)
-        self._show_back_btn()
-        self._entry_row.pack_forget()
+        def _enter():
+            prev = self._story_text.get("1.0", "end-1c") \
+                if self._mode == "story_input" else ""
+            self._reset()
+            self._mode = "story_input"
+            self._set_prompt(prompt)
+            self._show_back_btn()
+            self._entry_row.pack_forget()
+            self._story_text.configure(height=self._story_text_height)
+            self._story_text.delete("1.0", "end")
+            if prev:
+                self._story_text.insert("1.0", prev)
+            self._story_frame.pack(fill="x", pady=(4, 0))
         self._story_text_height = 6
-        self._story_text.configure(height=self._story_text_height)
-        self._story_text.delete("1.0", "end")
-        self._story_frame.pack(fill="x", pady=(4, 0))
+        self._current_view_rebuilder = _enter
+        _enter()
         return self._run()
 
     def _expand_story_text(self, e=None):
@@ -2140,7 +2372,7 @@ class TkPicker:
 
             cids   = []
             photos = []  # kept alive via virt_items, not _img_refs
-            x = max(20, cw // 8)
+            x = self._px(14)
 
             # Segment label into emoji / plain-text runs
             segs, buf, in_em = [], "", False
@@ -2196,69 +2428,90 @@ class TkPicker:
         self._sel  = -1
         ti = 0  # counter for alternating row colors across only toggle rows
         for i, label in enumerate(opts):
-            is_checked   = label.startswith("[x]")
-            is_unchecked = label.startswith("[ ]")
-            is_toggle    = is_checked or is_unchecked
-
+            is_toggle = label.startswith("[x]") or label.startswith("[ ]")
             if is_toggle:
                 rbg = self.ROW_COLORS[ti % len(self.ROW_COLORS)]
                 ti += 1
             else:
                 rbg = self.BG
 
-            row   = tk.Frame(self._inner, bg=rbg, cursor="hand2")
+            row = tk.Frame(self._inner, bg=rbg, cursor="hand2")
             row.pack(fill="x", padx=14, pady=(0, 1) if is_toggle else (6, 2))
+            self._rows.append(self._populate_settings_row(row, i, label, rbg))
 
-            if is_toggle:
-                strip_color = self.ACCENT if is_checked else "#cccccc"
-                strip = tk.Frame(row, bg=strip_color, width=4, bd=0,
-                                 highlightthickness=0)
-                strip.pack(side="left", fill="y")
+    def _populate_settings_row(self, row, i, label, rbg):
+        """Build (or rebuild) the contents of one settings row inside `row`.
+        Shared by the full-list build and single-row in-place updates so a
+        setting change never has to tear down and rebuild the whole list."""
+        for w in row.winfo_children():
+            w.destroy()
+        is_checked   = label.startswith("[x]")
+        is_unchecked = label.startswith("[ ]")
+        is_toggle    = is_checked or is_unchecked
 
-                BOX = 18
-                box_cv = tk.Canvas(row, width=BOX, height=BOX, bg=rbg,
-                                   highlightthickness=0, bd=0)
-                box_cv.pack(side="left", padx=(10, 8), pady=10)
-                if is_checked:
-                    box_cv.create_rectangle(0, 0, BOX, BOX,
-                                            fill=self.ACCENT, outline="")
-                    box_cv.create_line(3, 9,  7, 14, fill="white", width=2,
-                                       capstyle="round", joinstyle="round")
-                    box_cv.create_line(7, 14, 15, 4, fill="white", width=2,
-                                       capstyle="round", joinstyle="round")
-                else:
-                    box_cv.create_rectangle(1, 1, BOX-1, BOX-1,
-                                            fill="", outline="#cccccc", width=2)
+        if is_toggle:
+            strip_color = self.ACCENT if is_checked else "#cccccc"
+            strip = tk.Frame(row, bg=strip_color, width=4, bd=0,
+                             highlightthickness=0)
+            strip.pack(side="left", fill="y")
 
-                display = label[4:]
-                fg = self.FG if is_checked else self.FG_DIM
-                lbl = tk.Label(row, text=display, bg=rbg, fg=fg,
-                               font=self._font(14), anchor="w")
-                lbl.pack(side="left", fill="x", expand=True, pady=10, padx=(0, 12))
-
-                all_widgets = [row, strip, box_cv, lbl]
-                bg_widgets  = [row, box_cv, lbl]
+            BOX = 18
+            box_cv = tk.Canvas(row, width=BOX, height=BOX, bg=rbg,
+                               highlightthickness=0, bd=0)
+            box_cv.pack(side="left", padx=(10, 8), pady=10)
+            if is_checked:
+                box_cv.create_rectangle(0, 0, BOX, BOX,
+                                        fill=self.ACCENT, outline="")
+                box_cv.create_line(3, 9,  7, 14, fill="white", width=2,
+                                   capstyle="round", joinstyle="round")
+                box_cv.create_line(7, 14, 15, 4, fill="white", width=2,
+                                   capstyle="round", joinstyle="round")
             else:
-                inner_ws    = self._pack_rich_label(row, label, rbg,
-                                                    font=self._font(14, "bold"), pady=8)
-                all_widgets = [row] + inner_ws
-                bg_widgets  = all_widgets
+                box_cv.create_rectangle(1, 1, BOX-1, BOX-1,
+                                        fill="", outline="#cccccc", width=2)
 
-            self._rows.append({"frame": row, "label": label,
-                                "row_bg": rbg, "all_widgets": all_widgets,
-                                "bg_widgets": bg_widgets})
-            for w in all_widgets:
-                w.bind("<Button-1>",   lambda e, i=i: self._click_row(i))
-                w.bind("<MouseWheel>", self._on_scroll)
-                w.bind("<Button-4>",   self._on_scroll)
-                w.bind("<Button-5>",   self._on_scroll)
+            display = label[4:]
+            fg = self.FG if is_checked else self.FG_DIM
+            lbl = tk.Label(row, text=display, bg=rbg, fg=fg,
+                           font=self._font(14), anchor="w")
+            lbl.pack(side="left", fill="x", expand=True, pady=10, padx=(0, 12))
 
-    def pick_settings(self, prompt, options, initial_sel=0):
+            all_widgets = [row, strip, box_cv, lbl]
+            bg_widgets  = [row, box_cv, lbl]
+        else:
+            inner_ws    = self._pack_rich_label(row, label, rbg,
+                                                font=self._font(14, "bold"), pady=8)
+            all_widgets = [row] + inner_ws
+            bg_widgets  = all_widgets
+
+        for w in all_widgets:
+            w.bind("<Button-1>",   lambda e, i=i: self._click_row(i))
+            w.bind("<MouseWheel>", self._on_scroll)
+            w.bind("<Button-4>",   self._on_scroll)
+            w.bind("<Button-5>",   self._on_scroll)
+        return {"frame": row, "label": label, "row_bg": rbg,
+                "all_widgets": all_widgets, "bg_widgets": bg_widgets}
+
+    def _update_settings_row(self, idx, new_label):
+        """Replace one settings row's contents in place, preserving scroll
+        position and selection. Used for toggles / copy-size cycling so the
+        list does not reload and jump to the top on every change."""
+        rd = self._rows[idx]
+        self._rows[idx] = self._populate_settings_row(rd["frame"], idx,
+                                                       new_label, rd["row_bg"])
+        self._options[idx] = new_label
+        self._color_row(idx, selected=(idx == self._sel))
+
+    def pick_settings(self, prompt, options, initial_sel=0, on_select=None):
+        """Show a settings list. If `on_select(idx)` is given, clicking/Entering
+        a row calls it: a returned label updates that row in place (no reload),
+        while None makes the row a final selection returned to the caller."""
         def _enter():
             prev_sel = self._sel if self._sel >= 0 else initial_sel
             self._reset()
             self._mode        = "list"
             self._options     = list(options)
+            self._on_list_select = on_select
             self._filter_mode = False
             self._set_prompt(prompt)
             self._show_back_btn()
@@ -2269,7 +2522,7 @@ class TkPicker:
         _enter()
         return self._run()
 
-    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None, is_favorite_fn=None, on_copy_size=None, copy_sizes=None, button_sizes=None, default_copy_px=None):
+    def pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None, is_favorite_fn=None, on_copy_size=None, copy_sizes=None, button_sizes=None, default_copy_px=None, locked_url=None, locked_tooltip=None):
         # Materialize entries once so a rebuild uses the same order (and image
         # workers on the reruns don't re-consume a generator).
         entries = list(entries)
@@ -2281,18 +2534,21 @@ class TkPicker:
                     on_favorite=on_favorite, is_favorite_fn=is_favorite_fn,
                     on_copy_size=on_copy_size,
                     copy_sizes=copy_sizes, button_sizes=button_sizes,
-                    default_copy_px=default_copy_px)
+                    default_copy_px=default_copy_px,
+                    locked_url=locked_url, locked_tooltip=locked_tooltip)
         self._current_view_rebuilder = lambda: self._enter_pick_with_images(**args)
         self._enter_pick_with_images(**args)
         result = self._run()
         _dbg(f"PICK_WITH_IMAGES: _run done result={result!r}")
         return result
 
-    def _enter_pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None, is_favorite_fn=None, on_copy_size=None, copy_sizes=None, button_sizes=None, default_copy_px=None):
+    def _enter_pick_with_images(self, prompt, entries, on_url, on_select=None, thumb_size=None, patterns=None, preload=False, placeholder=None, filter=True, show_dark_btn=False, show_back_btn=True, show_research_cb=False, prompt_fn=None, on_favorite=None, is_favorite_fn=None, on_copy_size=None, copy_sizes=None, button_sizes=None, default_copy_px=None, locked_url=None, locked_tooltip=None):
         thumb = thumb_size if thumb_size is not None else self.THUMB
         self._reset()
         self._on_favorite    = on_favorite
         self._is_favorite_fn = is_favorite_fn
+        self._locked_url     = locked_url
+        self._locked_tooltip = locked_tooltip
         self._on_copy_size    = on_copy_size
         self._copy_sizes      = copy_sizes
         self._default_copy_px = default_copy_px
@@ -2345,7 +2601,7 @@ class TkPicker:
             i = len(self._rows)
             cur_gen = self._gen_id
             if cur_gen != gen:
-                _dbg(f"STALE _append_row label={label!r} row_gen={gen} cur_gen={cur_gen} — STALE CALLBACK from old pick_with_images!", include_tb=True)
+                _dbg(f"STALE _append_row label={label!r} row_gen={gen} cur_gen={cur_gen} - STALE CALLBACK from old pick_with_images!", include_tb=True)
             else:
                 _dbg(f"APPEND_ROW gen={gen} row_idx={i} label={label[:60]!r} inner_children={len(self._inner.winfo_children())}")
             rbg = self.ROW_COLORS[i % len(self.ROW_COLORS)]
@@ -2386,6 +2642,7 @@ class TkPicker:
             txt.bind("<FocusIn>",  lambda e: self._entry.focus_set())
 
             heart_btn = None
+            lock_widgets = []
             if self._on_favorite:
                 is_fav    = self._is_favorite_fn(label) if self._is_favorite_fn else False
                 heart_ch  = "♥" if is_fav else "♡"
@@ -2395,6 +2652,8 @@ class TkPicker:
                                      padx=6, pady=0, takefocus=True,
                                      highlightthickness=0)
                 heart_btn.pack(side="right", padx=(0, 6))
+            elif self._locked_url:
+                lock_widgets = self._pack_locked_favorite(row, rbg)
 
             txt.pack(side="left", fill="x", expand=True, padx=(0, 8), pady=0)
 
@@ -2459,7 +2718,9 @@ class TkPicker:
                 else:
                     txt.insert("end", kw_part, "kw_normal")
 
-            all_widgets = [row, img_lbl, txt] + ([heart_btn] if heart_btn else [])
+            all_widgets = ([row, img_lbl, txt]
+                           + ([heart_btn] if heart_btn else [])
+                           + lock_widgets)
             rd = {"frame": row, "label": label,
                   "row_bg": rbg, "all_widgets": all_widgets,
                   "txt": txt, "_copied": False,
@@ -2523,7 +2784,7 @@ class TkPicker:
             cur_gen = self._gen_id
             _dbg(f"ON_IMAGE_READY gen={gen} cur_gen={cur_gen} rank={rank} label={label[:50]!r} path_ok={path is not None}")
             if cur_gen != gen:
-                _dbg(f"STALE ON_IMAGE_READY rank={rank} label={label[:50]!r} — dropping stale callback gen={gen} cur={cur_gen}")
+                _dbg(f"STALE ON_IMAGE_READY rank={rank} label={label[:50]!r} - dropping stale callback gen={gen} cur={cur_gen}")
                 return
             photo = None
             if path:
@@ -2534,10 +2795,10 @@ class TkPicker:
                 except Exception as e:
                     _dbg(f"ON_IMAGE_READY: PhotoImage failed path={path!r}: {e}")
             if photo is None:
-                _dbg(f"ON_IMAGE_READY: using blank placeholder rank={rank} label={label[:50]!r}")
-                photo = ImageTk.PhotoImage(Image.new("RGBA", (thumb, thumb), (0, 0, 0, 0)))
-                self._img_refs.append(photo)
-            pending[rank] = (label, photo, score)
+                _dbg(f"ON_IMAGE_READY: no image, skipping row rank={rank} label={label[:50]!r}")
+                pending[rank] = None
+            else:
+                pending[rank] = (label, photo, score)
             _flush()
 
         dispatched = [0]
@@ -2740,7 +3001,7 @@ class TkPicker:
 
         worker_thread = threading.Thread(target=_worker, daemon=True)
         worker_thread.start()
-        self.root.mainloop()
+        self._run_mainloop()
         self.root.bind("<Escape>", self._cancel)
 
         if skipped[0]:
@@ -2847,7 +3108,7 @@ class TkPicker:
             self.root.after(150, _poll)
 
         self.root.after(150, _poll)
-        self.root.mainloop()
+        self._run_mainloop()
         return not cancelled[0]
 
     def show_story_progress(self, cmd):
@@ -2934,7 +3195,7 @@ class TkPicker:
                 self.root.after(0, self.root.quit)
 
         threading.Thread(target=_worker, daemon=True).start()
-        self.root.mainloop()
+        self._run_mainloop()
         self._progbar.stop()
         return error[0]
 
@@ -2963,7 +3224,7 @@ class TkPicker:
             self.root.after(0, self.root.quit)
 
         threading.Thread(target=_worker, daemon=True).start()
-        self.root.mainloop()
+        self._run_mainloop()
         self._progbar.stop()
 
         if error[0]:
@@ -3015,6 +3276,9 @@ class TkPicker:
 
     def destroy(self):
         self._destroyed = True
+        if self._theme_watcher is not None:
+            self._theme_watcher.stop()
+            self._theme_watcher = None
         try: self.root.destroy()
         except Exception as e: _dbg(f"root destroy failed: {e}")
 

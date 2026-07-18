@@ -1,67 +1,105 @@
-"""
-License management via Polar.sh (https://polar.sh).
-
-Kitchen Search is an offline desktop app, so licensing is built around Polar's
-*customer portal* license-key endpoints, which are public (no API token) and
-safe to call from a distributed client:
-
-    POST /v1/customer-portal/license-keys/activate
-    POST /v1/customer-portal/license-keys/validate
-    POST /v1/customer-portal/license-keys/deactivate
-
-Flow
-----
-1. The user buys a license on Polar's hosted checkout. Polar generates a key
-   and emails it to them. We never touch payment data.
-2. The user pastes the key into Settings. We call `activate`, which reserves one
-   activation slot for this machine and returns an `activation_id` we store.
-   Polar enforces the per-key activation limit configured in the dashboard, so a
-   key posted publicly stops working once its slots are exhausted (and the owner
-   can revoke a leaked key from the dashboard).
-3. `is_licensed()` is a fast, offline check against cached state. We only hit the
-   network to (re)validate periodically, and we keep working offline within a
-   grace window so the app stays usable on a plane.
-
-The activation is per-machine but the model is per-user: set a generous
-activation limit (~20-25) in the Polar dashboard so legitimate multi-device use
-never trips it while shared keys saturate quickly.
-"""
-
+import base64
+import hashlib
+import hmac
 import json
+import os
 import socket
 import threading
 import time
 import urllib.error
 import urllib.request
+import uuid
 
 from ksapp.log import _dbg
 from ksapp.ssl_ctx import ssl_ctx
 from ksapp.picker_utils import CONFIG_DIR
 
 # ── configuration ───────────────────────────────────────────────────────────
-# Fill these in with values from your Polar dashboard. ORGANIZATION_ID is the
-# UUID of the Polar organization that owns the license-key benefit. Until it is
-# set, licensing stays disabled and all gated features remain hidden.
-# POLAR_CHECKOUT_URL is the public checkout link the Settings screen opens when
-# the user clicks "Buy a license"; it should resolve to a Polar product that
-# grants a license-key benefit on purchase.
-POLAR_ORGANIZATION_ID = "4fe552d5-9e18-4b49-ad80-d46ee070515a"
-POLAR_CHECKOUT_URL    = "https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_4bJTxctynmYttDxJvFIEt5rPlK50Rtt7VAyOm48uZ4s/redirect"
-POLAR_API_BASE        = "https://sandbox-api.polar.sh"
+_SANDBOX = os.environ.get("KS_SANDBOX") == "1"
+
+POLAR_ORGANIZATION_ID = ("4fe552d5-9e18-4b49-ad80-d46ee070515a" if _SANDBOX
+                         else "a68cb446-bae8-49e0-a45c-7bd0f35ec8ac")
+POLAR_API_BASE        = ("https://sandbox-api.polar.sh" if _SANDBOX
+                         else "https://api.polar.sh")
+POLAR_CHECKOUT_URL    = ("https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_4bJTxctynmYttDxJvFIEt5rPlK50Rtt7VAyOm48uZ4s/redirect" if _SANDBOX
+                         else "https://buy.polar.sh/polar_cl_ZMalIyTWg5yqsmoqd9mY0uHMMWLfPhO687XwU3bSRSP")
+
+# ── offline entitlement cert ─────────────────────────────────────────────────
+LICENSE_PUBLIC_KEY_B64 = ("ZMUvky6AS45CAYVzBsBVo+M81pxDtOfHjU8cFjtdAaI=" if _SANDBOX
+                          else "EERxu73hs6ulRUZXf7XzlkkRms4Kydlvlszl2tCZYH0=")
+CERT_METADATA_KEY      = "ks_cert"
 
 _LICENSE_FILE = CONFIG_DIR / "license.json"
 
-# How often we attempt an online re-validation (seconds).
-_RECHECK_SECONDS = 30 * 86400      # 30 days
-# How long the app keeps features unlocked while offline before locking down,
-# measured from the last *successful* validation (seconds).
-_GRACE_SECONDS   = 90 * 86400      # 90 days
+_S_A = b"\x02\x4e\xf7\x4a\xa6\xc0\x11\xdf\x3e\x34\x03\x4c\x34\xba\x0f\xa5\xe9\xd5\x4f\x29\xda\x1b\xa0\x7c\xb4\xd3\x7f\x46\x07\xd4\x6e\x00"
+_S_B = b"\x3c\x5c\xa5\x30\x6c\x92\xca\xcb\x5e\xc5\x31\x05\xaa\x4f\x2b\x56\xbb\xc3\xf8\x0f\xa8\xd3\x72\x32\x70\xc7\x0e\x94\x06\xc3\x32\xe4"
+_LICENSE_SECRET = bytes(a ^ b for a, b in zip(_S_A, _S_B))
+
+_SIGNED_FIELDS = ("key", "activation_id", "valid", "last_validated_at",
+                  "limit_activations", "usage", "customer_id", CERT_METADATA_KEY)
+
+
+def _machine_fingerprint():
+    """A stable-ish per-machine id so a signed license.json copied to another
+    machine fails verification. Hashed so the raw identifiers never hit disk."""
+    parts = []
+    try:
+        parts.append(str(uuid.getnode()))          # MAC-derived node id
+    except Exception:
+        pass
+    try:
+        parts.append(socket.gethostname() or "")
+    except Exception:
+        pass
+    for path in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                parts.append(fh.read().strip())
+                break
+        except Exception:
+            pass
+    raw = "|".join(p for p in parts if p) or "kitchensearch"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _sign_state(state):
+    payload = {k: state.get(k) for k in _SIGNED_FIELDS}
+    payload["_fp"] = _machine_fingerprint()
+    msg = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hmac.new(_LICENSE_SECRET, msg, hashlib.sha256).hexdigest()
+
+
+def _b64url_decode(s):
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+def verify_cert(token, expected_customer_id=None):
+    if not token:
+        return None
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    from cryptography.exceptions import InvalidSignature
+    try:
+        payload_b64, sig_b64 = token.split(".", 1)
+        payload_bytes = _b64url_decode(payload_b64)
+        pub = Ed25519PublicKey.from_public_bytes(base64.b64decode(LICENSE_PUBLIC_KEY_B64))
+        pub.verify(_b64url_decode(sig_b64), payload_bytes)
+        payload = json.loads(payload_bytes)
+    except (ValueError, InvalidSignature):
+        return None
+    assert isinstance(payload, dict)
+    if payload.get("v") != 1:
+        return None
+    if expected_customer_id is not None and payload.get("customer_id") != expected_customer_id:
+        return None
+    return payload
+
+_RECHECK_SECONDS = 30 * 86400
+_GRACE_SECONDS   = 90 * 86400
 
 _HTTP_TIMEOUT = 10
 
 
 def _machine_label():
-    """A human-readable label so the owner can recognise activations in Polar."""
     try:
         return socket.gethostname() or "kitchensearch"
     except Exception:
@@ -69,13 +107,6 @@ def _machine_label():
 
 
 class LicenseManager:
-    """Caches license state on disk and talks to Polar's customer-portal API.
-
-    `is_licensed()` never blocks on the network; it reads cached state. Network
-    calls happen only on explicit user action (`activate`/`deactivate`) and via
-    `refresh_async()`, which re-validates in the background when state is stale.
-    """
-
     def __init__(self):
         self._lock  = threading.Lock()
         self._state = self._load()
@@ -83,27 +114,31 @@ class LicenseManager:
     # ── persistence ─────────────────────────────────────────────────────────
     def _load(self):
         try:
-            return json.loads(_LICENSE_FILE.read_text(encoding="utf-8"))
+            raw = json.loads(_LICENSE_FILE.read_text(encoding="utf-8"))
         except Exception:
             return {}
+        if not isinstance(raw, dict):
+            return {}
+        sig = raw.get("_sig")
+        if isinstance(sig, str) and hmac.compare_digest(sig, _sign_state(raw)):
+            return raw
+        recovered = {k: raw.get(k) for k in ("key", "activation_id",
+                                             "limit_activations", "usage")
+                     if raw.get(k) is not None}
+        recovered["valid"] = False
+        recovered["last_validated_at"] = 0
+        return recovered
 
     def _save(self):
-        """Persist self._state atomically. Raises on failure so callers can
-        roll back rather than silently burning an activation slot."""
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        out = dict(self._state)
+        out["_sig"] = _sign_state(out)
         tmp = _LICENSE_FILE.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(self._state, indent=2), encoding="utf-8")
+        tmp.write_text(json.dumps(out, indent=2), encoding="utf-8")
         tmp.replace(_LICENSE_FILE)
 
     # ── HTTP ──────────────────────────────────────────────────────────────────
     def _post(self, endpoint, payload):
-        """POST JSON to a customer-portal endpoint.
-
-        Returns (status_code, parsed_body_or_None). Network/transport failures
-        surface as status_code None so callers can distinguish "can't reach
-        Polar" (keep the grace window) from "Polar said no" (definitively
-        invalid).
-        """
         url  = f"{POLAR_API_BASE}{endpoint}"
         data = json.dumps(payload).encode("utf-8")
         req  = urllib.request.Request(
@@ -145,13 +180,14 @@ class LicenseManager:
 
     @staticmethod
     def checkout_url():
-        """Public checkout URL the Settings 'Buy a license' entry opens in a
-        browser. Empty string means buy flow is not configured."""
         return POLAR_CHECKOUT_URL
 
+    def _cert_ok(self):
+        payload = verify_cert(self._state.get(CERT_METADATA_KEY),
+                              self._state.get("customer_id"))
+        return payload is not None and time.time() < payload.get("expires_at", 0)
+
     def is_licensed(self):
-        """Fast, offline check. True only if we have a validated activation that
-        hasn't outlived the offline grace window."""
         st = self._state
         if not st.get("key") or not st.get("activation_id"):
             return False
@@ -160,7 +196,7 @@ class LicenseManager:
         last = st.get("last_validated_at", 0)
         if time.time() - last > _GRACE_SECONDS:
             return False
-        return True
+        return self._cert_ok()
 
     def status_summary(self):
         """Short human-readable status for the settings screen."""
@@ -179,7 +215,6 @@ class LicenseManager:
 
     # ── operations ─────────────────────────────────────────────────────────
     def activate(self, key):
-        """Activate `key` for this machine. Returns (ok: bool, message: str)."""
         key = (key or "").strip()
         if not key:
             return False, "No license key entered."
@@ -217,25 +252,25 @@ class LicenseManager:
             try:
                 self._save()
             except Exception as e:
-                # Polar already consumed an activation slot; rolling back our
-                # cache means is_licensed() stays False so the user can retry
-                # without thinking it worked. They will need to deactivate via
-                # the dashboard to free the slot.
                 self._state = prev_state
                 _dbg(f"license save failed during activate: {e}")
                 return False, (
                     "License activated on the server, but the local cache could "
                     "not be saved.\nCheck that your config directory is writable "
                     "and try again.")
+
+        for attempt in range(4):
+            if self.validate() and self.is_licensed():
+                break
+            if attempt < 3:
+                time.sleep(2)
+        if not self.is_licensed():
+            return True, ("License activated, but its entitlement is still "
+                          "being issued.\nIt will unlock automatically shortly. "
+                          "Reopening the app refreshes it.")
         return True, "License activated. Thanks for your support!"
 
     def validate(self):
-        """Re-check the current activation against Polar. Returns bool.
-
-        Updates cached state. A transport failure leaves state untouched so the
-        grace window keeps the app usable offline; an explicit rejection marks
-        the license invalid (this is how a revoked/over-limit key gets locked
-        out at the next check)."""
         st = self._state
         key, activation_id = st.get("key"), st.get("activation_id")
         if not key or not activation_id or not self.configured():
@@ -251,10 +286,6 @@ class LicenseManager:
             return self.is_licensed()  # offline: trust the grace window
 
         with self._lock:
-            # A concurrent deactivate() may have cleared our state while the
-            # validate POST was in flight. If activation_id changed under us,
-            # drop this response on the floor — otherwise a successful response
-            # would silently re-license a machine the user just deactivated.
             if self._state.get("activation_id") != activation_id:
                 return False
             if status == 200 and (body or {}).get("status") == "granted":
@@ -264,9 +295,11 @@ class LicenseManager:
                     self._state["limit_activations"] = body["limit_activations"]
                 if body.get("usage") is not None:
                     self._state["usage"] = body["usage"]
-                ok = True
+                self._state["customer_id"] = body.get("customer_id")
+                metadata = (body.get("customer") or {}).get("metadata") or {}
+                self._state[CERT_METADATA_KEY] = metadata.get(CERT_METADATA_KEY)
+                ok = self.is_licensed()
             else:
-                # Polar reached and said no: revoked, disabled, or unknown key.
                 self._state["valid"] = False
                 ok = False
             try:
@@ -276,12 +309,6 @@ class LicenseManager:
         return ok
 
     def deactivate(self):
-        """Release this machine's activation slot. Returns (ok, message).
-
-        Local state is cleared *only* on a real success (or 404 = already gone
-        server-side). Network failures and Polar errors leave local state
-        intact so the user can retry without leaking the slot on Polar's side.
-        """
         st = self._state
         key, activation_id = st.get("key"), st.get("activation_id")
         if not key or not activation_id:
@@ -305,9 +332,6 @@ class LicenseManager:
             try:
                 self._save()
             except Exception as e:
-                # Server already freed the slot; local cache write failed, so
-                # is_licensed() will still report True until the file is
-                # writable again. Surface this so the user can fix permissions.
                 self._state = prev_state
                 _dbg(f"license save failed during deactivate: {e}")
                 return False, (
@@ -316,11 +340,11 @@ class LicenseManager:
         return True, "License deactivated on this device."
 
     def refresh_async(self):
-        """If cached state is stale, re-validate in a background thread so the
-        UI is never blocked. Safe to call once at startup."""
         st = self._state
         if not st.get("key") or not st.get("activation_id") or not self.configured():
             return
-        if time.time() - st.get("last_validated_at", 0) < _RECHECK_SECONDS:
+        stale = time.time() - st.get("last_validated_at", 0) >= _RECHECK_SECONDS
+        cert_pending = st.get("valid") and not self._cert_ok()
+        if not (stale or cert_pending):
             return
         threading.Thread(target=self.validate, daemon=True).start()

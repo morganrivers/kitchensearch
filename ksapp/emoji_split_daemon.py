@@ -276,11 +276,11 @@ def main():
                 from multiprocessing.connection import Client as _Client
                 _c = _Client(IPC_ADDRESS)
                 _c.close()
-                # Another healthy daemon is already listening — don't clobber it.
+                # Another healthy daemon is already listening - don't clobber it.
                 print("Daemon already running. Exiting.", flush=True)
                 sys.exit(0)
             except (ConnectionRefusedError, OSError):
-                # Stale socket file from a crashed daemon — safe to remove.
+                # Stale socket file from a crashed daemon - safe to remove.
                 sock_path.unlink(missing_ok=True)
 
     (model, base_minilm, code_to_idx, combo_map,
@@ -301,10 +301,10 @@ def main():
             try:
                 conn = listener.accept()
             except OSError as e:
-                _dlog(f"main: listener.accept OSError: {e} — exiting accept loop")
+                _dlog(f"main: listener.accept OSError: {e} - exiting accept loop")
                 break
             _last_activity[0] = time.monotonic()
-            _dlog("main: accepted new connection — dispatching handler thread")
+            _dlog("main: accepted new connection - dispatching handler thread")
             threading.Thread(
                 target=handle,
                 args=(conn, model, base_minilm, code_to_idx, combo_map,

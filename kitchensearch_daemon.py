@@ -5,7 +5,7 @@ KitchenSearch background daemon.
 Windows: registers a global hotkey (default Ctrl+Alt+K), hosts a system-tray
 icon, and adds itself to the registry for login auto-start.
 
-macOS: hosts a status-bar (menu-bar) icon via rumps. No global hotkey — users
+macOS: hosts a status-bar (menu-bar) icon via rumps. No global hotkey - users
 bind one through Raycast/Alfred/System Settings against the `kitchensearch`
 command. Menu items spawn the picker as a subprocess.
 """
@@ -176,7 +176,7 @@ def _spawn():
         cmd = [str(_PYTHON), str(_PICKER_PY)]
     _picker_proc[0] = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NO_WINDOW)
 
-# ── tray icon — Win32 via ctypes ──────────────────────────────────────────────
+# ── tray icon - Win32 via ctypes ──────────────────────────────────────────────
 
 _WM_DESTROY = 0x0002
 _WM_TRAY    = 0x8001   # WM_APP+1, tray callback message
@@ -326,7 +326,7 @@ def _show_menu(hwnd):
 def _launch_settings():
     threading.Thread(target=_open_settings, daemon=True).start()
 
-# hwnd of the tray window — set once _run() creates it; used by _restart_daemon().
+# hwnd of the tray window - set once _run() creates it; used by _restart_daemon().
 _tray_hwnd = [None]
 
 # ── hotkey + tray message loop ────────────────────────────────────────────────
@@ -369,7 +369,7 @@ def _run():
                 _spawn()
         elif msg == wm_taskbar_created and state["hicon"]:
             _add_tray_icon(hwnd, state["hicon"])
-        elif msg == 0x0010:  # WM_CLOSE — destroy window and exit message loop
+        elif msg == 0x0010:  # WM_CLOSE - destroy window and exit message loop
             print(f"[{APP_NAME}] WM_CLOSE received, shutting down tray")
             user32.DestroyWindow(hwnd)
         elif msg == _WM_DESTROY:
@@ -390,7 +390,7 @@ def _run():
     hwnd = user32.CreateWindowExW(
         0, class_name, APP_NAME, 0,
         0, 0, 0, 0,
-        ctypes.c_void_p(-3),   # HWND_MESSAGE — invisible message-only window
+        ctypes.c_void_p(-3),   # HWND_MESSAGE - invisible message-only window
         None, hinstance, None,
     )
     if not hwnd:
@@ -402,7 +402,7 @@ def _run():
 
     if not user32.RegisterHotKey(hwnd, _HOTKEY_ID, hotkey_mods, hotkey_vk):
         err = kernel32.GetLastError()
-        print(f"[{APP_NAME}] RegisterHotKey failed (err {err}) — hotkey may be in use by another app")
+        print(f"[{APP_NAME}] RegisterHotKey failed (err {err}) - hotkey may be in use by another app")
     else:
         print(f"[{APP_NAME}] Hotkey registered: {hotkey}")
 
@@ -492,7 +492,7 @@ def _open_settings():
             display.config(fg="#1a1a1a")
         except ValueError:
             captured["valid"] = False
-            hotkey_var.set(f"{hotkey_str}  — unsupported key")
+            hotkey_var.set(f"{hotkey_str}  (unsupported key)")
             display.config(fg="#cc0000")
         return "break"
 
@@ -542,7 +542,7 @@ def _restart_daemon():
         subprocess.Popen([str(_DAEMON_EXE)], creationflags=_flags)
     else:
         subprocess.Popen([str(_PYTHON), str(_SELF)], creationflags=_flags)
-    # Find the tray window — works whether we're the tray process or a --settings subprocess.
+    # Find the tray window - works whether we're the tray process or a --settings subprocess.
     hwnd = _tray_hwnd[0] or ctypes.windll.user32.FindWindowW("KitchenSearchTray", None)
     if hwnd:
         print(f"[{APP_NAME}] posting WM_CLOSE to tray hwnd {hwnd}")
@@ -642,7 +642,7 @@ def _main_win():
     if "--setup" in args:
         return
 
-    # Named mutex — one tray instance at a time.
+    # Named mutex - one tray instance at a time.
     # Retry for up to 2 s so a restarted instance can wait for the old one to exit.
     import time as _time
     for _attempt in range(20):
