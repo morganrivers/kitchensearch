@@ -98,15 +98,10 @@ jobs:
           path: tests/test_run/test_02_keyword_search/
           if-no-files-found: warn
 
-      - name: Run test_15_banner
-        continue-on-error: true
-        run: '"$TOOL_PY" tests/mac_run.py test_15_banner'
-      - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gif-test_15_banner
-          path: tests/test_run/test_15_banner/
-          if-no-files-found: warn
+      # test_15_banner and test_30_manyresults are skipped on macOS: they drive
+      # the UI with mouse events (mousedown/click), which the macOS harness does
+      # not implement (tests/mac_harness.py). Linux and Windows run them. Restore
+      # them here once mac_harness gains mouse support.
 
       - name: Run test_16_story
         continue-on-error: true
@@ -116,16 +111,6 @@ jobs:
         with:
           name: gif-test_16_story
           path: tests/test_run/test_16_story/
-          if-no-files-found: warn
-
-      - name: Run test_30_manyresults
-        continue-on-error: true
-        run: '"$TOOL_PY" tests/mac_run.py test_30_manyresults'
-      - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gif-test_30_manyresults
-          path: tests/test_run/test_30_manyresults/
           if-no-files-found: warn
 
       - name: Run test_31_darkmode
@@ -155,10 +140,13 @@ jobs:
       - name: Verify render health
         if: always()
         # test_16_story's copied image needs the semantic-story model, which
-        # isn't available in CI, so skip it here.
+        # isn't available in CI, so skip it here. test_15_banner and
+        # test_30_manyresults are not run on macOS (mouse events unsupported),
+        # so skip them too in case a stale run folder lingers.
         run: |
-          "$TOOL_PY" tests/health_check.py --all --skip test_16_story --run-dir tests/test_run --json > tests/test_run/health-check.json || true
-          "$TOOL_PY" tests/health_check.py --all --skip test_16_story --run-dir tests/test_run
+          SKIP="--skip test_16_story --skip test_15_banner --skip test_30_manyresults"
+          "$TOOL_PY" tests/health_check.py --all $SKIP --run-dir tests/test_run --json > tests/test_run/health-check.json || true
+          "$TOOL_PY" tests/health_check.py --all $SKIP --run-dir tests/test_run
       - if: always()
         uses: actions/upload-artifact@v4
         with:
