@@ -4,8 +4,10 @@
 Offline companion to ``tests/os_compare.py``. Instead of pulling artifacts with
 the GitHub CLI, this points straight at directories of PNGs you already have on
 disk — unzipped CI artifacts, or a local ``tests/test_run`` — and builds one
-self-contained HTML page that places each OS's copied image next to the others,
-matched by test (and optionally by step).
+self-contained, multi-page HTML report: a contact-sheet overview page followed
+by one page per test placing each OS's copied image next to the others, matched
+by test (and optionally by step). The pages carry print page-breaks, so the
+browser's "Save as PDF" yields a single multi-page PDF.
 
 Why a separate tool: ``os_compare.py`` needs ``gh`` + network + auth. This one
 needs nothing but the PNGs, so it works on a laptop with three downloaded
@@ -57,6 +59,7 @@ _OS_ALIASES = {
 _STEP_RE = re.compile(r"(test_\d+_[a-z0-9_]+)", re.I)
 _STEP_NUM_RE = re.compile(r"^(\d+)_")
 _DEFAULT_THUMB = 360
+_OVERVIEW_THUMB = 140   # small contact-sheet thumbnails on the summary page
 
 
 def _clip_images(folder: Path):
@@ -132,11 +135,15 @@ def _resolve_os_dirs(args):
     return dirs
 
 
-def _render_cell(entries, size, all_steps):
+def _hash6(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:6]
+
+
+def _figures(entries, size, all_steps):
+    """Inner HTML (stacked <figure>s) + the set of content hashes for one OS."""
     if not entries:
-        return '<td class="missing">— copied nothing</td>', set()
-    hashes = set()
-    blocks = []
+        return '<div class="missing">— copied nothing</div>', set()
+    hashes, blocks = set(), []
     for label, path in entries:
         b64, short, dims = _thumb(path, size)
         hashes.add(short)
@@ -145,63 +152,114 @@ def _render_cell(entries, size, all_steps):
             f'<figure><a href="data:image/png;base64,{b64}" target="_blank">'
             f'<img src="data:image/png;base64,{b64}"></a>'
             f'<figcaption>{cap}</figcaption></figure>')
-    return f'<td>{"".join(blocks)}</td>', hashes
+    return "".join(blocks), hashes
+
+
+def _diverges(per_os, active, test):
+    """(differs, n_present) — final copied image per OS compared across OSes."""
+    final_hashes, present = set(), 0
+    for o in active:
+        entries = per_os[o].get(test, [])
+        if entries:
+            present += 1
+            final_hashes.add(_hash6(entries[-1][1]))
+    return (len(final_hashes) > 1 or present < len(active)), present
+
+
+def _overview_table(per_os, active, tests, all_steps):
+    """Page 1: compact contact-sheet of every test, small thumbnails."""
+    rows = ['<table><thead><tr><th>test</th>'
+            + "".join(f"<th>{o}</th>" for o in active) + "</tr></thead><tbody>"]
+    for test in tests:
+        cells = []
+        for o in active:
+            inner, _ = _figures(per_os[o].get(test, []), _OVERVIEW_THUMB, all_steps)
+            cls = ' class="missing"' if not per_os[o].get(test) else ""
+            cells.append(f"<td{cls}>{inner}</td>")
+        differs, _ = _diverges(per_os, active, test)
+        cls = ' class="diff"' if differs else ""
+        flag = "⚠" if differs else "✓"
+        anchor = f'<a href="#{test}">{test}</a>'
+        rows.append(f'<tr{cls}><td class="step">{flag} {anchor}</td>{"".join(cells)}</tr>')
+    rows.append("</tbody></table>")
+    return "".join(rows)
+
+
+def _detail_page(per_os, active, test, size, all_steps):
+    """One printed page per test: larger side-by-side columns + a verdict banner."""
+    differs, present = _diverges(per_os, active, test)
+    if present == 0:
+        banner = '<span class="badge warn">no OS copied anything</span>'
+    elif differs:
+        banner = '<span class="badge warn">⚠ diverges across OSes</span>'
+    else:
+        banner = '<span class="badge ok">✓ identical across OSes</span>'
+    cols = []
+    for o in active:
+        inner, _ = _figures(per_os[o].get(test, []), size, all_steps)
+        cols.append(f'<div class="col"><div class="os">{o}</div>{inner}</div>')
+    return (f'<section class="page" id="{test}">'
+            f'<h2>{test} {banner}</h2>'
+            f'<div class="cols">{"".join(cols)}</div></section>')
 
 
 def _build_html(per_os, dirs, size, all_steps):
     active = [o for o in _OS_ORDER if o in dirs]
     tests = sorted({t for o in active for t in per_os[o]})
 
-    rows = ['<table><thead><tr><th>test</th>'
-            + "".join(f"<th>{o}</th>" for o in active) + "</tr></thead><tbody>"]
-    for test in tests:
-        cells, final_hashes = [], set()
-        for o in active:
-            entries = per_os[o].get(test, [])
-            html, hashes = _render_cell(entries, size, all_steps)
-            cells.append(html)
-            # divergence check uses the final image per OS (last entry)
-            if entries:
-                fb, fh, _ = _thumb(entries[-1][1], size)
-                final_hashes.add(fh)
-        present = sum(1 for o in active if per_os[o].get(test))
-        differs = len(final_hashes) > 1 or present < len(active)
-        cls = ' class="diff"' if differs else ""
-        flag = " ⚠" if differs else " ✓"
-        rows.append(f'<tr{cls}><td class="step">{test}{flag}</td>{"".join(cells)}</tr>')
-    rows.append("</tbody></table>")
-    body = "".join(rows) if tests else \
-        '<p class="empty">No clipboard PNGs found in the given directories.</p>'
-
     srcs = "".join(f"<li><b>{o}</b>: <code>{dirs[o]}</code> "
                    f"({len(per_os[o])} test(s) with a copied image)</li>"
                    for o in active)
     mode = "every copied step" if all_steps else "final copied image per test"
 
+    if not tests:
+        pages = '<p class="empty">No clipboard PNGs found in the given directories.</p>'
+    else:
+        pages = (f'<section class="page">'
+                 f'<h1>Cross-OS clipboard compare</h1>'
+                 f'<p>The {mode}, side by side. The 6-char tag is the PNG content '
+                 f'hash: matching tags = byte-identical across OSes. A ⚠ marks a '
+                 f'test where an OS diverged or copied nothing. Each test also has '
+                 f'its own page below (click a name to jump). Click any image for '
+                 f'full size. Informational only — does not gate CI.</p>'
+                 f'<ul>{srcs}</ul>'
+                 f'{_overview_table(per_os, active, tests, all_steps)}'
+                 f'</section>')
+        pages += "".join(_detail_page(per_os, active, t, size, all_steps)
+                         for t in tests)
+
     return f"""<!doctype html><meta charset="utf-8">
 <title>Cross-OS clipboard compare</title>
 <style>
- body{{font-family:system-ui,sans-serif;margin:24px;background:#fafafa;color:#222}}
- h1{{margin:0 0 4px}}
- table{{border-collapse:collapse;margin:16px 0}}
+ body{{font-family:system-ui,sans-serif;margin:0;background:#eceef1;color:#222}}
+ h1{{margin:0 0 4px}} h2{{margin:0 0 14px;font-size:18px}}
+ .page{{background:#fff;max-width:1000px;margin:20px auto;padding:24px 28px;
+        border:1px solid #dcdfe3;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
+ table{{border-collapse:collapse;margin:16px 0;width:100%}}
  th,td{{border:1px solid #ccc;padding:8px;text-align:center;vertical-align:top}}
- thead th{{background:#eef;position:sticky;top:0}}
+ thead th{{background:#eef}}
  td.step{{font-family:monospace;font-size:13px;text-align:left;white-space:nowrap}}
- td.missing{{color:#c00;background:#fdf0f0}}
+ td.missing,.missing{{color:#c00;background:#fdf0f0}}
  tr.diff td.step{{background:#fff6e0}}
- figure{{margin:0 0 10px}}
- figure:last-child{{margin-bottom:0}}
+ .cols{{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}}
+ .col{{flex:1;min-width:200px;text-align:center}}
+ .os{{font-weight:600;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #eef}}
+ figure{{margin:0 0 12px}} figure:last-child{{margin-bottom:0}}
  img{{display:block;margin:auto;max-width:{size}px;border:1px solid #ddd;background:#f0f0f0}}
  figcaption{{font:11px monospace;color:#666;margin-top:3px}}
  code{{background:#eee;padding:1px 4px;border-radius:3px}}
- .empty{{color:#888}}
+ a{{color:#245}} .empty{{color:#888;padding:24px}}
+ .badge{{font:600 12px system-ui;padding:2px 8px;border-radius:10px;vertical-align:middle}}
+ .badge.ok{{background:#e6f6e6;color:#1a7f1a}} .badge.warn{{background:#fdeccf;color:#8a5a00}}
+ @page{{margin:14mm}}
+ @media print{{
+   body{{background:#fff}}
+   .page{{break-after:page;box-shadow:none;border:none;margin:0;max-width:none}}
+   .page:last-child{{break-after:auto}}
+   thead th{{background:#eef !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+ }}
 </style>
-<h1>Cross-OS clipboard compare</h1>
-<p>The {mode}, side by side. The 6-char tag is the PNG content hash: matching
-tags = byte-identical across OSes. A ⚠ row means an OS diverged or copied
-nothing. Click any image for full size. Informational only — does not gate CI.</p>
-<ul>{srcs}</ul>
-{body}
+{pages}
 """
 
 
