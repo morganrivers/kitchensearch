@@ -31,6 +31,7 @@ tests/baseline/
 tests/test_run/
 tests/_test_config/
 tests/semantic_tests/results/
+tests/os_compare_report/
 
 # build artifacts and downloaded packages
 *.exe

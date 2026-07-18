@@ -139,6 +139,8 @@ def main():
         if result["expected"] and not result["passed"]:
             failed = True
 
+    from run_common import write_status
+    write_status(out_dir, failed, stderr)
     sys.exit(1 if failed else 0)
 
 

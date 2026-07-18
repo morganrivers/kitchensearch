@@ -125,6 +125,45 @@ micromamba run -n py311 python tests/run_tests.py --update-baseline --test test_
 
 ---
 
+## Cross-platform CI (mac / Windows / Linux)
+
+Three GitHub workflows (`.github/workflows/{linux,mac,windows}-smoke.yml`) install
+the app on each OS, drive the same tests through the platform harness, and upload
+each test's folder (GIF, screenshots, copied clipboard image) as an artifact.
+
+**Pass condition is baseline-free.** The old gate compared the copied clipboard
+image against a stored hash and failed on every harmless re-encoding, forcing
+constant re-baselining across OSes. The gate now (`tests/health_check.py`) fails
+only when an OS is genuinely broken:
+
+- the driver recorded a crash (`status.json` `failed`),
+- a screenshot rendered blank / solid,
+- a copied clipboard image is blank / black / transparent,
+- the whole run copied nothing at all (`copied-images.log` empty on every test).
+
+Cosmetic per-OS pixel differences pass. Run it locally against a downloaded run:
+
+```bash
+micromamba run -n py311 python tests/health_check.py --all \
+  --skip test_16_story --run-dir tests/test_run
+```
+
+### Eyeball what each OS copied (one command)
+
+`tests/os_compare.py` downloads the newest Linux/macOS/Windows artifacts with `gh`
+and builds one self-contained HTML page showing the final copied image per test,
+one column per OS. Informational only — it never gates CI.
+
+```bash
+micromamba run -n py311 python tests/os_compare.py --open
+```
+
+Needs the GitHub CLI authenticated for this repo. Pin specific runs instead of the
+newest with `--linux/--mac/--windows <run_id>`. The 6-char tag under each thumbnail
+is the image content hash: identical tag = byte-identical across OSes.
+
+---
+
 ## File layout
 
 ```

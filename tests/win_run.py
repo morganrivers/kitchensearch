@@ -83,6 +83,8 @@ def main():
     if stderr:
         print(f"  STDERR:\n{stderr}")
 
+    from run_common import write_status
+    write_status(out_dir, failed, stderr)
     sys.exit(1 if failed else 0)
 
 
