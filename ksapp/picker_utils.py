@@ -696,6 +696,7 @@ def _spawn_daemon():
     else:
         kwargs["start_new_session"] = True
     proc = subprocess.Popen(cmd, **kwargs)
+    log.close()
     if IS_NAMED_PIPE:
         # Windows uses the daemon's named mutex instead of a pid file.
         # Wait briefly for the daemon to acquire it so subsequent

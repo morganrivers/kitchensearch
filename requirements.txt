@@ -8,6 +8,7 @@ onnxruntime
 tokenizers
 screeninfo
 certifi
+cryptography
 python-xlib; sys_platform == "linux"
 rumps; sys_platform == "darwin"
 

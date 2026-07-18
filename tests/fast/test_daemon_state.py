@@ -402,14 +402,21 @@ class SpawnDaemonHygieneTest(_DaemonStateBase):
     def test_spawn_clears_stale_loading_status(self):
         self._status_path.write_text(
             json.dumps({"step": "Ready", "pct": 100.0}), encoding="utf-8")
-        live = self._spawn_dummy()  # a real, live pid for _write_pid_record
-        fake = mock.Mock()
-        fake.pid = live.pid
-        with mock.patch.object(picker_utils.subprocess, "Popen", return_value=fake) as popen:
-            picker_utils._spawn_daemon()
-        # Popen is mocked, so the real process never inherits the daemon log fd;
-        # close it here so it doesn't leak as a ResourceWarning.
-        popen.call_args.kwargs["stdout"].close()
+
+        script = self._log_path.parent / "dummy_daemon.py"
+        script.write_text(
+            "import signal, sys, time\n"
+            "signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))\n"
+            "time.sleep(60)\n",
+            encoding="utf-8")
+        missing_bin = self._log_path.parent / "no-such-daemon-bin"
+
+        with mock.patch.object(picker_utils, "DAEMON_BIN", missing_bin), \
+             mock.patch.object(picker_utils, "DAEMON_PY", script), \
+             mock.patch.object(picker_utils, "_PYTHON", sys.executable):
+            proc = picker_utils._spawn_daemon()
+        self._children.append(proc)
+
         self.assertFalse(
             self._status_path.exists(),
             "stale loading status must be cleared so the UI shows the new "
