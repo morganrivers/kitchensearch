@@ -13,11 +13,27 @@ Single source of truth for two things every OS needs to agree on:
 """
 import json
 import math
+import sys
 from pathlib import Path
 
 from PIL import Image
 
 STATUS_FILE = "status.json"
+
+
+def force_utf8_stdio() -> None:
+    """Make stdout/stderr encode UTF-8 regardless of the console code page.
+
+    The drivers print non-ASCII (e.g. the ``→`` in progress lines). On a
+    Windows CI console (cp1252) an un-reconfigured stream raises
+    UnicodeEncodeError mid-run, which the driver then mis-reports as a generic
+    test failure. Every entry point that prints should call this first.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass
 
 # Luminance standard deviation below which an image is treated as uniform (a
 # solid fill: black screen, white screen, blank). Real content sits at ~40-50;

@@ -51,11 +51,26 @@ kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
 ULONG_PTR = ctypes.c_size_t
 
+INPUT_MOUSE           = 0
 INPUT_KEYBOARD        = 1
 KEYEVENTF_EXTENDEDKEY = 0x0001
 KEYEVENTF_KEYUP       = 0x0002
 KEYEVENTF_UNICODE     = 0x0004
 SW_RESTORE            = 9
+
+MOUSEEVENTF_LEFTDOWN   = 0x0002
+MOUSEEVENTF_LEFTUP     = 0x0004
+MOUSEEVENTF_RIGHTDOWN  = 0x0008
+MOUSEEVENTF_RIGHTUP    = 0x0010
+MOUSEEVENTF_MIDDLEDOWN = 0x0020
+MOUSEEVENTF_MIDDLEUP   = 0x0040
+
+# Recorded scripts use X11 button numbers: 1=left, 2=middle, 3=right.
+_MOUSE_BUTTONS = {
+    1: (MOUSEEVENTF_LEFTDOWN,   MOUSEEVENTF_LEFTUP),
+    2: (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP),
+    3: (MOUSEEVENTF_RIGHTDOWN,  MOUSEEVENTF_RIGHTUP),
+}
 
 
 class _KEYBDINPUT(ctypes.Structure):
@@ -107,6 +122,10 @@ user32.SetForegroundWindow.argtypes      = [wintypes.HWND]
 user32.SetForegroundWindow.restype       = wintypes.BOOL
 user32.SendInput.argtypes                = [wintypes.UINT, ctypes.POINTER(_INPUT), ctypes.c_int]
 user32.SendInput.restype                 = wintypes.UINT
+user32.SetCursorPos.argtypes             = [ctypes.c_int, ctypes.c_int]
+user32.SetCursorPos.restype              = wintypes.BOOL
+user32.ClientToScreen.argtypes           = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+user32.ClientToScreen.restype            = wintypes.BOOL
 kernel32.GetCurrentThreadId.argtypes     = []
 kernel32.GetCurrentThreadId.restype      = wintypes.DWORD
 
@@ -127,6 +146,7 @@ _KEY_CODES = {
     "End":       (0x23, True),
     "Page_Up":   (0x21, True),
     "Page_Down": (0x22, True),
+    **{f"F{n}": (0x70 + n - 1, False) for n in range(1, 13)},  # F1..F12
 }
 
 _MOD_VK = {
@@ -142,6 +162,12 @@ def _send_vk(vk: int, up: bool = False, extended: bool = False):
         flags |= KEYEVENTF_EXTENDEDKEY
     inp = _INPUT(type=INPUT_KEYBOARD)
     inp.ki = _KEYBDINPUT(wVk=vk, wScan=0, dwFlags=flags, time=0, dwExtraInfo=0)
+    user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(_INPUT))
+
+
+def _send_mouse(flags: int):
+    inp = _INPUT(type=INPUT_MOUSE)
+    inp.mi = _MOUSEINPUT(dx=0, dy=0, mouseData=0, dwFlags=flags, time=0, dwExtraInfo=0)
     user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(_INPUT))
 
 
@@ -468,14 +494,37 @@ class WinTestHarness:
     def focus(self):
         self._activate()
 
-    def click(self, *_a, **_kw):
-        raise NotImplementedError("click() is not implemented in the Windows harness")
+    def _move_to(self, x: int, y: int):
+        """Move the cursor to window-relative (x, y), mirroring the X11 harness
+        whose coordinates are relative to the window's client top-left."""
+        hwnd = self._find_window() or self._hwnd
+        pt = wintypes.POINT(int(x), int(y))
+        if hwnd:
+            user32.ClientToScreen(hwnd, ctypes.byref(pt))
+        assert user32.SetCursorPos(pt.x, pt.y), "SetCursorPos failed"
+        time.sleep(0.05)
 
-    def mousedown(self, *_a, **_kw):
-        raise NotImplementedError("mousedown() is not implemented in the Windows harness")
+    def click(self, x: int, y: int, button: int = 1):
+        """Click at pixel (x, y) relative to the window's top-left corner."""
+        down, up = _MOUSE_BUTTONS[button]
+        self._activate()
+        self._move_to(x, y)
+        _send_mouse(down)
+        _send_mouse(up)
 
-    def mouseup(self, *_a, **_kw):
-        raise NotImplementedError("mouseup() is not implemented in the Windows harness")
+    def mousedown(self, x: int, y: int, button: int = 1):
+        """Press (but do not release) a button — used before a screenshot to capture menus."""
+        down, _ = _MOUSE_BUTTONS[button]
+        self._activate()
+        self._move_to(x, y)
+        _send_mouse(down)
+        if button == 3:
+            time.sleep(0.35)   # let Tk's event loop post the popup, as on X11
+
+    def mouseup(self, x: int, y: int, button: int = 1):
+        """Release a previously pressed mouse button."""
+        _, up = _MOUSE_BUTTONS[button]
+        _send_mouse(up)
 
     # ── GIF export (duplicated from harness.py on purpose) ───────────────────
 

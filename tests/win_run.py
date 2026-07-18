@@ -24,6 +24,7 @@ from pathlib import Path
 _TESTS_DIR = Path(__file__).parent
 sys.path.insert(0, str(_TESTS_DIR))
 
+from run_common import force_utf8_stdio, write_status
 from win_harness import WinTestHarness, dump_clipboard
 
 _SCRIPTS_DIR = _TESTS_DIR / "scripts"
@@ -38,6 +39,7 @@ def _load_script(path: Path):
 
 
 def main():
+    force_utf8_stdio()
     p = argparse.ArgumentParser()
     p.add_argument("test_name", help="e.g. test_01_main_menu")
     p.add_argument("--output-dir", default=str(_DEFAULT_OUT),
@@ -61,6 +63,7 @@ def main():
 
     print(f"\n  Running {args.test_name} on Windows …")
     failed = False
+    driver_errors: list[str] = []
     try:
         with harness as h:
             mod.run(h)
@@ -68,7 +71,9 @@ def main():
             h.make_gif(gif)
             print(f"  GIF → {gif}")
     except Exception as exc:
-        print(f"  ERROR: {exc}", file=sys.stderr)
+        msg = f"{type(exc).__name__}: {exc}"
+        print(f"  ERROR: {msg}", file=sys.stderr)
+        driver_errors.append(msg)
         failed = True
 
     clip = dump_clipboard(out_dir)
@@ -77,14 +82,18 @@ def main():
     else:
         print("  Clipboard was empty")
         if args.require_clipboard:
+            driver_errors.append("clipboard required but empty after test")
             failed = True
 
-    stderr = harness.meaningful_stderr
-    if stderr:
-        print(f"  STDERR:\n{stderr}")
+    app_stderr = harness.meaningful_stderr
+    if app_stderr:
+        print(f"  STDERR:\n{app_stderr}")
 
-    from run_common import write_status
-    write_status(out_dir, failed, stderr)
+    # Record the driver-level error (the raised exception / missing clipboard)
+    # alongside the app's own stderr so the render-health gate reports the real
+    # cause instead of "no stderr captured".
+    status_detail = "\n".join(driver_errors + ([app_stderr] if app_stderr else []))
+    write_status(out_dir, failed, status_detail)
     sys.exit(1 if failed else 0)
 
 

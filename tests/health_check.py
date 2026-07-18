@@ -29,7 +29,7 @@ from pathlib import Path
 _TESTS_DIR = Path(__file__).parent
 sys.path.insert(0, str(_TESTS_DIR))
 
-from run_common import image_health, read_status  # noqa: E402
+from run_common import force_utf8_stdio, image_health, read_status  # noqa: E402
 
 _DEFAULT_RUN = _TESTS_DIR / "test_run"
 
@@ -96,10 +96,7 @@ def _collect_tests(run_dir: Path, explicit, skip):
 
 
 def main():
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
+    force_utf8_stdio()
 
     p = argparse.ArgumentParser()
     p.add_argument("test_name", nargs="?", help="e.g. test_02_keyword_search")
