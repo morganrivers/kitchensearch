@@ -99,11 +99,26 @@ _GRACE_SECONDS   = 90 * 86400
 _HTTP_TIMEOUT = 10
 
 
+_DEVICE_LABEL_FILE = CONFIG_DIR / "device_label"
+
+
 def _machine_label():
     try:
-        return socket.gethostname() or "kitchensearch"
+        cached = _DEVICE_LABEL_FILE.read_text(encoding="utf-8").strip()
+        if cached:
+            return cached
     except Exception:
-        return "kitchensearch"
+        pass
+    label = uuid.uuid4().hex
+    assert label
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = _DEVICE_LABEL_FILE.with_suffix(".tmp")
+        tmp.write_text(label, encoding="utf-8")
+        tmp.replace(_DEVICE_LABEL_FILE)
+    except Exception:
+        pass
+    return label
 
 
 class LicenseManager:
